@@ -98,7 +98,7 @@ Olulised valikud **Settings** saki all:
 
 Et vältida turvahoiatusi (Windows Security Warning) failide avamisel serverist, lisa failiserver GPO abil **Local Intranet** tsooni:
 
-* *Computer Configuration -> Administrative Templates -> Windows Components -> Internet Explorer -> Internet Control Panel -> Security Page -> Site to Zone Assignment List*.
+* ***Computer Configuration -> Administrative Templates -> Windows Components -> Internet Explorer -> Internet Control Panel -> Security Page -> Site to Zone Assignment List***.
 * Väärtus: `\\serveri-nimi` ja Zone: `1`.
 
 ---
