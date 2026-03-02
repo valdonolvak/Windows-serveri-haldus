@@ -88,7 +88,7 @@ Olulised valikud **Settings** saki all:
 
 1. Logi kasutaja arvutisse sisse.
 2. Tee Documents kaustal paremklõps -> **Properties** -> **Location**.
-3. Seal peaks olema kirjas serveri võrgutee (nt `\\AD1\RedirFoler\username\Documents`).
+3. Seal peaks olema kirjas serveri võrgutee (nt `\\AD1\RedirFoler\kasutajanimi\Documents`).
 
 > **Ekraanitõmmis viide:** Vaata artikli lõpus olevat pilti *"Deploy Folder Redirection in Windows 11"*, mis kinnitab, et asukoht on muutunud võrguteeks.
 
