@@ -24,7 +24,7 @@ Enne poliitika loomist peab serveris olema koht, kuhu andmed salvestatakse.
 
 ### 2.1. Loo turvagrupp
 
-Loo Active Directorys grupp (nt `munFolderRedirection`), kuhu kuuluvad kasutajad, kellele ümbersuunamist rakendatakse.
+Loo Active Directorys grupp (nt `RedirectFolders`), kuhu kuuluvad kasutajad, kellele ümbersuunamist rakendatakse.
 
 ### 2.2. Loo jagatud kaust (Shared Folder)
 
@@ -44,11 +44,13 @@ See tagab, et kasutajad pääsevad ligi ainult enda failidele.
 <img width="370" height="382" alt="image" src="https://github.com/user-attachments/assets/4b257c24-19b7-4301-ae0d-ac3b6650e51e" />
 
 
-4. Lisa oma loodud grupp (`munFolderRedirection`) ja anna neile õigus **"This folder only"**: *List folder, Read attributes, Create folders*.
+4. Lisa oma loodud grupp (`RedirectFolders`) ja anna neile õigus **"This folder only"**: *List folder, Read attributes, Create folders*.
 
 > **Ekraanitõmmis viide:** Vaata artiklist jaotist *"create shared folder for redirected user's profiles"*, kus on näha täpsed linnukesed NTFS õiguste tabelis.
 <img width="500" height="303" alt="image" src="https://github.com/user-attachments/assets/b365e75c-6b2a-4858-acac-ee2dc3d9bd3e" />
 
+---
+Määra **Full Control** õigused grupile **Authenticated Users** võrgujagamise seadetes (**Sharing** –> **Advanced Sharing** -> **Permissions**).
 
 <img width="250" height="250" alt="image" src="https://github.com/user-attachments/assets/fb9f7872-b435-4dd4-ae56-275a44e9180e" />
 
@@ -57,8 +59,8 @@ See tagab, et kasutajad pääsevad ligi ainult enda failidele.
 ## 3. Etapp: Group Policy seadistamine
 
 1. Ava **Group Policy Management** (`gpmc.msc`).
-2. Loo uus GPO (nt `UserFolderRedirection`) ja lingi see vastava OU-ga.
-3. **Security Filtering:** Eemalda *Authenticated Users* ja lisa oma grupp `munFolderRedirection`.
+2. Loo uus GPO (nt `KaustadeYmbersuunamine`) ja lingi see vastava OU-ga.
+3. **Security Filtering:** Eemalda *Authenticated Users* ja lisa oma grupp `RedirectFolders`.
 
 ### 3.1. Poliitika muutmine (Edit GPO)
 
@@ -69,7 +71,7 @@ Liigu: **User Configuration** -> **Policies** -> **Windows Settings** -> **Folde
 1. Paremklõps **Documents** -> **Properties**.
 2. **Setting:** Vali *Basic – Redirect everyone’s folder to the same location*.
 3. **Target folder location:** *Create a folder for each user under the root path*.
-4. **Root Path:** Sisesta serveri tee, nt `\\mun-fs1\RedirFolder`.
+4. **Root Path:** Sisesta serveri tee, nt `\ \AD1\RedirFoler`.
 
 > **Ekraanitõmmis viide:** Otsi artiklist pilti *"Enable user Folder Redirection in Windows via GPO"*. See näitab, kuidas Root Path peab välja nägema.
 
@@ -88,7 +90,7 @@ Olulised valikud **Settings** saki all:
 
 1. Logi kasutaja arvutisse sisse.
 2. Tee Documents kaustal paremklõps -> **Properties** -> **Location**.
-3. Seal peaks olema kirjas serveri võrgutee (nt `\\mun-fs1\RedirFolder\username\Documents`).
+3. Seal peaks olema kirjas serveri võrgutee (nt `\ \AD1\RedirFoler\username\Documents`).
 
 > **Ekraanitõmmis viide:** Vaata artikli lõpus olevat pilti *"Deploy Folder Redirection in Windows 11"*, mis kinnitab, et asukoht on muutunud võrguteeks.
 
