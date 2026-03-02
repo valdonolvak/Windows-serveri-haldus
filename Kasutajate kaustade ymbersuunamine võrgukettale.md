@@ -108,12 +108,7 @@ Olulised valikud **Settings** saki all:
 
 ---
 
-### Oluline nõuanne: "Trusted Sites"
-
-Et vältida turvahoiatusi (Windows Security Warning) failide avamisel serverist, lisa failiserver GPO abil **Local Intranet** tsooni:
-
-* ***Computer Configuration -> Administrative Templates -> Windows Components -> Internet Explorer -> Internet Control Panel -> Security Page -> Site to Zone Assignment List***.
-* Väärtus: `\\serveri-nimi` ja Zone: `1`.
+### Oluline nõuanne: Selleks, et see poliitika hakkaks ka toimima tuleb kasutajad lisada sellesse AD gruppi või siis terved grupid lisada sinna gruppi, kelle puhul soovid, et kaustas asuksid võrgukettal
 
 ---
 
