@@ -22,7 +22,7 @@ Enne poliitika loomist peab serveris olema koht, kuhu andmed salvestatakse.
 
 ### 2.1. Loo turvagrupp
 
-Loo Active Directorys grupp OU KASUTAJAD all (nt `RedirectFolders`), kuhu kuuluvad kasutajad, kellele ümbersuunamist rakendatakse.
+Loo Active Directorys grupp OU KASUTAJAD alla (nt `RedirectFolders`), kuhu kuuluvad kasutajad, kellele ümbersuunamist rakendatakse.
 
 ### 2.2. Loo jagatud kaust (Shared Folder)
 
