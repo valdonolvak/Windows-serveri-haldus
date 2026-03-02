@@ -44,9 +44,9 @@ See tagab, et kasutajad pääsevad ligi ainult enda failidele.
 
 4. Lisa oma loodud grupp (`RedirectFolders`) ja anna neile õigus **"This folder only"**: *List folder, Read attributes, Create folders*.
 
-> **Ekraanitõmmis viide:** Vaata artiklist jaotist *"create shared folder for redirected user's profiles"*, kus on näha täpsed linnukesed NTFS õiguste tabelis.
 <img width="500" height="303" alt="image" src="https://github.com/user-attachments/assets/b365e75c-6b2a-4858-acac-ee2dc3d9bd3e" />
 
+> **Ekraanitõmmis:** Ekraanitõmmisel näha, kus on  täpsed linnukesed NTFS õiguste tabelis.
 ---
 Määra **Full Control** õigused grupile **Authenticated Users** võrgujagamise seadetes (**Sharing** –> **Advanced Sharing** -> **Permissions**).
 
