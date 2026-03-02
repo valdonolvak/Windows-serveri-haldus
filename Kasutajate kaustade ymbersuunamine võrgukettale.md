@@ -72,6 +72,7 @@ Liigu: **User Configuration** -> **Policies** -> **Windows Settings** -> **Folde
 4. **Root Path:** Sisesta serveri tee, nt `\\AD1\RedirFoler`.
 
 > **Ekraanitõmmis viide:** Otsi artiklist pilti *"Enable user Folder Redirection in Windows via GPO"*. See näitab, kuidas Root Path peab välja nägema.
+<img width="450" height="344" alt="image" src="https://github.com/user-attachments/assets/8e812b3c-8f57-4a9f-adba-2b458555d333" />
 
 ---
 
