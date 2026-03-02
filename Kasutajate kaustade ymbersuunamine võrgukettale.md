@@ -58,7 +58,7 @@ Määra **Full Control** õigused grupile **Authenticated Users** võrgujagamise
 
 1. Ava **Group Policy Management** (`gpmc.msc`).
 2. Loo uus GPO (nt `KaustadeYmbersuunamine`) ja lingi see vastava OU-ga.
-3. **Security Filtering:** Eemalda *Authenticated Users* ja lisa oma grupp `RedirectFolders`.
+3. **Security Filtering:** Eemalda ***Authenticated Users*** ja lisa selle asemel oma grupp **`RedirectFolders`** ja **Domain Computers** .
 <img width="320" height="307" alt="image" src="https://github.com/user-attachments/assets/3051080d-163b-4e52-aa6d-76d4b2b38f31" />
 
 
