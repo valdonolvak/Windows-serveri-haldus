@@ -1,6 +1,4 @@
-Muidugi! Siin on põhjalik ja struktureeritud õppematerjal kausta ümbersuunamise (Folder Redirection) seadistamiseks Windowsi domeenis, tuginedes Woshub-i juhendile.
-
-Olen lisanud viited ekraanitõmmistele (mille leiad algsest artiklist), et sul oleks visuaalne pidepunkt.
+Õppematerjal kausta ümbersuunamise (Folder Redirection) seadistamiseks Windowsi domeenis, tuginedes Woshub-i juhendile https://woshub.com/enable-folder-redirection-with-gpo/.
 
 ---
 
