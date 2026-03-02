@@ -52,13 +52,6 @@ Määra **Full Control** õigused grupile **Authenticated Users** võrgujagamise
 
 <img width="250" height="250" alt="image" src="https://github.com/user-attachments/assets/fb9f7872-b435-4dd4-ae56-275a44e9180e" />
 
-### Oluline nõuanne: "Trusted Sites"
-
-Et vältida turvahoiatusi (Windows Security Warning) failide avamisel serverist, lisa failiserver GPO abil **Local Intranet** tsooni:
-
-* ***Computer Configuration -> Administrative Templates -> Windows Components -> Internet Explorer -> Internet Control Panel -> Security Page -> Site to Zone Assignment List***.
-* Väärtus: `\\serveri-nimi` ja Zone: `1`.
-
 ---
 
 ## 3. Etapp: Group Policy seadistamine
@@ -82,6 +75,13 @@ Liigu: **User Configuration** -> **Policies** -> **Windows Settings** -> **Folde
 
 > **Ekraanitõmmis viide:** Otsi artiklist pilti *"Enable user Folder Redirection in Windows via GPO"*. See näitab, kuidas Root Path peab välja nägema.
 <img width="450" height="344" alt="image" src="https://github.com/user-attachments/assets/8e812b3c-8f57-4a9f-adba-2b458555d333" />
+
+### Oluline nõuanne: "Trusted Sites"
+
+Et vältida turvahoiatusi (Windows Security Warning) failide avamisel serverist, lisa failiserver GPO abil **Local Intranet** tsooni:
+
+* ***Computer Configuration -> Administrative Templates -> Windows Components -> Internet Explorer -> Internet Control Panel -> Security Page -> Site to Zone Assignment List***.
+* Väärtus: `\\serveri-nimi` ja Zone: `1`.
 
 ---
 
