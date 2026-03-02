@@ -71,7 +71,7 @@ Liigu: **User Configuration** -> **Policies** -> **Windows Settings** -> **Folde
 1. Paremklõps **Documents** -> **Properties**.
 2. **Setting:** Vali *Basic – Redirect everyone’s folder to the same location*.
 3. **Target folder location:** *Create a folder for each user under the root path*.
-4. **Root Path:** Sisesta serveri tee, nt `\ \AD1\RedirFoler`.
+4. **Root Path:** Sisesta serveri tee, nt `\\AD1\RedirFoler`.
 
 > **Ekraanitõmmis viide:** Otsi artiklist pilti *"Enable user Folder Redirection in Windows via GPO"*. See näitab, kuidas Root Path peab välja nägema.
 
