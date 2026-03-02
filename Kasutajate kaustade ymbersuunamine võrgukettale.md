@@ -26,7 +26,7 @@ Loo Active Directorys grupp OU KASUTAJAD alla (nt `RedirectFolders`), kuhu kuulu
 
 ### 2.2. Loo jagatud kaust (Shared Folder)
 
-1. Loo serveris kaust (nt `D:\RedirFolder`).
+1. Loo serveris kaust (nt `F:\RedirFolder`).
 2. Jaga see võrgus: **Advanced Sharing** -> **Permissions** -> Anna *Authenticated Users* grupile **Full Control**.
 
 ### 2.3. Seadista NTFS õigused (Kriitiline samm!)
