@@ -52,6 +52,13 @@ Määra **Full Control** õigused grupile **Authenticated Users** võrgujagamise
 
 <img width="250" height="250" alt="image" src="https://github.com/user-attachments/assets/fb9f7872-b435-4dd4-ae56-275a44e9180e" />
 
+### Oluline nõuanne: "Trusted Sites"
+
+Et vältida turvahoiatusi (Windows Security Warning) failide avamisel serverist, lisa failiserver GPO abil **Local Intranet** tsooni:
+
+* ***Computer Configuration -> Administrative Templates -> Windows Components -> Internet Explorer -> Internet Control Panel -> Security Page -> Site to Zone Assignment List***.
+* Väärtus: `\\serveri-nimi` ja Zone: `1`.
+
 ---
 
 ## 3. Etapp: Group Policy seadistamine
