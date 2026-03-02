@@ -82,6 +82,7 @@ Olulised valikud **Settings** saki all:
 
 * **Grant the user exclusive rights:** Kui see on märgitud, on ainult kasutajal juurdepääs. Kui soovid, et administraatorid ka faile näeksid, võta linnuke ära (eeldusel, et seadistasid NTFS õigused 2. etapis õigesti).
 * **Move the contents of Documents to the new location:** Soovitatav sisse lülitada, et kasutaja praegused failid liiguksid automaatselt serverisse.
+<img width="350" height="312" alt="image" src="https://github.com/user-attachments/assets/8f4e1e33-7a35-4265-9597-e9d95ee77ce8" />
 
 ---
 
