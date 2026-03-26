@@ -1,0 +1,178 @@
+Jah — **sinu sise-domeeni `minuleht.perenimi.local` HTTPS-i jaoks ei ole CA Web Enrollment vajalik**. Microsofti järgi on CA Web Enrollment lihtsalt **brauseripõhine** sertifikaaditellimise viis; see sobib eriti siis, kui tahad teha käsitsi interaktiivseid taotlusi või töötada stand-alone CA-ga. Enterprise CA saab sertifikaaditaotlusi vastu võtta ka **Certificates MMC snap-in’i** või **PowerShelli `Get-Certificate` cmdleti** kaudu, seega võib Web Enrollmenti täiesti välja jätta. ([Microsoft Learn][1])
+
+Allpool ongi **ainult ilma Web Enrollmentita juhend**.
+
+---
+
+# 1) Paigalda AD CS ainult Certification Authority rolliga
+
+## PowerShell
+
+```powershell
+Install-WindowsFeature ADCS-Cert-Authority -IncludeManagementTools
+```
+
+## GUI
+
+Server Manager → Add Roles and Features → Active Directory Certificate Services → märgi ainult **Certification Authority**.
+
+**Miks see vajalik on:** Certification Authority on see teenus, mis **allkirjastab ja väljastab** sinu sisevõrgu sertifikaadid. Kui sinu eesmärk on lihtsalt oma domeeni saitidele usaldatud HTTPS, siis sellest rollist piisab. Web Enrollment lisab ainult veebipõhise taotluslehe, mitte sertifikaadi väljastamise põhifunktsiooni. ([Microsoft Learn][1])
+
+---
+
+# 2) Konfigureeri CA Enterprise Root CA-ks
+
+## PowerShell
+
+```powershell
+Install-AdcsCertificationAuthority `
+  -CAType EnterpriseRootCA `
+  -CryptoProviderName "RSA#Microsoft Software Key Storage Provider" `
+  -KeyLength 2048 `
+  -HashAlgorithmName SHA256 `
+  -ValidityPeriod Years `
+  -ValidityPeriodUnits 5
+```
+
+## GUI
+
+Configure AD CS wizard:
+
+* **Enterprise CA**
+* **Root CA**
+* **Create a new private key**
+* RSA **2048**
+* SHA256
+* kehtivus näiteks **5 aastat**
+
+**Miks see vajalik on:** Enterprise CA töötab Active Directoryga koos ja võimaldab sertifikaadimallide kasutamist ning nende levitamist kogu domeenis. Microsofti dokumentatsiooni järgi on sertifikaadimallid enterprise CA keskkonnas AD-s talletatud ning uued mallid replitseeruvad domeenikontrolleritesse. ([Microsoft Learn][2])
+
+---
+
+# 3) Veendu, et CA saab väljastada serverisertifikaate
+
+Kui kasutad vaikimalli, siis piisab tavaliselt **Web Server** või **SslWebServer** mallist. Kui vaja, loo sellest koopia ja kohanda.
+
+## GUI
+
+Certification Authority → **Certificate Templates** → **New** → **Certificate Template to Issue** → vali serveri mall.
+
+**Miks see vajalik on:** CA ei väljastada mingit sertifikaati juhuslikult, vaid ainult neid, mille mall on talle välja antud. Microsofti järgi tuleb CA-le template “issue’iks” lisada, et ta saaks selle alusel sertifikaate väljastada. ([Microsoft Learn][2])
+
+---
+
+# 4) Küsi IIS-i serverile veebisertifikaat
+
+## PowerShell
+
+```powershell
+Get-Certificate `
+  -Template "WebServer" `
+  -DnsName "minuleht.perenimi.local" `
+  -CertStoreLocation "cert:\LocalMachine\My"
+```
+
+## GUI
+
+`certlm.msc` → Personal → Certificates → **Request New Certificate** → vali **Web Server** → pane nimeks `minuleht.perenimi.local`.
+
+**Miks see vajalik on:** sertifikaat peab vastama sellele nimele, mida brauser kasutab. `Get-Certificate` suudab taotluse saata enrollment serverisse ning väljastatud sertifikaadi kohe masinapoodi paigaldada. ([Microsoft Learn][3])
+
+---
+
+# 5) Seo sertifikaat IIS saidiga HTTPS bindingus
+
+## GUI
+
+IIS Manager → sinu sait → **Bindings…** → Add:
+
+* Type: **https**
+* Port: **443**
+* Hostname: `minuleht.perenimi.local`
+* SSL certificate: vali just saadud sertifikaat
+
+## PowerShell
+
+```powershell
+Import-Module WebAdministration
+
+New-WebBinding -Name "minuleht" -Protocol https -Port 443 -HostHeader "minuleht.perenimi.local"
+```
+
+**Miks see vajalik on:** IIS valib sissetuleva päringu järgi õige saidi ja sertifikaadi hostinime ning pordi alusel. SNI lubab sama IP ja pordi peal mitut HTTPS saiti, kui neid vaja peaks olema. ([Microsoft Learn][4])
+
+---
+
+# 6) Ekspordi CA juursertifikaat
+
+## PowerShell
+
+```cmd
+certutil -ca.cert C:\temp\rootCA.cer
+```
+
+**Miks see vajalik on:** klient ei pea usaldama serverisertifikaati otse; ta peab usaldama CA-d, mis selle allkirjastas. Selleks on vaja CA juursertifikaat kliendile kätte toimetada. ([Microsoft Learn][5])
+
+---
+
+# 7) Jaga CA usaldus kliendimasinatele GPO kaudu
+
+## GUI
+
+Group Policy Management → uus GPO näiteks `Trust-Internal-CA` → Edit:
+
+`Computer Configuration → Policies → Windows Settings → Security Settings → Public Key Policies → Trusted Root Certification Authorities → Import`
+
+Impordi sinna `rootCA.cer`.
+
+**Miks see vajalik on:** Microsofti järgi saab Active Directory domeenis usaldatavaid root-sertifikaate Windowsi seadmetele jagada **Group Policy** kaudu. GPO tuleb siduda domeeni, saidi või OU-ga, kus vastavad arvutid asuvad. ([Microsoft Learn][5])
+
+---
+
+# 8) Seo GPO õigesse OU-sse või domeenile
+
+## GUI
+
+Group Policy Management → linki GPO domeenile või sellele OU-le, kus klientarvutid asuvad.
+
+**Miks see vajalik on:** GPO toimib ainult nendele objektidele, millega ta on seotud. Kui linki pole, ei jõua usaldusjuur klientideni. ([Microsoft Learn][5])
+
+---
+
+# 9) Rakenda poliitika kliendis
+
+## CMD
+
+```cmd
+gpupdate /force
+```
+
+## Kontroll
+
+`certlm.msc` → **Trusted Root Certification Authorities**
+
+**Miks see vajalik on:** pärast poliitika uuendamist peab CA juursertifikaat olema kliendi masinapoes, muidu brauser ei usalda HTTPS ühendust. ([Microsoft Learn][5])
+
+---
+
+# 10) Testi lehte
+
+Ava kliendis:
+
+```text
+https://minuleht.perenimi.local
+```
+
+**Miks see vajalik on:** kui DNS, sertifikaadi nimi, IIS binding ja GPO usaldus on õiged, avaneb sait ilma sertifikaadiveata. IIS kontrollib päringus hostinime ja kasutab sobivat sertifikaati; brauser kontrollib omakorda usaldusahelat. ([Microsoft Learn][4])
+
+---
+
+## Kokkuvõte
+
+**Web Enrollmenti võib julgelt välja jätta**, kui eesmärk on oma domeenis olevate saitide jaoks CA-st sertifikaate väljastada ja usaldus GPO kaudu klientidele levitada. See teeb lahenduse lihtsamaks: **CA + sertifikaadimall + GPO + IIS HTTPS binding** on kogu vajalik ahel. Web Enrollment on lisamugavus käsitsi brauseripõhiseks taotlemiseks, mitte nõue sisevõrgu HTTPS jaoks. ([Microsoft Learn][1])
+
+[1]: https://learn.microsoft.com/en-us/windows-server/identity/ad-cs/certificate-authority-web-enrollment "Certification Authority Web Enrollment | Microsoft Learn"
+[2]: https://learn.microsoft.com/en-us/windows-server/identity/ad-cs/manage-certificate-templates "Manage certificate templates in Windows Server | Microsoft Learn"
+[3]: https://learn.microsoft.com/en-us/powershell/module/pki/get-certificate?view=windowsserver2025-ps "Get-Certificate (pki) | Microsoft Learn"
+[4]: https://learn.microsoft.com/en-us/iis/configuration/system.applicationhost/sites/site/bindings/binding "Binding &lt;binding&gt; | Microsoft Learn"
+[5]: https://learn.microsoft.com/en-us/windows-server/identity/ad-cs/distribute-certificates-group-policy "Distribute certificates to Windows devices by using Group Policy | Microsoft Learn"
