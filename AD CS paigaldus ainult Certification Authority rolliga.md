@@ -20,6 +20,7 @@ Server Manager → Add Roles and Features → Active Directory Certificate Servi
 
 <img width="642" height="462" alt="image" src="https://github.com/user-attachments/assets/c769b6d9-a2a3-4307-be36-014b34a240df" />
 
+
 **Miks see vajalik on:** Certification Authority on see teenus, mis **allkirjastab ja väljastab** sinu sisevõrgu sertifikaadid. Kui sinu eesmärk on lihtsalt oma domeeni saitidele usaldatud HTTPS, siis sellest rollist piisab. Web Enrollment lisab ainult veebipõhise taotluslehe, mitte sertifikaadi väljastamise põhifunktsiooni. ([Microsoft Learn][1])
 
 ---
@@ -42,6 +43,18 @@ Install-AdcsCertificationAuthority `
 Peale CA paigaldust tuleb sul lõpetada selle seadistamine (vt. pilti allpool)
 <img width="202" height="97" alt="image" align="left" src="https://github.com/user-attachments/assets/8ac4cf68-bfa6-44c3-be10-c509760b014c" />
 
+<img width="625" height="463" alt="image" src="https://github.com/user-attachments/assets/6b96e115-74c9-49bc-b2cc-4e44adcdf0ff" />
+<img width="625" height="463" alt="image" src="https://github.com/user-attachments/assets/f331d1c3-3555-4931-beb1-542f7fc0cb74" />
+<img width="625" height="463" alt="image" src="https://github.com/user-attachments/assets/637c2d3e-f865-4297-81bd-2517a110c05d" />
+<img width="625" height="463" alt="image" src="https://github.com/user-attachments/assets/e16daa42-a78a-4b8c-9650-96b60c10debf" />
+<img width="625" height="463" alt="image" src="https://github.com/user-attachments/assets/e3ef7e40-0ccb-4f2b-8ff5-6cc27fa3bc08" />
+CA Name jätate nagu teil seal pakutakse (vt allpool)
+<img width="625" height="463" alt="image" src="https://github.com/user-attachments/assets/4425fa5d-71ee-4c8a-9c69-cda6d4d78445" />
+
+<img width="625" height="463" alt="image" src="https://github.com/user-attachments/assets/8f62cacd-23c2-4b66-84ae-6cfdb48a3302" />
+
+Confirmation aknas on näha siis vaikimisi väärtusi. Kui kõik sobib, siis vajutada **Configure**:
+<img width="625" height="463" alt="image" src="https://github.com/user-attachments/assets/49f86008-42b0-4020-8155-4b2a94f6c365" />
 
 Configure AD CS wizard:
 
