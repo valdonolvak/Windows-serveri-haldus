@@ -185,6 +185,7 @@ New-WebBinding -Name "minuleht" -Protocol https -Port 443 -HostHeader "minuleht.
 
 **Miks see vajalik on:** IIS valib sissetuleva päringu järgi õige saidi ja sertifikaadi hostinime ning pordi alusel. SNI lubab sama IP ja pordi peal mitut HTTPS saiti, kui neid vaja peaks olema. ([Microsoft Learn][4])
 
+NB! Järgnevaid samme ei ole vaja enam teha, kui sinu töökohaarvutid on lisatud samasse domeeni. 
 ---
 
 # 6) Ekspordi CA juursertifikaat
