@@ -40,7 +40,8 @@ Install-AdcsCertificationAuthority `
 
 ## GUI
 Peale CA paigaldust tuleb sul lõpetada selle seadistamine (vt. pilti allpool)
-<img width="202" height="97" alt="image" src="https://github.com/user-attachments/assets/8ac4cf68-bfa6-44c3-be10-c509760b014c" />
+<img width="202" height="97" alt="image" align="left" src="https://github.com/user-attachments/assets/8ac4cf68-bfa6-44c3-be10-c509760b014c" />
+
 
 Configure AD CS wizard:
 
