@@ -93,9 +93,14 @@ Selleks siis avanevas aknas, kui oled aktiivseks teinud kausta "Certificate Temp
 <img width="625" height="330" alt="image" src="https://github.com/user-attachments/assets/e5a13a53-b1c5-4393-b821-8f6af3d7ca92" />
 
 Seejärel avanevas aknas annad uuele mallile nime aknas **General** ning määrad ära ka selle kestvuse (Valid period)
-Meie näites anname nimeks Veebiserver-GPO ning kestvuseks 5 aastat ja 6 kuud (vt allpool olevat pilti)
-<img width="330" height="334" alt="image" src="https://github.com/user-attachments/assets/d3e30ffb-345f-404b-8969-cbef5004fce5" />
+Meie näites anname nimeks Veebiserver-GPO ning kestvuseks 5 aastat ja 6 kuud (vt allpool olevat pilti)</br>
 
+<img width="330" height="334" alt="image" src="https://github.com/user-attachments/assets/d3e30ffb-345f-404b-8969-cbef5004fce5" /></br>
+
+Vahelehel **Request Handling** paneme linnukese, et lubame vajadusel ka privaatvõtit eksportida (üldiselt ei ole see hea praktika, aga testimiskeskkonnas või sõltuvalt orgnisatsioonist, võib vahel see vajalik olla)</br>
+<img width="330" height="455" alt="image" src="https://github.com/user-attachments/assets/891e2ade-5668-4a5f-b955-7b8077929d37" />
+
+Seejärel vajutame **OK** nuple.
 
 Certification Authority → **Certificate Templates** → **New** → **Certificate Template to Issue** → vali serveri mall.
 
