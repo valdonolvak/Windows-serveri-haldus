@@ -101,7 +101,7 @@ Vahelehel **Request Handling** paneme linnukese, et lubame vajadusel ka privaatv
 <img width="330" height="455" alt="image" src="https://github.com/user-attachments/assets/891e2ade-5668-4a5f-b955-7b8077929d37" />
 
 Samuti on vaja lisada vahekaardil **Security** kasutajagrupile **Authenticated Users** **Enroll** õigus (vt allpool olevalt pildilt)</br>
-<img width="435" height="608" alt="image" src="https://github.com/user-attachments/assets/e3cacdb7-26c9-4183-9c40-a51f2556e159" />
+<img width="330" height="608" alt="image" src="https://github.com/user-attachments/assets/e3cacdb7-26c9-4183-9c40-a51f2556e159" />
 
 Seejärel vajutame **OK** nuple.
 
