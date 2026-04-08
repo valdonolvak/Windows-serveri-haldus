@@ -155,7 +155,7 @@ Ning seejärel vajuta nupule **Enroll** </br>
 Ja siis nupule **Finish**
 
 Siis ilmub sertifikaadi hoidlasse Personal->Certificates alla sinu veebilehe URL'i nimega sertifikaat.</br>
-<img width="1129" height="276" alt="image" src="https://github.com/user-attachments/assets/bd2a7bb5-bf0b-4437-938b-fcbb72471ce9" />
+<img width="850" height="175" alt="image" src="https://github.com/user-attachments/assets/bd2a7bb5-bf0b-4437-938b-fcbb72471ce9" />
 
 
 **Miks see vajalik on:** sertifikaat peab vastama sellele nimele, mida brauser kasutab. `Get-Certificate` suudab taotluse saata enrollment serverisse ning väljastatud sertifikaadi kohe masinapoodi paigaldada. ([Microsoft Learn][3])
