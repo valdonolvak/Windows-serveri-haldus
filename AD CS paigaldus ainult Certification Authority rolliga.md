@@ -43,9 +43,16 @@ Install-AdcsCertificationAuthority `
 Peale CA paigaldust tuleb sul lõpetada selle seadistamine (vt. pilti allpool)
 <img width="202" height="97" alt="image" align="left" src="https://github.com/user-attachments/assets/8ac4cf68-bfa6-44c3-be10-c509760b014c" />
 
+Viisard siis alljärgnev:
 <img width="625" height="463" alt="image" src="https://github.com/user-attachments/assets/6b96e115-74c9-49bc-b2cc-4e44adcdf0ff" />
+
+**Enterprise CA**
 <img width="625" height="463" alt="image" src="https://github.com/user-attachments/assets/f331d1c3-3555-4931-beb1-542f7fc0cb74" />
+
+ **Root CA**
 <img width="625" height="463" alt="image" src="https://github.com/user-attachments/assets/637c2d3e-f865-4297-81bd-2517a110c05d" />
+
+**Create a new private key**
 <img width="625" height="463" alt="image" src="https://github.com/user-attachments/assets/e16daa42-a78a-4b8c-9650-96b60c10debf" />
 <img width="625" height="463" alt="image" src="https://github.com/user-attachments/assets/e3ef7e40-0ccb-4f2b-8ff5-6cc27fa3bc08" />
 CA Name jätate nagu teil seal pakutakse (vt allpool)
