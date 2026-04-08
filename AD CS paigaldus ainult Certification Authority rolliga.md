@@ -134,6 +134,8 @@ Get-Certificate `
 ## GUI
 
 `certlm.msc` → Personal → Certificates → **Request New Certificate** → vali **Web Server** → pane nimeks `minuleht.perenimi.local`.
+<img width="850" height="353" alt="image" src="https://github.com/user-attachments/assets/e71ee0df-4f2f-43b6-8f3d-e6bd92fa2d09" />
+
 
 **Miks see vajalik on:** sertifikaat peab vastama sellele nimele, mida brauser kasutab. `Get-Certificate` suudab taotluse saata enrollment serverisse ning väljastatud sertifikaadi kohe masinapoodi paigaldada. ([Microsoft Learn][3])
 
