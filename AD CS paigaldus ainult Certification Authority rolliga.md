@@ -43,8 +43,9 @@ Install-AdcsCertificationAuthority `
 Peale CA paigaldust tuleb sul lõpetada selle seadistamine (vt. pilti allpool)<br>
 <p><img width="202" height="97" alt="image" align="left" src="https://github.com/user-attachments/assets/8ac4cf68-bfa6-44c3-be10-c509760b014c" /></p>
 
-Viisard siis alljärgnev:<br>
+<p>Viisard siis alljärgnev:<br>
 <img width="625" height="463" alt="image" src="https://github.com/user-attachments/assets/6b96e115-74c9-49bc-b2cc-4e44adcdf0ff" />
+</p>
 
 **Enterprise CA**<br>
 <img width="625" height="463" alt="image" src="https://github.com/user-attachments/assets/f331d1c3-3555-4931-beb1-542f7fc0cb74" />
