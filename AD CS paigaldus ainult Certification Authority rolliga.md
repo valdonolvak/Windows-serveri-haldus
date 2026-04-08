@@ -93,7 +93,7 @@ Selleks siis avanevas aknas, kui oled aktiivseks teinud kausta "Certificate Temp
 <img width="625" height="330" alt="image" src="https://github.com/user-attachments/assets/e5a13a53-b1c5-4393-b821-8f6af3d7ca92" />
 
 Seejärel avanevas aknas annad uuele mallile nime aknas **General** ning määrad ära ka selle kestvuse (Valid period)
-Meie näites anname nimeks Veebiserver-GPO ning kestvuseks 5 aastat ja 6 kuud (vt allpool olevat pilti)</br>
+Meie näites anname nimeks Veebileht-GPO ning kestvuseks 5 aastat ja 6 kuud (vt allpool olevat pilti)</br>
 
 <img width="330" height="334" alt="image" src="https://github.com/user-attachments/assets/d3e30ffb-345f-404b-8969-cbef5004fce5" /></br>
 
@@ -107,12 +107,12 @@ Selleks siis vajutame aknas **Certificate Authority** paremal pool aknas hiire p
 Certification Authority → **Certificate Templates** → **New** → **Certificate Template to Issue** → vali serveri mall.</br>
 <img width="625" height="433" alt="image" src="https://github.com/user-attachments/assets/b00a8bb5-bf3e-472e-a332-4b3ce9253759" />
 
-Uues aknas on meil nüüd olemas selle uue sertifikaadi mall (meie näite puhul on selleks sertifikaadi malli nimeks **Veebiserver-GPO**)</br>
+Uues aknas on meil nüüd olemas selle uue sertifikaadi mall (meie näite puhul on selleks sertifikaadi malli nimeks **Veebileht-GPO**)</br>
 <img width="480" height="306" alt="image" src="https://github.com/user-attachments/assets/c4b0815b-ac46-4f12-900d-570c0ef8e1c6" />
 
 Valime selle ja vajutame **OK** nuple
 
-Nüüd on meil sertifikaatide mallide loendis ka meie loodud mall nimega **Veebiserver-GPO**</br>
+Nüüd on meil sertifikaatide mallide loendis ka meie loodud mall nimega **Veebileht-GPO**</br>
 <img width="625" height="300" alt="image" src="https://github.com/user-attachments/assets/77664122-a7f6-46bf-8321-b02218f8b705" />
 
 
