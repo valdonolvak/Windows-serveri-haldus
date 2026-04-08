@@ -16,7 +16,7 @@ Install-WindowsFeature ADCS-Cert-Authority -IncludeManagementTools
 
 Server Manager → Add Roles and Features → Active Directory Certificate Services → märgi ainult **Certification Authority**.
 
-<img width="1293" height="923" alt="image" src="https://github.com/user-attachments/assets/c769b6d9-a2a3-4307-be36-014b34a240df" />
+<img width="642" height="462" alt="image" src="https://github.com/user-attachments/assets/c769b6d9-a2a3-4307-be36-014b34a240df" />
 
 **Miks see vajalik on:** Certification Authority on see teenus, mis **allkirjastab ja väljastab** sinu sisevõrgu sertifikaadid. Kui sinu eesmärk on lihtsalt oma domeeni saitidele usaldatud HTTPS, siis sellest rollist piisab. Web Enrollment lisab ainult veebipõhise taotluslehe, mitte sertifikaadi väljastamise põhifunktsiooni. ([Microsoft Learn][1])
 
