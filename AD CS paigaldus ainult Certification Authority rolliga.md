@@ -112,6 +112,10 @@ Uues aknas on meil nüüd olemas selle uue sertifikaadi mall (meie näite puhul 
 
 Valime selle ja vajutame **OK** nuple
 
+Nüüd on meil sertifikaatide mallide loendis ka meie loodud mall nimega **Veebiserver-GPO**</br>
+<img width="625" height="300" alt="image" src="https://github.com/user-attachments/assets/77664122-a7f6-46bf-8321-b02218f8b705" />
+
+
 **Miks see vajalik on:** CA ei väljastada mingit sertifikaati juhuslikult, vaid ainult neid, mille mall on talle välja antud. Microsofti järgi tuleb CA-le template “issue’iks” lisada, et ta saaks selle alusel sertifikaate väljastada. ([Microsoft Learn][2])
 
 ---
