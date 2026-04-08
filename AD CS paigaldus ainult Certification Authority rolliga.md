@@ -140,6 +140,24 @@ Get-Certificate `
 <img width="850" height="353" alt="image" src="https://github.com/user-attachments/assets/e71ee0df-4f2f-43b6-8f3d-e6bd92fa2d09" />
 
 
+Seejärel on avanenud aknas näha sinu äsja loodud mall **"Veebilehe-GPO"** </br>
+<img width="246" height="235" alt="image" src="https://github.com/user-attachments/assets/abf7b176-1dc3-478a-8e87-1559a41ffe1b" />
+
+Enda veebiserveri kodulehele HTTPS ühenduse jaoks sertifikaadi loomiseks vajuta hüüumärgiga olevale tekstile ning siis uues aknas saad ära kirjeldada enda veebilehe Common Name nime (CN) </br>
+<img width="275" height="275" alt="image" src="https://github.com/user-attachments/assets/59c65919-5712-44ea-ad98-4f117ff4d0ac" />
+
+Lahtris **Subject Name** vali **Type** osas **Common name** ning kirjuta lahtrisse **Value** enda veebilehe URL (meie näite puhul kohv.perenimi.local, kus perenimi.local on sinu domeeninimi) ja seejärel vajuta nupule **Add** nii et sinu veebilehe URL liigub kõrvalolevasse aknasse </br>
+<img width="275" height="84" alt="image" src="https://github.com/user-attachments/assets/6cfc424c-c0df-4176-a409-1990b8a1535e" />
+
+Ning seejärel vajuta nupule **Enroll** </br>
+<img width="245" height="234" alt="image" src="https://github.com/user-attachments/assets/8a2ff92e-1234-47ac-b8f5-c610f214f19b" />
+
+Ja siis nupule **Finish**
+
+Siis ilmub sertifikaadi hoidlasse Personal->Certificates alla sinu veebilehe URL'i nimega sertifikaat.</br>
+<img width="1129" height="276" alt="image" src="https://github.com/user-attachments/assets/bd2a7bb5-bf0b-4437-938b-fcbb72471ce9" />
+
+
 **Miks see vajalik on:** sertifikaat peab vastama sellele nimele, mida brauser kasutab. `Get-Certificate` suudab taotluse saata enrollment serverisse ning väljastatud sertifikaadi kohe masinapoodi paigaldada. ([Microsoft Learn][3])
 
 ---
