@@ -100,6 +100,9 @@ Meie näites anname nimeks Veebileht-GPO ning kestvuseks 5 aastat ja 6 kuud (vt 
 Vahelehel **Request Handling** paneme linnukese, et lubame vajadusel ka privaatvõtit eksportida (üldiselt ei ole see hea praktika, aga testimiskeskkonnas või sõltuvalt orgnisatsioonist, võib vahel see vajalik olla)</br>
 <img width="330" height="455" alt="image" src="https://github.com/user-attachments/assets/891e2ade-5668-4a5f-b955-7b8077929d37" />
 
+Samuti on vaja lisada vahekaardil **Security** kasutajagrupile **Authenticated Users** **Enroll** õigus (vt allpool olevalt pildilt)</br>
+<img width="435" height="608" alt="image" src="https://github.com/user-attachments/assets/e3cacdb7-26c9-4183-9c40-a51f2556e159" />
+
 Seejärel vajutame **OK** nuple.
 
 Peale seda on meil võimalik nüüd taodelda uut sertfikaati nende vaikeväärtustega, mis me tegime.
@@ -109,10 +112,6 @@ Certification Authority → **Certificate Templates** → **New** → **Certific
 
 Uues aknas on meil nüüd olemas selle uue sertifikaadi mall (meie näite puhul on selleks sertifikaadi malli nimeks **Veebileht-GPO**)</br>
 <img width="480" height="306" alt="image" src="https://github.com/user-attachments/assets/c4b0815b-ac46-4f12-900d-570c0ef8e1c6" />
-
-Samuti on vaja lisada vahekaardil **Security** kasutajagrupile **Authenticated Users** **Enroll** õigus (vt allpool olevalt pildilt)</br>
-<img width="435" height="608" alt="image" src="https://github.com/user-attachments/assets/e3cacdb7-26c9-4183-9c40-a51f2556e159" />
-
 
 Valime selle ja vajutame **OK** nuple
 
