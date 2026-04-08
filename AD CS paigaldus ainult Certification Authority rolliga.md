@@ -83,7 +83,18 @@ Kui kasutad vaikimalli, siis piisab tavaliselt **Web Server** või **SslWebServe
 
 ## GUI
 
+Server Manager aknas Tools->Certificate Authority valides saad valida sertifikaatide malle, mille alusel enda uus sertifikaat teha.
+Ennem uue sertifikaadi tegemist on soovitatav teha duplikaat juba olemasolevast **Web Server** mallist kuna soovime enda veebilehele HTTPS'i sertifikaati.
+
+Selleks siis avanevas aknas, kui oled aktiivseks teinud kausta "Certificate Templates", siis vajutad paremas aknas tühja ala peal (vt allolevat pilti) ja valid valiku **Manage**
+<img width="625" height="483" alt="image" src="https://github.com/user-attachments/assets/3028bcb1-e206-4694-9dc4-5cdfa27713f8" />
+
+**Manage** valides avaneb allolev aken ning otsid sealt üles sertifikaadi malli nimega **Web server** ja parema hiireklikiga valid **Duplicate template**:
+<img width="625" height="330" alt="image" src="https://github.com/user-attachments/assets/e5a13a53-b1c5-4393-b821-8f6af3d7ca92" />
+
+
 Certification Authority → **Certificate Templates** → **New** → **Certificate Template to Issue** → vali serveri mall.
+
 
 **Miks see vajalik on:** CA ei väljastada mingit sertifikaati juhuslikult, vaid ainult neid, mille mall on talle välja antud. Microsofti järgi tuleb CA-le template “issue’iks” lisada, et ta saaks selle alusel sertifikaate väljastada. ([Microsoft Learn][2])
 
