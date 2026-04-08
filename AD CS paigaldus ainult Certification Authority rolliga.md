@@ -110,6 +110,10 @@ Certification Authority → **Certificate Templates** → **New** → **Certific
 Uues aknas on meil nüüd olemas selle uue sertifikaadi mall (meie näite puhul on selleks sertifikaadi malli nimeks **Veebileht-GPO**)</br>
 <img width="480" height="306" alt="image" src="https://github.com/user-attachments/assets/c4b0815b-ac46-4f12-900d-570c0ef8e1c6" />
 
+Samuti on vaja lisada vahekaardil **Security** kasutajagrupile **Authenticated Users** **Enroll** õigus (vt allpool olevalt pildilt)</br>
+<img width="435" height="608" alt="image" src="https://github.com/user-attachments/assets/e3cacdb7-26c9-4183-9c40-a51f2556e159" />
+
+
 Valime selle ja vajutame **OK** nuple
 
 Nüüd on meil sertifikaatide mallide loendis ka meie loodud mall nimega **Veebileht-GPO**</br>
