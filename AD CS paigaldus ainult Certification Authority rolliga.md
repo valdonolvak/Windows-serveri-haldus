@@ -102,8 +102,15 @@ Vahelehel **Request Handling** paneme linnukese, et lubame vajadusel ka privaatv
 
 Seejärel vajutame **OK** nuple.
 
+Peale seda on meil võimalik nüüd taodelda uut sertfikaati nende vaikeväärtustega, mis me tegime.
+Selleks siis vajutame aknas **Certificate Authority** paremal pool aknas hiire paremale klahvile 
 Certification Authority → **Certificate Templates** → **New** → **Certificate Template to Issue** → vali serveri mall.
+<img width="625" height="433" alt="image" src="https://github.com/user-attachments/assets/b00a8bb5-bf3e-472e-a332-4b3ce9253759" />
 
+Uues aknas on meil nüüd olemas selle uue sertifikaadi mall (meie näite puhul on selleks sertifikaadi malli nimeks **Veebiserver-GPO**)
+<img width="480" height="306" alt="image" src="https://github.com/user-attachments/assets/c4b0815b-ac46-4f12-900d-570c0ef8e1c6" />
+
+Valime selle ja vajutame **OK** nuple
 
 **Miks see vajalik on:** CA ei väljastada mingit sertifikaati juhuslikult, vaid ainult neid, mille mall on talle välja antud. Microsofti järgi tuleb CA-le template “issue’iks” lisada, et ta saaks selle alusel sertifikaate väljastada. ([Microsoft Learn][2])
 
