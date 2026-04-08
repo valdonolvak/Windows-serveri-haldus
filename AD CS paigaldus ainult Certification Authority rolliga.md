@@ -172,6 +172,8 @@ IIS Manager → sinu sait → **Bindings…** → Add:
 * Port: **443**
 * Hostname: `minuleht.perenimi.local`
 * SSL certificate: vali just saadud sertifikaat
+<img width="434" height="346" alt="image" src="https://github.com/user-attachments/assets/356f210c-8d90-4b2c-8d49-91b60caa8802" />
+
 
 ## PowerShell
 
