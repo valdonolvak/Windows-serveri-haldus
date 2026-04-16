@@ -4,8 +4,11 @@ $caName = "NOLVAK-AD-CA"
 Write-Host "=== Sertifikaadi kontroll ===" -ForegroundColor Cyan
 
 # Kontroll 1: serveri sertifikaat Personal store all
+# Lisatud 'Sort-Object' ja 'Select-Object', et vältida massiivi viga (System.Object[])
 $cert = Get-ChildItem Cert:\LocalMachine\My |
-    Where-Object { $_.Subject -like "*CN=$siteName*" }
+    Where-Object { $_.Subject -like "*CN=$siteName*" } |
+    Sort-Object NotAfter -Descending |
+    Select-Object -First 1
 
 if ($cert) {
     Write-Host "OK - Serveri sertifikaat leitud" -ForegroundColor Green
@@ -20,7 +23,8 @@ Write-Host "`n=== CA usaldus kontroll ===" -ForegroundColor Cyan
 
 # Kontroll 2: Trusted Root store
 $rootCA = Get-ChildItem Cert:\LocalMachine\Root |
-    Where-Object { $_.Subject -like "*CN=$caName*" }
+    Where-Object { $_.Subject -like "*CN=$caName*" } |
+    Select-Object -First 1
 
 if ($rootCA) {
     Write-Host "OK - Root CA on Trusted Root hoidlas" -ForegroundColor Green
@@ -33,6 +37,7 @@ Write-Host "`n=== Sertifikaadi ahela kontroll ===" -ForegroundColor Cyan
 
 if ($cert) {
     $chain = New-Object System.Security.Cryptography.X509Certificates.X509Chain
+    # Kuna $cert on nüüd kindlasti üks objekt, siis .Build($cert) töötab veatult
     $chain.Build($cert) | Out-Null
 
     if ($chain.ChainStatus.Count -eq 0) {
