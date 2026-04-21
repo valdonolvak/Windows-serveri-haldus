@@ -94,8 +94,10 @@ Selleks siis avanevas aknas, kui oled aktiivseks teinud kausta "Certificate Temp
 
 Seejärel avanevas aknas annad uuele mallile nime aknas **General** ning määrad ära ka selle kestvuse (Valid period)
 Meie näites anname nimeks Veebileht-GPO ning kestvuseks 5 aastat ja 6 kuud (vt allpool olevat pilti)</br>
+Kindlasti ära märkida ka kastike, kus kirjutatud **Publish certificate in Active Directory** (vt allpool olevat pilti)</br>
 
-<img width="330" height="334" alt="image" src="https://github.com/user-attachments/assets/d3e30ffb-345f-404b-8969-cbef5004fce5" /></br>
+<img width="298" height="307" alt="image" src="https://github.com/user-attachments/assets/328b0d9a-5b61-4df3-a1de-75d4e1784d87" /></br>
+
 
 Vahelehel **Request Handling** paneme linnukese, et lubame vajadusel ka privaatvõtit eksportida (üldiselt ei ole see hea praktika, aga testimiskeskkonnas või sõltuvalt orgnisatsioonist, võib vahel see vajalik olla)</br>
 <img width="330" height="455" alt="image" src="https://github.com/user-attachments/assets/891e2ade-5668-4a5f-b955-7b8077929d37" />
