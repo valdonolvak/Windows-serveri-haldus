@@ -146,11 +146,12 @@ Seejärel on avanenud aknas näha sinu äsja loodud mall **"Veebilehe-GPO"** </b
 <img width="246" height="235" alt="image" src="https://github.com/user-attachments/assets/abf7b176-1dc3-478a-8e87-1559a41ffe1b" />
 
 Enda veebiserveri kodulehele HTTPS ühenduse jaoks sertifikaadi loomiseks vajuta hüüumärgiga olevale tekstile ning siis uues aknas saad ära kirjeldada enda veebilehe Common Name nime (CN) </br>
-<img width="325" height="380" alt="image" src="https://github.com/user-attachments/assets/8f321c17-6620-4c19-b9d2-5c8c3b9952f0" />
+<img width="335" height="380" alt="image" src="https://github.com/user-attachments/assets/8f321c17-6620-4c19-b9d2-5c8c3b9952f0" />
 
 
 Lahtris **Subject Name** vali **Type** osas **Common name** ning kirjuta lahtrisse **Value** enda veebilehe URL (meie näite puhul kohv.perenimi.local, kus perenimi.local on sinu domeeninimi) ja seejärel vajuta nupule **Add** nii et sinu veebilehe URL liigub kõrvalolevasse aknasse </br>
-<img width="376" height="340" alt="image" src="https://github.com/user-attachments/assets/e8879b5f-8d44-4ef7-a044-7ea0e3bee5a8" />
+Lahtris **Alternative name** vali **Type** osas **DNS** ning kirjuta lahtrisse **Value** enda veebilehe URL (meie näite puhul kohv.perenimi.local, kus perenimi.local on sinu domeeninimi) ja seejärel vajuta nupule **Add** nii et sinu veebilehe URL liigub kõrvalolevasse aknasse </br>
+<img width="366" height="340" alt="image" src="https://github.com/user-attachments/assets/e8879b5f-8d44-4ef7-a044-7ea0e3bee5a8" />
 
 
 Ning seejärel vajuta nupule **Enroll** </br>
