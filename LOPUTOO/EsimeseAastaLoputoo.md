@@ -1,5 +1,3 @@
----
-
 # LÕPUTÖÖ: Windows operatsioonisüsteemide haldus
 
 ### ⚠️ ETTEVALMISTUS JA LITSENTS
