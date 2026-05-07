@@ -86,5 +86,5 @@ Maksimaalne punktisumma on **25 punkti**.
 *   **Veebiteenused (6p):** IIS/Wordpressi toimimine, HTTPS sertifikaat, AD kasutajatega autentimine Wordpressis.
 
 ---
-**Edu eksamil! Kui kõik GPO-d on valmis, tee klientmasinatele `gpupdate /force` ja kontrolli tulemust.**
+**Edu lõputöö tegemisel! Kui kõik GPO-d on valmis, tee klientmasinatele `gpupdate /force` ja kontrolli tulemust.**
 http://googleusercontent.com/youtube_content/1
