@@ -26,7 +26,7 @@ Võrguaadress moodustub valemiga **192.168.XXX.0/24**, kus **XXX** on sinu virtu
 | TOO-Win11Ent-IT25-Nimi | **Arvuti2** | DHCP | Klient (Win 11) |
 
 *   **Administraatori parool:** `Passw0rd`
-*   **Kasutajate paroolid:** `Par00LA!`
+*   **Domeeni loodavate kasutajate paroolid pane järgmiseks:** `Par00LA!`
 
 ---
 
