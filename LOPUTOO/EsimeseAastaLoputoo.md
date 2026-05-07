@@ -37,41 +37,42 @@ Võrguaadress moodustub valemiga **192.168.XXX.0/24**, kus **XXX** on sinu virtu
     *   Loo kettale **F:** kaustad `STUFF`, `WWW` ja `Kasutajad$`. Kõik edasised jagatud ressursid peavad asuma sellel kettal.
 3.  **DHCP server:** Seadista AD1 peal DHCP skoop nimega **HKHK**. Vahemik: `192.168.XXX.100 - 120`. (1p.)
 4.  **Domeeniga liitumine:** Muuda klientarvutite nimed (**Arvuti1**, **Arvuti2**) ja lisa nad domeeni. (1p.)
-5.  **OU struktuur:** Loo OU nimega **KASUTAJAD** ning selle alla alam-OU-d: **LEKTORID**, **TUDENGID** ja **VEEB**. (1p.)
-6.  **Kasutajad ja grupid:**
+5.   **OU struktuur arvutite jaoks**: Loo domeeniarvutite jaoks OU nimega **ARVUTID** ning selle sisse OU'd **Win10** ja **Win11**. Seejärel pane Windows10 klientmasin OU sisse **Win10** ja Windows 11 operatsioonisüsteemiga klientmasin OU **Win11** alla. (1p.)
+6.   **OU struktuur:** Loo OU nimega **KASUTAJAD** ning selle alla alam-OU-d: **LEKTORID**, **TUDENGID** ja **VEEB**. (1p.)
+7.  **Kasutajad ja grupid:**
     *   **LEKTORID:** Grupp `Lektorid`, kasutajad `oppejoud1` ja `oppejoud2`.
     *   **TUDENGID:** Grupp `Tudengid`, kasutajad `tudeng1` ja `tudeng2`. Lubatud logida sisse E-R 08:00–19:00. (2p.)
-7.  **Taustapildi GPO:** Loo GPO nimega **`GPO_Taustapildid`**.
+8.  **Taustapildi GPO:** Loo GPO nimega **`GPO_Taustapildid`**.
     *   Määrata erinevad taustapildid lektoritele ja tudengitele asukohast `F:\STUFF\`.
     *   Seadista NTFS õigused nii, et tudengid ei saaks ligi lektorite piltidele. (2p.)
-8.  **Kaustade suunamine (Folder Redirection):** Loo GPO nimega **`GPO_Folder_Redirection`**.
+9.  **Kaustade suunamine (Folder Redirection):** Loo GPO nimega **`GPO_Folder_Redirection`**.
     *   Suuna kasutajate **Desktop** ja **Documents** kaustad serverisse `\\AD1\Kasutajad$`.
     *   *Juhend:* [https://shorturl.at/sZMcJ](https://shorturl.at/sZMcJ) (2p.)
-9.  **Tarkvara GPO-d:** Loo GPO-d **`GPO_Software_7zip`** ja **`GPO_Software_Chrome`** tarkvara automaatseks paigalduseks msi pakettidena. (2p.)
-10. **Chrome seadistamine:** Lisa Chrome ADMX paketid ja loo GPO nimega **`GPO_Chrome_Settings`**. Määra koduleheks `[https://www.hkhk.edu.ee](https://www.hkhk.edu.ee)`.
+10.  **Tarkvara GPO-d:** Loo GPO-d **`GPO_Software_7zip`** ja **`GPO_Software_Chrome`** tarkvara automaatseks paigalduseks msi pakettidena. (2p.)
+11. **Chrome seadistamine:** Lisa Chrome ADMX paketid ja loo GPO nimega **`GPO_Chrome_Settings`**. Määra koduleheks `[https://www.hkhk.edu.ee](https://www.hkhk.edu.ee)`.
     *   *Juhend:* [https://shorturl.at/RFQ5U](https://shorturl.at/RFQ5U) (2p.)
-11. **Teine DC (AD2):** Muuda AD2 nimi ja IP. Lisa see teiseks domeenikontrolleriks **PowerShelli** abil. (2p.)
+12. **Teine DC (AD2):** Muuda AD2 nimi ja IP. Lisa see teiseks domeenikontrolleriks **PowerShelli** abil. (2p.)
     *   *Käsud:* `Install-WindowsFeature AD-Domain-Services...` ja `Install-ADDSDomainController...`
     *   *Juhend:* [RDR-IT juhend](https://rdr-it.com/en/active-directory-add-a-domain-controller-to-powershell/)
-12. **DHCP Failover:** Seadista AD2-le DHCP roll ja loo AD1-st failover ühendus (Load balance) skoobile HKHK.
+13. **DHCP Failover:** Seadista AD2-le DHCP roll ja loo AD1-st failover ühendus (Load balance) skoobile HKHK.
     *   *Video:* [https://www.youtube.com/watch?v=S7Eh7ubTVtY](https://www.youtube.com/watch?v=S7Eh7ubTVtY) (1p.)
-13. **IIS ja Wordpress:** Paigalda IIS ja Wordpress.
+14. **IIS ja Wordpress:** Paigalda IIS ja Wordpress.
     *   Nimi: `veebileht.perenimi.local` | Failid: `F:\WWW\veebileht.perenimi.local`
     *   AB: `wp_loputoo`, kasutaja `wpuser`, parool `Passw0rd!`. (2p.)
-14. **HTTPS seadistamine:** Seadista Wordpressi lehele HTTPS ühendus (Self-signed sertifikaat).
+15. **HTTPS seadistamine:** Seadista Wordpressi lehele HTTPS ühendus (Self-signed sertifikaat).
     *   *Juhend:* [https://shorturl.at/QkQHJ](https://shorturl.at/QkQHJ) (2p.)
-15. **AD Autentimine WP-s:** Paigalda plugin, mis lubab **VEEB** OU kasutajatel (`Peatoimetaja`, `ToimetajaAbi`, parool `Toimetaja123!`) logida Wordpressi sisse oma domeenikasutajaga. (2p.)
+16. **AD Autentimine WP-s:** Paigalda plugin, mis lubab **VEEB** OU kasutajatel (`Peatoimetaja`, `ToimetajaAbi`, parool `Toimetaja123!`) logida Wordpressi sisse oma domeenikasutajaga. (2p.)
 
 ---
 
 ## HINDAMISJUHEND
 
-Maksimaalne punktisumma on **24 punkti**.
+Maksimaalne punktisumma on **25 punkti**.
 
 | Punktid | Hinne | Kirjeldus |
 | :--- | :--- | :--- |
-| **21 - 24** | **5 (Väga hea)** | Kõik teenused töötavad veatult, GPO-d on korrektselt nimega ja lingitud, dokumentatsioon/failitee (F:) on õige. |
-| **17 - 20** | **4 (Hea)** | Enamus teenuseid töötab, esineb väiksemaid loogikavigu või mõni GPO ei rakendu täielikult. |
+| **22 - 25** | **5 (Väga hea)** | Kõik teenused töötavad veatult, GPO-d on korrektselt nimega ja lingitud, dokumentatsioon/failitee (F:) on õige. |
+| **17 - 21** | **4 (Hea)** | Enamus teenuseid töötab, esineb väiksemaid loogikavigu või mõni GPO ei rakendu täielikult. |
 | **12 - 16** | **3 (Rahuldav)** | Põhiteenused (AD, DNS, DHCP) töötavad, kuid keerukamad osad (Failover, HTTPS, AD Auth) on puudulikud. |
 | **< 12** | **2 (Mittearvestatud)** | Kriitilised teenused ei tööta, masinad ei ole domeenis või seadistus on poolik. |
 
@@ -79,7 +80,7 @@ Maksimaalne punktisumma on **24 punkti**.
 
 ### Punktide detailne jaotus:
 *   **Infrastruktuur (4p):** AD/DNS seadistus, ketta F: initsialiseerimine, DHCP skoobi loomine, masinate domeeni lisamine.
-*   **Kasutajahaldus (3p):** OU struktuuri korrektsus, sisselogimispiirangud, gruppide loomine.
+*   **Kasutajahaldus (4p):** OU struktuuri korrektsus, sisselogimispiirangud, gruppide loomine.
 *   **Grupipoliitikad (8p):** Taustapildid (õigustega), Kaustade suunamine, Tarkvara paigaldus, Chrome ADMX ja avaleht.
 *   **Serveri haldus (3p):** AD2 lisamine PowerShelliga, DHCP Failover seadistus.
 *   **Veebiteenused (6p):** IIS/Wordpressi toimimine, HTTPS sertifikaat, AD kasutajatega autentimine Wordpressis.
