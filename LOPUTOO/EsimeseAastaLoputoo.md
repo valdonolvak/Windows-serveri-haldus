@@ -22,7 +22,7 @@ Võrguaadress moodustub valemiga **192.168.XXX.0/24**, kus **XXX** on sinu virtu
 | :--- | :--- | :--- | :--- |
 | TOO-WinServer-IT25-Nimi | **AD1** | `192.168.XXX.10` | DC, DNS, DHCP, IIS |
 | TOO-Win2022Core-IT25-Nimi | **AD2** | `192.168.XXX.11` | Secondary DC, DHCP Failover |
-| TOO-Winklient-IT25-Nimi | **Arvuti1** | DHCP | Klient (Win 10/11) |
+| TOO-Winklient-IT25-Nimi | **Arvuti1** | DHCP | Klient (Win 10) |
 | TOO-Win11Ent-IT25-Nimi | **Arvuti2** | DHCP | Klient (Win 11) |
 
 *   **Administraatori parool:** `Passw0rd`
