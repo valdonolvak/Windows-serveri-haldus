@@ -3,19 +3,19 @@
 ```powershell
 # ========================================================
 # ACTIVE DIRECTORY + WORDPRESS AUTO GRADER
-# FINAL VERSION - USER OU TRACKING & ROBUST MATCHING
+# FINAL ULTIMATE VERSION - JSON STRUCTURE FIXED
 # ========================================================
 
 $ErrorActionPreference = "Continue"
 
-# Lubame ebausaldusväärsed sertifikaadid ja TLS protokollid
+# 1. TURVASEADED (TLS 1.3 ja sertifikaatide ignoreerimine)
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor 12288 -bor [Net.SecurityProtocolType]::Tls11 -bor [Net.SecurityProtocolType]::Tls
 [Net.ServicePointManager]::ServerCertificateValidationCallback = { $true }
 
 Import-Module ActiveDirectory
 
 # ========================================================
-# RESULT OBJECT
+# RESULT OBJECT & HELPER
 # ========================================================
 
 $Checks = @()
@@ -52,7 +52,7 @@ function Add-Check {
 }
 
 # ========================================================
-# DOMAIN / STUDENT
+# DOMAIN / STUDENT (Tuvastame nime domeenist)
 # ========================================================
 
 try {
@@ -65,86 +65,68 @@ catch {
 }
 
 # ========================================================
-# HOSTNAME
+# 1. SERVERI PÕHISEADISTUS (Hostname & Network)
 # ========================================================
 
+# Hostname
 $Hostname = $env:COMPUTERNAME
 Add-Check "Server Name" "AD1" $Hostname ($Hostname -eq "AD1") 0.5 0.5
 
-# ========================================================
-# NETWORK
-# ========================================================
-
+# Võrk
 $NIC = Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -like "10.0.*" } | Select-Object -First 1
 
 if ($NIC) {
-    # IP
     $IP = $NIC.IPAddress
     Add-Check "IP Address" "10.0.xxx.10" $IP ($IP -match "^10\.0\.\d+\.10$") 0.5 0.5
 
-    # GATEWAY
     $Gateway = (Get-NetRoute -DestinationPrefix "0.0.0.0/0" | Select-Object -First 1).NextHop
     Add-Check "Gateway" "10.0.xxx.1" $Gateway ($Gateway -match "^10\.0\.\d+\.1$") 0.5 0.5
 
-    # DNS
     $DNS = (Get-DnsClientServerAddress -InterfaceIndex $NIC.InterfaceIndex -AddressFamily IPv4).ServerAddresses
     $DNSOK = ($DNS.Count -ge 2 -and $DNS[0] -eq "127.0.0.1" -and $DNS[1] -eq "1.1.1.1")
     Add-Check "DNS Servers" "127.0.0.1, 1.1.1.1" ($DNS -join ", ") $DNSOK 0.5 0.5
 }
 
-# ========================================================
-# WINDOWS ROLES
-# ========================================================
-
+# Rollid
 $ADDS = Get-WindowsFeature AD-Domain-Services
 $DNSRole = Get-WindowsFeature DNS
 Add-Check "AD DS Role" "Installed" $ADDS.InstallState $ADDS.Installed 0.5 0.5
 Add-Check "DNS Role" "Installed" $DNSRole.InstallState $DNSRole.Installed 0.5 0.5
 
 # ========================================================
-# DOMAIN & OUs
+# 2. ACTIVE DIRECTORY STRUKTUUR (Domain, OUs, Users)
 # ========================================================
 
-try {
-    Add-Check "Domain" "*.lan" $DomainName ($DomainName -like "*.lan") 1 1
-} catch {
-    Add-Check "Domain" "*.lan" "NOT FOUND" $false 1 1
-}
+# Domeeni nimi
+Add-Check "Domain" "*.lan" $DomainName ($DomainName -like "*.lan") 1 1
 
+# OUs (Toetab pesastatud struktuuri)
 $OU1 = Get-ADOrganizationalUnit -Filter 'Name -eq "KASUTAJAD"'
 $OU2 = Get-ADOrganizationalUnit -Filter 'Name -eq "WORDPRESS"'
 Add-Check "OU KASUTAJAD" "Exists" $(if($OU1){"Exists"}else{"Missing"}) ($OU1 -ne $null) 1 1
 Add-Check "OU WORDPRESS" "Exists" $(if($OU2){"Exists"}else{"Missing"}) ($OU2 -ne $null) 1 1
 
-# ========================================================
-# USERS (GLOBAL SEARCH WITH OU INFO)
-# ========================================================
-
-# Otsime kasutajad üle domeeni
+# Kasutajad (Globaalne otsing üle domeeni)
 $User1 = Get-ADUser -Filter 'SamAccountName -eq "pea.toimetaja" -or Name -like "*Pea Toimetaja*"' -Properties PasswordNeverExpires,Enabled | Select-Object -First 1
 $User2 = Get-ADUser -Filter 'SamAccountName -eq "abi.toimetaja" -or Name -like "*Abi Toimetaja*"' -Properties PasswordNeverExpires,Enabled | Select-Object -First 1
 
-# Funktsioon asukoha leidmiseks
 function Get-UserLocation {
     param($User)
-    if ($User) {
-        # Eemaldab kasutaja enda nime DN-st, jättes alles vaid OU tee
-        return ($User.DistinguishedName -split ',', 2)[1]
-    }
+    if ($User) { return ($User.DistinguishedName -split ',', 2)[1] }
     return "Not Found"
 }
 
-$User1OU = Get-UserLocation $User1
-$User2OU = Get-UserLocation $User2
+$User1Location = Get-UserLocation $User1
+$User2Location = Get-UserLocation $User2
 
-Add-Check "User pea.toimetaja" "Exists in WORDPRESS OU" "Found in: $User1OU" ($User1 -ne $null -and $User1.Enabled -eq $true) 0.5 0.5
-Add-Check "User abi.toimetaja" "Exists in WORDPRESS OU" "Found in: $User2OU" ($User2 -ne $null -and $User2.Enabled -eq $true) 0.5 0.5
+Add-Check "User pea.toimetaja" "Exists" "Found in: $User1Location" ($User1 -ne $null -and $User1.Enabled -eq $true) 0.5 0.5
+Add-Check "User abi.toimetaja" "Exists" "Found in: $User2Location" ($User2 -ne $null -and $User2.Enabled -eq $true) 0.5 0.5
 
 $PWNever = ($User1.PasswordNeverExpires -and $User2.PasswordNeverExpires)
 Add-Check "Password Never Expires" "True" "Status: $PWNever" $PWNever 0.5 0.5
 
 # ========================================================
-# WORDPRESS GROUP (FUZZY MATCHING)
+# 3. GRUPI KONTROLL (Fuzzy Matching "KoduleheToimetaja")
 # ========================================================
 
 $MatchedGroup = $null
@@ -167,27 +149,21 @@ try {
     Add-Check "Group KoduleheToimetajad" "Exists" "ERROR" $false 0.5 0.5
 }
 
-# ========================================================
-# GROUP MEMBERS (DN-BASED COMPARISON)
-# ========================================================
-
+# Grupi liikmed (Kasutades leitud gruppi)
 try {
     if ($GroupExists -and $MatchedGroup) {
         $GroupMemberDNs = $MatchedGroup.Member
-
         $HasPea = ($User1 -ne $null -and $GroupMemberDNs -contains $User1.DistinguishedName)
         $HasAbi = ($User2 -ne $null -and $GroupMemberDNs -contains $User2.DistinguishedName)
 
-        # Tagavara tekstiline kontroll
         if (-not $HasPea -or -not $HasAbi) {
             $MembersObj = Get-ADGroupMember -Identity $MatchedGroup.DistinguishedName
             $MemberNames = $MembersObj.SamAccountName + $MembersObj.Name
             if (-not $HasPea) { $HasPea = ($MemberNames -match "pea.toimetaja" -or $MemberNames -match "Pea Toimetaja") }
             if (-not $HasAbi) { $HasAbi = ($MemberNames -match "abi.toimetaja" -or $MemberNames -match "Abi Toimetaja") }
         }
-
-        Add-Check "Group Member pea.toimetaja" "Added to group" $(if($HasPea){"YES"}else{"NO"}) $HasPea 0.5 0.5
-        Add-Check "Group Member abi.toimetaja" "Added to group" $(if($HasAbi){"YES"}else{"NO"}) $HasAbi 0.5 0.5
+        Add-Check "Group Member pea.toimetaja" "Added" $(if($HasPea){"YES"}else{"NO"}) $HasPea 0.5 0.5
+        Add-Check "Group Member abi.toimetaja" "Added" $(if($HasAbi){"YES"}else{"NO"}) $HasAbi 0.5 0.5
     } else {
         Add-Check "Group Member pea.toimetaja" "Added" "No Group" $false 0.5 0.5
         Add-Check "Group Member abi.toimetaja" "Added" "No Group" $false 0.5 0.5
@@ -197,9 +173,10 @@ try {
 }
 
 # ========================================================
-# DNS RECORD & WEBSITE
+# 4. DNS JA VEEBI KONTROLL
 # ========================================================
 
+# DNS Kirje
 $ProjectHost = "projekt.$Surname.lan"
 try {
     $DNSResult = Resolve-DnsName $ProjectHost -ErrorAction Stop
@@ -208,6 +185,7 @@ try {
     Add-Check "DNS Record" $ProjectHost "NOT FOUND" $false 0.5 0.5
 }
 
+# Veebi kättesaadavus
 $SiteReachable = $false
 foreach ($Proto in @("https", "http")) {
     if ($SiteReachable) { break }
@@ -218,14 +196,11 @@ foreach ($Proto in @("https", "http")) {
 }
 Add-Check "WordPress Website" "Reachable" $(if($SiteReachable){"YES ($UsedProto)"}else{"UNREACHABLE"}) $SiteReachable 0.5 0.5
 
-# ========================================================
-# WORDPRESS LDAP LOGIN TEST
-# ========================================================
-
+# WordPressi autentimine (Sisu-põhine tõekontroll)
 $TestPassword = "Passw0rd!"
 $LoginSuccess = $false
-$LoginMsg = "Autentimine ebaõnnestus"
-$CookieFile = "$env:TEMP\wp_strict_cookies.txt"
+$LoginMsg = "Sisselogimine ebaõnnestus"
+$CookieFile = "$env:TEMP\wp_final_cookies.txt"
 if (Test-Path $CookieFile) { Remove-Item $CookieFile }
 
 foreach ($Proto in @("https", "http")) {
@@ -247,18 +222,34 @@ foreach ($Proto in @("https", "http")) {
 Add-Check "WordPress LDAP Login" "pea.toimetaja authenticates" $LoginMsg $LoginSuccess 1 1
 
 # ========================================================
-# FINAL SCORE
+# KOKKUVÕTE JA JSON EKSPORT (image_e0f837.png järgi)
 # ========================================================
 
 $TotalPoints = [math]::Round($TotalPoints, 2)
-$Grade = if ($TotalPoints -ge 9) { 5 } elseif ($TotalPoints -ge 7) { 4 } elseif ($TotalPoints -ge 5) { 3 } else { "MA" }
+$MaxTotalPoints = [math]::Round(($Checks | Measure-Object -Property MaxPoints -Sum).Sum, 2)
 
-$Result = [PSCustomObject]@{ Student = $Surname; Points = $TotalPoints; Grade = $Grade; Checks = $Checks }
+if ($TotalPoints -ge 9) { $Grade = 5 }
+elseif ($TotalPoints -ge 7) { $Grade = 4 }
+elseif ($TotalPoints -ge 5) { $Grade = 3 }
+else { $Grade = "MA" }
+
+# Objekti loomine täpselt soovitud väljadega
+$Result = [PSCustomObject]@{
+    Student        = $Surname
+    Timestamp      = Get-Date
+    TotalPoints    = $TotalPoints
+    MaxTotalPoints = $MaxTotalPoints
+    Grade          = $Grade
+    Checks         = $Checks
+}
+
+# Salvestamine
 $Folder = "$PSScriptRoot\Results"; if (!(Test-Path $Folder)) { New-Item -ItemType Directory -Path $Folder -Force | Out-Null }
-$File = Join-Path $Folder "$Surname-result.json"; $Result | ConvertTo-Json -Depth 10 | Out-File $File -Encoding UTF8
+$File = Join-Path $Folder "$Surname-result.json"
+$Result | ConvertTo-Json -Depth 10 | Out-File $File -Encoding UTF8
 
 Write-Host "`n=================================="
-Write-Host "Õpilane: $Surname | Punktid: $TotalPoints | Hinne: $Grade"
+Write-Host "Õpilane: $Surname | Punktid: $TotalPoints / $MaxTotalPoints | Hinne: $Grade"
 Write-Host "==================================`n"
 
 ```
