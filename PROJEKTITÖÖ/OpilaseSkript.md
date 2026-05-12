@@ -430,49 +430,31 @@ catch {
         0.5 `
         0.5
 }
-
 # ========================================================
 # WORDPRESS LDAP LOGIN TEST
 # ========================================================
 
-# CHANGE THIS TO TASK PASSWORD
 $TestPassword = "Passw0rd!"
 
 try {
 
     $LoginUrl = "http://$ProjectHost/wp-login.php"
 
-    # -----------------------------
-    # SESSION
-    # -----------------------------
-
     $Session = New-Object `
         Microsoft.PowerShell.Commands.WebRequestSession
-
-    # -----------------------------
-    # OPEN LOGIN PAGE FIRST
-    # -----------------------------
 
     Invoke-WebRequest `
         -Uri $LoginUrl `
         -WebSession $Session | Out-Null
 
-    # -----------------------------
-    # LOGIN DATA
-    # -----------------------------
-
     $Body = @{
 
-        log         = "pea.toimetaja@$DomainName"
-        pwd         = $TestPassword
-        wp-submit   = "Log In"
-        redirect_to = "http://$ProjectHost/wp-admin/"
-        testcookie  = "1"
+        log           = "pea.toimetaja@$DomainName"
+        pwd           = $TestPassword
+        "wp-submit"   = "Log In"
+        redirect_to   = "http://$ProjectHost/wp-admin/"
+        testcookie    = "1"
     }
-
-    # -----------------------------
-    # LOGIN REQUEST
-    # -----------------------------
 
     $Response = Invoke-WebRequest `
         -Uri $LoginUrl `
@@ -480,10 +462,6 @@ try {
         -Body $Body `
         -WebSession $Session `
         -MaximumRedirection 10
-
-    # -----------------------------
-    # COOKIE CHECK
-    # -----------------------------
 
     $LoggedInCookie = (
         $Session.Cookies.GetCookies($LoginUrl) |
