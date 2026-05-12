@@ -3,7 +3,7 @@
 ```powershell
 # ========================================================
 # ACTIVE DIRECTORY + WORDPRESS AUTO GRADER
-# FULLY FIXED VERSION - CURL SESSION ENGINE
+# FULLY FIXED VERSION - HONEST AUTHENTICATION CHECK
 # ========================================================
 
 $ErrorActionPreference = "Continue"
@@ -391,7 +391,6 @@ $UsedProto = ""
 foreach ($Proto in @("https", "http")) {
     if ($SiteReachable) { break }
     try {
-        # Kasutame curl.exe-t kättesaadavuse testiks (kiirem ja ignoreerib TLS jamasid)
         $test = curl.exe -s -k -I "$($Proto)://$($ProjectHost)" --connect-timeout 5
         if ($test -match "200 OK") { 
             $SiteReachable = $true 
@@ -409,15 +408,14 @@ Add-Check `
     0.5
 
 # ========================================================
-# WORDPRESS LDAP LOGIN TEST
+# WORDPRESS LDAP LOGIN TEST (HONEST VALIDATION)
 # ========================================================
 
 $TestPassword = "Passw0rd!"
 $LoginSuccess = $false
-$LoginMsg = "Sisselogimine ebaõnnestus"
+$LoginMsg = "Autentimine ebaõnnestus (Vale parool või LDAP seadistus)"
 $CookieFile = "$env:TEMP\wp_cookies.txt"
 
-# Kustutame vana küpsisefaili kui see on olemas
 if (Test-Path $CookieFile) { Remove-Item $CookieFile }
 
 foreach ($Proto in @("https", "http")) {
@@ -426,18 +424,23 @@ foreach ($Proto in @("https", "http")) {
     $Url = "$($Proto)://$($ProjectHost)/wp-login.php"
     
     try {
-        # 1. SAMM: Külastame lehte, et saada sessiooni küpsised (testcookie jne)
+        # 1. SAMM: Külastame lehte, et saada sessiooni küpsised
         curl.exe -s -k -c $CookieFile "$Url" --connect-timeout 10 | Out-Null
         
-        # 2. SAMM: Saadame POST päringu koos küpsistega
-        # log = pea.toimetaja (ilma domeenita nagu soovisid)
-        # pwd = Passw0rd! (selgelt koodis)
+        # 2. SAMM: Saadame POST päringu
+        # Eemaldasime -L, et näha serveri vahetut vastust sisselogimisele
         $PostData = "log=pea.toimetaja&pwd=$($TestPassword)&wp-submit=Log+In&testcookie=1"
+        $ResponseHeaders = curl.exe -s -k -b $CookieFile -i -X POST -d "$PostData" "$Url" --connect-timeout 10
         
-        $ResultStr = curl.exe -s -k -b $CookieFile -L -i -X POST -d "$PostData" "$Url" --connect-timeout 10
-        
-        # 3. KONTROLL: Kas vastuses on sisselogimise küpsis või suunamine administraatori paneeli
-        if ($ResultStr -match "wordpress_logged_in" -or $ResultStr -match "Location: .*wp-admin") {
+        # 3. RANGE KONTROLL: 
+        # Edukas sisselogimine tekitab 'Set-Cookie: wordpress_logged_in...' 
+        # JA suunab edasi (HTTP 302 Found)
+        if ($ResponseHeaders -match "Set-Cookie: wordpress_logged_in" -and $ResponseHeaders -match "302 Found") {
+            $LoginSuccess = $true
+            $LoginMsg = "OK ($($Proto.ToUpper()))"
+        }
+        elseif ($ResponseHeaders -match "302 Found" -and $ResponseHeaders -match "Location: .*wp-admin") {
+            # Mõned pluginad suunavad kohe, ilma et me näeks küpsist päises (aga suunamine on wp-adminisse)
             $LoginSuccess = $true
             $LoginMsg = "OK ($($Proto.ToUpper()))"
         }
@@ -459,49 +462,15 @@ Add-Check `
 # FINAL SCORE
 # ========================================================
 
-$TotalPoints = [math]::Round(
-    $TotalPoints,
-    2
-)
+$TotalPoints = [math]::Round($TotalPoints, 2)
+$MaxTotalPoints = [math]::Round(($Checks | Measure-Object -Property MaxPoints -Sum).Sum, 2)
 
-$MaxTotalPoints = [math]::Round(
-    (
-        $Checks |
-
-        Measure-Object `
-            -Property MaxPoints `
-            -Sum
-    ).Sum,
-    2
-)
-
-# ========================================================
-# GRADE
-# ========================================================
-
-if ($TotalPoints -ge 9) {
-
-    $Grade = 5
-}
-elseif ($TotalPoints -ge 7) {
-
-    $Grade = 4
-}
-elseif ($TotalPoints -ge 5) {
-
-    $Grade = 3
-}
-else {
-
-    $Grade = "MA"
-}
-
-# ========================================================
-# RESULT OBJECT
-# ========================================================
+if ($TotalPoints -ge 9) { $Grade = 5 }
+elseif ($TotalPoints -ge 7) { $Grade = 4 }
+elseif ($TotalPoints -ge 5) { $Grade = 3 }
+else { $Grade = "MA" }
 
 $Result = [PSCustomObject]@{
-
     Student = $Surname
     Timestamp = Get-Date
     TotalPoints = $TotalPoints
@@ -515,26 +484,9 @@ $Result = [PSCustomObject]@{
 # ========================================================
 
 $Folder = "$PSScriptRoot\Results"
-
-if (!(Test-Path $Folder)) {
-
-    New-Item `
-        -ItemType Directory `
-        -Path $Folder `
-        -Force | Out-Null
-}
-
-$File = Join-Path `
-    $Folder `
-    "$Surname-result.json"
-
-$Result |
-
-    ConvertTo-Json -Depth 10 |
-
-    Out-File `
-        $File `
-        -Encoding UTF8
+if (!(Test-Path $Folder)) { New-Item -ItemType Directory -Path $Folder -Force | Out-Null }
+$File = Join-Path $Folder "$Surname-result.json"
+$Result | ConvertTo-Json -Depth 10 | Out-File $File -Encoding UTF8
 
 # ========================================================
 # OUTPUT
@@ -544,15 +496,10 @@ Write-Host ""
 Write-Host "=================================="
 Write-Host "KONTROLL LÕPETATUD"
 Write-Host "=================================="
-Write-Host ""
-
 Write-Host "Õpilane: $Surname"
 Write-Host "Punktid: $TotalPoints / $MaxTotalPoints"
 Write-Host "Hinne: $Grade"
-
-Write-Host ""
-Write-Host "JSON:"
-Write-Host $File
+Write-Host "JSON: $File"
 Write-Host ""
 
 ```
