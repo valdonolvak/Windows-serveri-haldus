@@ -1,5 +1,10 @@
 ```powershell
-$ErrorActionPreference = "SilentlyContinue"
+# ========================================================
+# ACTIVE DIRECTORY + WORDPRESS AUTO GRADER
+# FULL VERSION
+# ========================================================
+
+$ErrorActionPreference = "Continue"
 
 Import-Module ActiveDirectory
 
@@ -22,10 +27,13 @@ function Add-Check {
     )
 
     if ($Success) {
+
         $Status = "PASS"
         $Awarded = $Points
+
     }
     else {
+
         $Status = "FAIL"
         $Awarded = 0
     }
@@ -33,6 +41,7 @@ function Add-Check {
     $global:TotalPoints += $Awarded
 
     $global:Checks += [PSCustomObject]@{
+
         Category = $Category
         Expected = $Expected
         Actual = $Actual
@@ -43,15 +52,18 @@ function Add-Check {
 }
 
 # ========================================================
-# STUDENT
+# DOMAIN / STUDENT
 # ========================================================
 
 try {
 
     $Domain = Get-ADDomain
+
     $DomainName = $Domain.DNSRoot
 
-    $Surname = $DomainName.Split(".")[0]
+    $Surname = (
+        $DomainName.Split(".")[0]
+    )
 
 }
 catch {
@@ -77,13 +89,20 @@ Add-Check `
 # NETWORK
 # ========================================================
 
-$NIC = Get-NetIPAddress -AddressFamily IPv4 |
+$NIC = Get-NetIPAddress `
+    -AddressFamily IPv4 |
+
     Where-Object {
         $_.IPAddress -like "10.0.*"
     } |
+
     Select-Object -First 1
 
 if ($NIC) {
+
+    # -----------------------------
+    # IP
+    # -----------------------------
 
     $IP = $NIC.IPAddress
 
@@ -95,9 +114,14 @@ if ($NIC) {
         0.5 `
         0.5
 
+    # -----------------------------
+    # GATEWAY
+    # -----------------------------
+
     $Gateway = (
         Get-NetRoute `
             -DestinationPrefix "0.0.0.0/0" |
+
         Select-Object -First 1
     ).NextHop
 
@@ -108,6 +132,10 @@ if ($NIC) {
         ($Gateway -match "^10\.0\.\d+\.1$") `
         0.5 `
         0.5
+
+    # -----------------------------
+    # DNS
+    # -----------------------------
 
     $DNS = (
         Get-DnsClientServerAddress `
@@ -133,8 +161,11 @@ if ($NIC) {
 # WINDOWS ROLES
 # ========================================================
 
-$ADDS = Get-WindowsFeature AD-Domain-Services
-$DNSRole = Get-WindowsFeature DNS
+$ADDS = Get-WindowsFeature `
+    AD-Domain-Services
+
+$DNSRole = Get-WindowsFeature `
+    DNS
 
 Add-Check `
     "AD DS Role" `
@@ -231,6 +262,10 @@ Add-Check `
     0.5 `
     0.5
 
+# -----------------------------
+# PASSWORD NEVER EXPIRES
+# -----------------------------
+
 $PWNever = (
     $User1.PasswordNeverExpires -and
     $User2.PasswordNeverExpires
@@ -250,25 +285,29 @@ Add-Check `
 
 try {
 
-    $WPGroup = Get-ADGroup `
-        -Filter 'Name -eq "KoduleheToimetajad"'
+    $SearchBase = "OU=WORDPRESS,$($Domain.DistinguishedName)"
 
-    $GroupExists = ($WPGroup -ne $null)
+    $WPGroup = Get-ADGroup `
+        -Filter 'Name -eq "KoduleheToimetajad"' `
+        -SearchBase $SearchBase
+
+    $GroupExists = (
+        $WPGroup -ne $null
+    )
 
     Add-Check `
         "Group KoduleheToimetajad" `
-        "Exists" `
+        "Exists in WORDPRESS OU" `
         $(if($GroupExists){"Exists"}else{"Missing"}) `
         $GroupExists `
         0.5 `
         0.5
-
 }
 catch {
 
     Add-Check `
         "Group KoduleheToimetajad" `
-        "Exists" `
+        "Exists in WORDPRESS OU" `
         "NOT FOUND" `
         $false `
         0.5 `
@@ -309,7 +348,6 @@ try {
         $HasAbi `
         0.5 `
         0.5
-
 }
 catch {
 
@@ -335,6 +373,7 @@ try {
 
     $ProjectIP = (
         $DNSResult |
+
         Where-Object {
             $_.Type -eq "A"
         }
@@ -370,7 +409,7 @@ try {
         -TimeoutSec 10
 
     $WP = (
-        $Response.Content -match "wordpress"
+        $Response.StatusCode -eq 200
     )
 
     Add-Check `
@@ -396,49 +435,67 @@ catch {
 # WORDPRESS LDAP LOGIN TEST
 # ========================================================
 
-# STANDARD TEST PASSWORD
+# CHANGE THIS TO TASK PASSWORD
 $TestPassword = "Passw0rd!"
-
-#$TestPassword = Read-Host "Sisesta AD/WordPress testparool"
 
 try {
 
     $LoginUrl = "http://$ProjectHost/wp-login.php"
 
+    # -----------------------------
     # SESSION
-    $Session = New-Object Microsoft.PowerShell.Commands.WebRequestSession
+    # -----------------------------
 
-    # GET LOGIN PAGE FIRST (important for cookies)
+    $Session = New-Object `
+        Microsoft.PowerShell.Commands.WebRequestSession
+
+    # -----------------------------
+    # OPEN LOGIN PAGE FIRST
+    # -----------------------------
+
     Invoke-WebRequest `
         -Uri $LoginUrl `
-        -WebSession $Session `
-        -UseBasicParsing | Out-Null
+        -WebSession $Session | Out-Null
 
-    # LOGIN BODY
+    # -----------------------------
+    # LOGIN DATA
+    # -----------------------------
+
     $Body = @{
-        log           = "pea.toimetaja"
-        pwd           = $TestPassword
-        wp-submit     = "Log In"
-        redirect_to   = "http://$ProjectHost/wp-admin/"
-        testcookie    = "1"
+
+        log         = "pea.toimetaja@$DomainName"
+        pwd         = $TestPassword
+        wp-submit   = "Log In"
+        redirect_to = "http://$ProjectHost/wp-admin/"
+        testcookie  = "1"
     }
 
+    # -----------------------------
     # LOGIN REQUEST
+    # -----------------------------
+
     $Response = Invoke-WebRequest `
         -Uri $LoginUrl `
         -Method POST `
         -Body $Body `
         -WebSession $Session `
-        -MaximumRedirection 10 `
-        -UseBasicParsing
+        -MaximumRedirection 10
 
-    # CHECK COOKIES
-    $LoggedInCookie = $Session.Cookies.GetCookies($LoginUrl) |
+    # -----------------------------
+    # COOKIE CHECK
+    # -----------------------------
+
+    $LoggedInCookie = (
+        $Session.Cookies.GetCookies($LoginUrl) |
+
         Where-Object {
             $_.Name -like "wordpress_logged_in*"
         }
+    )
 
-    $LoginSuccess = ($LoggedInCookie -ne $null)
+    $LoginSuccess = (
+        $LoggedInCookie.Count -gt 0
+    )
 
     Add-Check `
         "WordPress LDAP Login" `
@@ -458,6 +515,7 @@ catch {
         1 `
         1
 }
+
 # ========================================================
 # FINAL SCORE
 # ========================================================
@@ -470,6 +528,7 @@ $TotalPoints = [math]::Round(
 $MaxTotalPoints = [math]::Round(
     (
         $Checks |
+
         Measure-Object `
             -Property MaxPoints `
             -Sum
@@ -534,7 +593,9 @@ $File = Join-Path `
     "$Surname-result.json"
 
 $Result |
+
     ConvertTo-Json -Depth 10 |
+
     Out-File `
         $File `
         -Encoding UTF8
