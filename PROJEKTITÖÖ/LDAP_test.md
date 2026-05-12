@@ -9,7 +9,8 @@
 $ErrorActionPreference = "Continue"
 
 # Lubame ebausaldusväärsed sertifikaadid ja kõik TLS protokollid (vajalik HTTPS jaoks)
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls13 -bor [Net.SecurityProtocolType]::Tls11 -bor [Net.SecurityProtocolType]::Tls
+# Kasutame numbrilisi väärtusi, et tagada ühilduvus (Tls12 = 3072, Tls13 = 12288)
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor 12288 -bor [Net.SecurityProtocolType]::Tls11 -bor [Net.SecurityProtocolType]::Tls
 [Net.ServicePointManager]::ServerCertificateValidationCallback = { $true }
 
 Import-Module ActiveDirectory
@@ -212,7 +213,6 @@ catch {
 # OUs
 # ========================================================
 
-# Otsime filtreerides, et leida ka pesastatud OU-d (nagu pildil image_effc71.png)
 $OU1 = Get-ADOrganizationalUnit -Filter 'Name -eq "KASUTAJAD"'
 $OU2 = Get-ADOrganizationalUnit -Filter 'Name -eq "WORDPRESS"'
 
@@ -277,7 +277,6 @@ Add-Check `
 # ========================================================
 
 try {
-    # Otsime gruppi nime järgi üle domeeni
     $WPGroup = Get-ADGroup -Filter 'Name -eq "KoduleheToimetajad"'
     $GroupExists = ($WPGroup -ne $null)
 
@@ -393,7 +392,6 @@ $UsedProto = ""
 foreach ($Proto in @("https", "http")) {
     if ($SiteReachable) { break }
     try {
-        # Kasutame $($Proto), et vältida kettatähise viga
         $Response = Invoke-WebRequest -Uri "$($Proto)://$($ProjectHost)" -TimeoutSec 10 -UseBasicParsing -ErrorAction Stop
         if ($Response.StatusCode -eq 200) {
             $SiteReachable = $true
@@ -416,68 +414,62 @@ Add-Check `
 
 $TestPassword = "Passw0rd!"
 $LoginSuccess = $false
-$LoginError = "Login failed"
+$LoginError = "No connection successful"
 $UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
-try {
-    foreach ($Proto in @("https", "http")) {
-        if ($LoginSuccess) { break }
-        
-        try {
-            $LoginUrl = "$($Proto)://$($ProjectHost)/wp-login.php"
-            $Session = New-Object Microsoft.PowerShell.Commands.WebRequestSession
-            $Session.UserAgent = $UserAgent
+foreach ($Proto in @("https", "http")) {
+    if ($LoginSuccess) { break }
+    
+    try {
+        $LoginUrl = "$($Proto)://$($ProjectHost)/wp-login.php"
+        $Session = New-Object Microsoft.PowerShell.Commands.WebRequestSession
+        $Session.UserAgent = $UserAgent
 
-            # 1. AVA LOGIN LEHT (Testcookie saamiseks)
-            Invoke-WebRequest -Uri $LoginUrl -WebSession $Session -TimeoutSec 10 -UseBasicParsing -ErrorAction Stop | Out-Null
+        # 1. AVA LOGIN LEHT (Testcookie saamiseks)
+        $InitialPage = Invoke-WebRequest -Uri $LoginUrl -WebSession $Session -TimeoutSec 10 -UseBasicParsing -ErrorAction Stop
 
-            # 2. LOGIN ANDMED
-            $Body = @{
-                log           = "pea.toimetaja@$DomainName"
-                pwd           = $TestPassword
-                "wp-submit"   = "Log In"
-                testcookie    = "1"
-            }
-
-            # 3. SAADA POST PÄRING
-            $Response = Invoke-WebRequest `
-                -Uri $LoginUrl `
-                -Method POST `
-                -Body $Body `
-                -WebSession $Session `
-                -UseBasicParsing `
-                -TimeoutSec 15 `
-                -ErrorAction Stop
-
-            # 4. KONTROLLI KÜPSIST VÕI SISU
-            $LoggedInCookie = $Session.Cookies.GetCookies($LoginUrl) | Where-Object { $_.Name -like "*wordpress_logged_in*" }
-            
-            if ($LoggedInCookie.Count -gt 0 -or $Response.Content -match "wp-admin") {
-                $LoginSuccess = $true
-                $LoginError = "OK ($($Proto.ToUpper()))"
-            }
-        } catch {
-            $LoginError = $_.Exception.Message
+        # 2. LOGIN ANDMED
+        $Body = @{
+            log           = "pea.toimetaja@$DomainName"
+            pwd           = $TestPassword
+            "wp-submit"   = "Log In"
+            testcookie    = "1"
         }
-    }
 
-    Add-Check `
-        "WordPress LDAP Login" `
-        "pea.toimetaja authenticates" `
-        $LoginError `
-        $LoginSuccess `
-        1 `
-        1
+        # 3. SAADA POST PÄRING
+        $Response = Invoke-WebRequest `
+            -Uri $LoginUrl `
+            -Method POST `
+            -Body $Body `
+            -WebSession $Session `
+            -UseBasicParsing `
+            -TimeoutSec 15 `
+            -ErrorAction Stop
+
+        # 4. KONTROLLI KÜPSIST VÕI SISU
+        $LoggedInCookie = $Session.Cookies.GetCookies($LoginUrl) | Where-Object { $_.Name -like "*wordpress_logged_in*" }
+        
+        if ($LoggedInCookie.Count -gt 0 -or $Response.Content -match "wp-admin") {
+            $LoginSuccess = $true
+            $LoginError = "OK ($($Proto.ToUpper()))"
+        }
+        else {
+            $LoginError = "Login failed: Invalid credentials or plugin not configured ($($Proto.ToUpper()))"
+        }
+    } 
+    catch {
+        # Salvestame vea, et näha miks konkreetne protokoll ebaõnnestus
+        $LoginError = "Error on $($Proto.ToUpper()): $($_.Exception.Message)"
+    }
 }
-catch {
-    Add-Check `
-        "WordPress LDAP Login" `
-        "pea.toimetaja authenticates" `
-        $_.Exception.Message `
-        $false `
-        1 `
-        1
-}
+
+Add-Check `
+    "WordPress LDAP Login" `
+    "pea.toimetaja authenticates" `
+    $LoginError `
+    $LoginSuccess `
+    1 `
+    1
 
 # ========================================================
 # FINAL SCORE
