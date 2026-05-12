@@ -3,7 +3,7 @@
 ```powershell
 # ========================================================
 # ACTIVE DIRECTORY + WORDPRESS AUTO GRADER
-# FULLY FIXED VERSION - FUZZY GROUP MATCHING & TRUTH TEST
+# FULLY FIXED VERSION - SMART GROUP & MEMBER MATCHING
 # ========================================================
 
 $ErrorActionPreference = "Continue"
@@ -280,20 +280,17 @@ $ActualGroupName = "Missing"
 $GroupExists = $false
 
 try {
-    if ($OU2) {
-        # Otsime kõik grupid WORDPRESS OU seest
-        $GroupsInOU = Get-ADGroup -Filter * -SearchBase $OU2.DistinguishedName
-        
-        foreach ($g in $GroupsInOU) {
-            # Teeme kontrolli paindlikuks: eemaldame tühikud ja muudame väiketähtedeks
-            # Kontrollime, kas nimi sisaldab nii "kodulehe" kui ka "toim" osasid
-            $CleanName = ($g.Name -replace '\s','').ToLower()
-            if ($CleanName -match "kodulehe" -and $CleanName -match "toim") {
-                $MatchedGroup = $g
-                $ActualGroupName = $g.Name
-                $GroupExists = $true
-                break # Leidsime sobiva, lõpetame tsükli
-            }
+    # Otsime kõik grupid tervest domeenist, et olla kindlad (ka juhul kui OU asukoht on vale)
+    $AllGroups = Get-ADGroup -Filter *
+    
+    foreach ($g in $AllGroups) {
+        # Puhastame nime tühikutest ja kontrollime märksõnu
+        $CleanName = ($g.Name -replace '\s','').ToLower()
+        if ($CleanName -match "kodulehe" -and $CleanName -match "toim") {
+            $MatchedGroup = $g
+            $ActualGroupName = $g.Name
+            $GroupExists = $true
+            break 
         }
     }
 
@@ -310,12 +307,12 @@ catch {
 }
 
 # ========================================================
-# GROUP MEMBERS
+# GROUP MEMBERS (USING MATCHED GROUP)
 # ========================================================
 
 try {
-    if ($GroupExists) {
-        # Kasutame leitud grupi täpset DistinguishedName-i liikmete kontrolliks
+    if ($GroupExists -and $MatchedGroup) {
+        # Kasutame leitud grupi täpset objekti liikmete hankimiseks
         $Members = Get-ADGroupMember -Identity $MatchedGroup.DistinguishedName
 
         $HasPea = ($Members.SamAccountName -contains "pea.toimetaja")
@@ -338,13 +335,13 @@ try {
             0.5
     }
     else {
-        # Kui gruppi ei leitud üldse
-        Add-Check "Group Member pea.toimetaja" "Added to group" "NO GROUP" $false 0.5 0.5
-        Add-Check "Group Member abi.toimetaja" "Added to group" "NO GROUP" $false 0.5 0.5
+        # Kui gruppi ei leitud üldse, on ka liikmed "puudu"
+        Add-Check "Group Member pea.toimetaja" "Added to group" "Missing (No Group)" $false 0.5 0.5
+        Add-Check "Group Member abi.toimetaja" "Added to group" "Missing (No Group)" $false 0.5 0.5
     }
 }
 catch {
-    Add-Check "Group Members" "Users added" "ERROR" $false 1 1
+    Add-Check "Group Members" "Users added" "ERROR fetching members" $false 1 1
 }
 
 # ========================================================
