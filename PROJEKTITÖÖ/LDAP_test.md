@@ -1,6 +1,3 @@
-
-
-```powershell
 # ========================================================
 # ACTIVE DIRECTORY + WORDPRESS AUTO GRADER
 # FULLY FIXED VERSION - NESTED OU & TLS 1.3 SUPPORT
@@ -387,7 +384,7 @@ catch {
 # ========================================================
 
 $SiteReachable = $false
-$UsedProto = ""
+$UsedProtoSite = ""
 
 foreach ($Proto in @("https", "http")) {
     if ($SiteReachable) { break }
@@ -395,7 +392,7 @@ foreach ($Proto in @("https", "http")) {
         $Response = Invoke-WebRequest -Uri "$($Proto)://$($ProjectHost)" -TimeoutSec 10 -UseBasicParsing -ErrorAction Stop
         if ($Response.StatusCode -eq 200) {
             $SiteReachable = $true
-            $UsedProto = $Proto
+            $UsedProtoSite = $Proto
         }
     } catch { }
 }
@@ -403,7 +400,7 @@ foreach ($Proto in @("https", "http")) {
 Add-Check `
     "WordPress Website" `
     "Reachable" `
-    $(if($SiteReachable){"YES ($UsedProto)"}else{"UNREACHABLE"}) `
+    $(if($SiteReachable){"YES ($UsedProtoSite)"}else{"UNREACHABLE"}) `
     $SiteReachable `
     0.5 `
     0.5
@@ -414,7 +411,7 @@ Add-Check `
 
 $TestPassword = "Passw0rd!"
 $LoginSuccess = $false
-$LoginError = "No connection successful"
+$LoginError = "Login failed"
 $UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
 foreach ($Proto in @("https", "http")) {
@@ -453,12 +450,8 @@ foreach ($Proto in @("https", "http")) {
             $LoginSuccess = $true
             $LoginError = "OK ($($Proto.ToUpper()))"
         }
-        else {
-            $LoginError = "Login failed: Invalid credentials or plugin not configured ($($Proto.ToUpper()))"
-        }
     } 
     catch {
-        # Salvestame vea, et näha miks konkreetne protokoll ebaõnnestus
         $LoginError = "Error on $($Proto.ToUpper()): $($_.Exception.Message)"
     }
 }
@@ -468,107 +461,4 @@ Add-Check `
     "pea.toimetaja authenticates" `
     $LoginError `
     $LoginSuccess `
-    1 `
     1
-
-# ========================================================
-# FINAL SCORE
-# ========================================================
-
-$TotalPoints = [math]::Round(
-    $TotalPoints,
-    2
-)
-
-$MaxTotalPoints = [math]::Round(
-    (
-        $Checks |
-
-        Measure-Object `
-            -Property MaxPoints `
-            -Sum
-    ).Sum,
-    2
-)
-
-# ========================================================
-# GRADE
-# ========================================================
-
-if ($TotalPoints -ge 9) {
-
-    $Grade = 5
-}
-elseif ($TotalPoints -ge 7) {
-
-    $Grade = 4
-}
-elseif ($TotalPoints -ge 5) {
-
-    $Grade = 3
-}
-else {
-
-    $Grade = "MA"
-}
-
-# ========================================================
-# RESULT OBJECT
-# ========================================================
-
-$Result = [PSCustomObject]@{
-
-    Student = $Surname
-    Timestamp = Get-Date
-    TotalPoints = $TotalPoints
-    MaxTotalPoints = $MaxTotalPoints
-    Grade = $Grade
-    Checks = $Checks
-}
-
-# ========================================================
-# SAVE JSON
-# ========================================================
-
-$Folder = "$PSScriptRoot\Results"
-
-if (!(Test-Path $Folder)) {
-
-    New-Item `
-        -ItemType Directory `
-        -Path $Folder `
-        -Force | Out-Null
-}
-
-$File = Join-Path `
-    $Folder `
-    "$Surname-result.json"
-
-$Result |
-
-    ConvertTo-Json -Depth 10 |
-
-    Out-File `
-        $File `
-        -Encoding UTF8
-
-# ========================================================
-# OUTPUT
-# ========================================================
-
-Write-Host ""
-Write-Host "=================================="
-Write-Host "KONTROLL LÕPETATUD"
-Write-Host "=================================="
-Write-Host ""
-
-Write-Host "Õpilane: $Surname"
-Write-Host "Punktid: $TotalPoints / $MaxTotalPoints"
-Write-Host "Hinne: $Grade"
-
-Write-Host ""
-Write-Host "JSON:"
-Write-Host $File
-Write-Host ""
-
-```
