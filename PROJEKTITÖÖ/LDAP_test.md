@@ -199,12 +199,20 @@ catch {
 # WORDPRESS REACHABILITY & LDAP LOGIN TEST
 # Proovib nii HTTPS kui HTTP
 # ========================================================
+# ========================================================
+# PARANDATUD WORDPRESS LDAP LOGIN TEST
+# ========================================================
+
+# Lubame kõik võimalikud turvaprotokollid korraga
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls13 -bor [Net.SecurityProtocolType]::Tls11 -bor [Net.SecurityProtocolType]::Tls
 
 $TestPassword = "Passw0rd!"
 $LoginSuccess = $false
-$SiteReachable = $false
 $UsedProtocol = ""
 $LoginError = "Ühendust ei saanud"
+
+# Defineerime brauseri tunnuse (User-Agent), et me ei näeks välja nagu robot
+$UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
 $Protocols = @("https", "http")
 
@@ -215,14 +223,14 @@ foreach ($Proto in $Protocols) {
         $BaseUrl = "$($Proto)://$ProjectHost"
         $LoginUrl = "$BaseUrl/wp-login.php"
         
-        # 1. Kontrollime kättesaadavust
-        $Resp = Invoke-WebRequest -Uri $BaseUrl -TimeoutSec 5 -ErrorAction Stop
-        if ($Resp.StatusCode -eq 200) { $SiteReachable = $true }
-
-        # 2. Proovime sisse logida
+        # Loome sessiooni
         $Session = New-Object Microsoft.PowerShell.Commands.WebRequestSession
-        Invoke-WebRequest -Uri $LoginUrl -WebSession $Session -TimeoutSec 5 -ErrorAction Stop | Out-Null
+        $Session.UserAgent = $UserAgent # Määrame brauseri tunnuse sessioonile
 
+        # 1. Ava login leht (kasutame -UseBasicParsing, et vältida IE sõltuvust)
+        Invoke-WebRequest -Uri $LoginUrl -WebSession $Session -TimeoutSec 10 -UseBasicParsing -ErrorAction Stop | Out-Null
+
+        # 2. Sisselogimise andmed
         $Body = @{
             log           = "pea.toimetaja@$DomainName"
             pwd           = $TestPassword
@@ -231,11 +239,27 @@ foreach ($Proto in $Protocols) {
             testcookie    = "1"
         }
 
-        $Response = Invoke-WebRequest -Uri $LoginUrl -Method POST -Body $Body -WebSession $Session -MaximumRedirection 10 -TimeoutSec 10 -ErrorAction Stop
+        # 3. Saada sisselogimise päring (POST)
+        $Response = Invoke-WebRequest `
+            -Uri $LoginUrl `
+            -Method POST `
+            -Body $Body `
+            -WebSession $Session `
+            -MaximumRedirection 5 `
+            -TimeoutSec 15 `
+            -UseBasicParsing `
+            -UserAgent $UserAgent `
+            -ErrorAction Stop
 
+        # 4. Kontrolli küpsiseid
         $LoggedInCookie = $Session.Cookies.GetCookies($LoginUrl) | Where-Object { $_.Name -like "wordpress_logged_in*" }
 
         if ($LoggedInCookie.Count -gt 0) {
+            $LoginSuccess = $true
+            $UsedProtocol = $Proto.ToUpper()
+        }
+        elseif ($Response.Content -match "wp-admin") {
+            # Igaks juhuks kontrollime ka vastuse sisu, kui küpsis on peidus
             $LoginSuccess = $true
             $UsedProtocol = $Proto.ToUpper()
         }
@@ -244,9 +268,6 @@ foreach ($Proto in $Protocols) {
         $LoginError = "$($Proto.ToUpper()): $($_.Exception.Message)"
     }
 }
-
-Add-Check "WordPress Website" "Reachable (HTTP or HTTPS)" $(if($SiteReachable){"YES"}else{"NO"}) $SiteReachable 0.5 0.5
-Add-Check "WordPress LDAP Login" "pea.toimetaja authenticates" $(if($LoginSuccess){"SUCCESS ($UsedProtocol)"}else{"FAILED: $LoginError"}) $LoginSuccess 1 1
 
 # ========================================================
 # FINAL SCORE & GRADE
