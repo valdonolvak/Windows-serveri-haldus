@@ -1,7 +1,7 @@
 ```powershell
 # ========================================================
 # ACTIVE DIRECTORY + WORDPRESS AUTO GRADER
-# FULL VERSION
+# FULLY FIXED VERSION
 # ========================================================
 
 $ErrorActionPreference = "Continue"
@@ -30,7 +30,6 @@ function Add-Check {
 
         $Status = "PASS"
         $Awarded = $Points
-
     }
     else {
 
@@ -61,10 +60,7 @@ try {
 
     $DomainName = $Domain.DNSRoot
 
-    $Surname = (
-        $DomainName.Split(".")[0]
-    )
-
+    $Surname = $DomainName.Split(".")[0]
 }
 catch {
 
@@ -144,6 +140,7 @@ if ($NIC) {
     ).ServerAddresses
 
     $DNSOK = (
+        $DNS.Count -ge 2 -and
         $DNS[0] -eq "127.0.0.1" -and
         $DNS[1] -eq "1.1.1.1"
     )
@@ -161,11 +158,8 @@ if ($NIC) {
 # WINDOWS ROLES
 # ========================================================
 
-$ADDS = Get-WindowsFeature `
-    AD-Domain-Services
-
-$DNSRole = Get-WindowsFeature `
-    DNS
+$ADDS = Get-WindowsFeature AD-Domain-Services
+$DNSRole = Get-WindowsFeature DNS
 
 Add-Check `
     "AD DS Role" `
@@ -209,7 +203,7 @@ catch {
 }
 
 # ========================================================
-# OU CHECKS
+# OUs
 # ========================================================
 
 $OU1 = Get-ADOrganizationalUnit `
@@ -262,9 +256,9 @@ Add-Check `
     0.5 `
     0.5
 
-# -----------------------------
+# ========================================================
 # PASSWORD NEVER EXPIRES
-# -----------------------------
+# ========================================================
 
 $PWNever = (
     $User1.PasswordNeverExpires -and
@@ -291,9 +285,7 @@ try {
         -Filter 'Name -eq "KoduleheToimetajad"' `
         -SearchBase $SearchBase
 
-    $GroupExists = (
-        $WPGroup -ne $null
-    )
+    $GroupExists = ($WPGroup -ne $null)
 
     Add-Check `
         "Group KoduleheToimetajad" `
@@ -430,6 +422,7 @@ catch {
         0.5 `
         0.5
 }
+
 # ========================================================
 # WORDPRESS LDAP LOGIN TEST
 # ========================================================
@@ -440,13 +433,16 @@ try {
 
     $LoginUrl = "http://$ProjectHost/wp-login.php"
 
+    # SESSION
     $Session = New-Object `
         Microsoft.PowerShell.Commands.WebRequestSession
 
+    # OPEN LOGIN PAGE
     Invoke-WebRequest `
         -Uri $LoginUrl `
         -WebSession $Session | Out-Null
 
+    # LOGIN BODY
     $Body = @{
 
         log           = "pea.toimetaja@$DomainName"
@@ -456,6 +452,7 @@ try {
         testcookie    = "1"
     }
 
+    # LOGIN REQUEST
     $Response = Invoke-WebRequest `
         -Uri $LoginUrl `
         -Method POST `
@@ -463,6 +460,7 @@ try {
         -WebSession $Session `
         -MaximumRedirection 10
 
+    # COOKIE CHECK
     $LoggedInCookie = (
         $Session.Cookies.GetCookies($LoginUrl) |
 
@@ -521,17 +519,14 @@ $MaxTotalPoints = [math]::Round(
 if ($TotalPoints -ge 9) {
 
     $Grade = 5
-
 }
 elseif ($TotalPoints -ge 7) {
 
     $Grade = 4
-
 }
 elseif ($TotalPoints -ge 5) {
 
     $Grade = 3
-
 }
 else {
 
