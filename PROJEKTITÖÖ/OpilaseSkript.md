@@ -1,3 +1,4 @@
+```powershell
 $ErrorActionPreference = "SilentlyContinue"
 
 Import-Module ActiveDirectory
@@ -544,3 +545,4 @@ Write-Host ""
 Write-Host "JSON:"
 Write-Host $File
 Write-Host ""
+```
