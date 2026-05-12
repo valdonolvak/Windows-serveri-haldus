@@ -1,22 +1,25 @@
 ```powershell
 # ========================================================
 # ACTIVE DIRECTORY + WORDPRESS AUTO GRADER
-# FULLY FIXED VERSION
+# VERSIOON: FINAL ULTIMATE (Terviklik tagasiside süsteem)
 # ========================================================
 
 $ErrorActionPreference = "Continue"
 
+# 1. TURVASEADED
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor 12288 -bor [Net.SecurityProtocolType]::Tls11 -bor [Net.SecurityProtocolType]::Tls
+[Net.ServicePointManager]::ServerCertificateValidationCallback = { $true }
+
 Import-Module ActiveDirectory
 
 # ========================================================
-# RESULT OBJECT
+# TULEMUSTE OBJEKT JA ABI-FUNKTSIOONID
 # ========================================================
 
 $Checks = @()
 $TotalPoints = 0
 
 function Add-Check {
-
     param(
         [string]$Category,
         [string]$Expected,
@@ -27,568 +30,235 @@ function Add-Check {
     )
 
     if ($Success) {
-
         $Status = "PASS"
         $Awarded = $Points
     }
     else {
-
         $Status = "FAIL"
         $Awarded = 0
     }
 
     $global:TotalPoints += $Awarded
-
     $global:Checks += [PSCustomObject]@{
-
         Category = $Category
         Expected = $Expected
-        Actual = $Actual
-        Status = $Status
-        Points = $Awarded
+        Actual   = $Actual
+        Status   = $Status
+        Points   = $Awarded
         MaxPoints = $MaxPoints
     }
 }
 
 # ========================================================
-# DOMAIN / STUDENT
+# ÕPILASE TUVASTAMINE
 # ========================================================
 
 try {
-
     $Domain = Get-ADDomain
-
     $DomainName = $Domain.DNSRoot
-
     $Surname = $DomainName.Split(".")[0]
 }
 catch {
-
     $Surname = "UNKNOWN"
 }
 
 # ========================================================
-# HOSTNAME
+# 1. SERVERI PÕHISEADISTUS
 # ========================================================
 
 $Hostname = $env:COMPUTERNAME
+Add-Check "Server Name" "AD1" $Hostname ($Hostname -eq "AD1") 0.5 0.5
 
-Add-Check `
-    "Server Name" `
-    "AD1" `
-    $Hostname `
-    ($Hostname -eq "AD1") `
-    0.5 `
-    0.5
-
-# ========================================================
-# NETWORK
-# ========================================================
-
-$NIC = Get-NetIPAddress `
-    -AddressFamily IPv4 |
-
-    Where-Object {
-        $_.IPAddress -like "10.0.*"
-    } |
-
-    Select-Object -First 1
+$NIC = Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -like "10.0.*" } | Select-Object -First 1
 
 if ($NIC) {
-
-    # -----------------------------
-    # IP
-    # -----------------------------
-
     $IP = $NIC.IPAddress
+    Add-Check "IP Address" "10.0.xxx.10" $IP ($IP -match "^10\.0\.\d+\.10$") 0.5 0.5
 
-    Add-Check `
-        "IP Address" `
-        "10.0.xxx.10" `
-        $IP `
-        ($IP -match "^10\.0\.\d+\.10$") `
-        0.5 `
-        0.5
+    $Gateway = (Get-NetRoute -DestinationPrefix "0.0.0.0/0" | Select-Object -First 1).NextHop
+    Add-Check "Gateway" "10.0.xxx.1" $Gateway ($Gateway -match "^10\.0\.\d+\.1$") 0.5 0.5
 
-    # -----------------------------
-    # GATEWAY
-    # -----------------------------
-
-    $Gateway = (
-        Get-NetRoute `
-            -DestinationPrefix "0.0.0.0/0" |
-
-        Select-Object -First 1
-    ).NextHop
-
-    Add-Check `
-        "Gateway" `
-        "10.0.xxx.1" `
-        $Gateway `
-        ($Gateway -match "^10\.0\.\d+\.1$") `
-        0.5 `
-        0.5
-
-    # -----------------------------
-    # DNS
-    # -----------------------------
-
-    $DNS = (
-        Get-DnsClientServerAddress `
-            -InterfaceIndex $NIC.InterfaceIndex `
-            -AddressFamily IPv4
-    ).ServerAddresses
-
-    $DNSOK = (
-        $DNS.Count -ge 2 -and
-        $DNS[0] -eq "127.0.0.1" -and
-        $DNS[1] -eq "1.1.1.1"
-    )
-
-    Add-Check `
-        "DNS Servers" `
-        "127.0.0.1, 1.1.1.1" `
-        ($DNS -join ", ") `
-        $DNSOK `
-        0.5 `
-        0.5
+    $DNS = (Get-DnsClientServerAddress -InterfaceIndex $NIC.InterfaceIndex -AddressFamily IPv4).ServerAddresses
+    $DNSOK = ($DNS.Count -ge 2 -and $DNS[0] -eq "127.0.0.1" -and $DNS[1] -eq "1.1.1.1")
+    Add-Check "DNS Servers" "127.0.0.1, 1.1.1.1" ($DNS -join ", ") $DNSOK 0.5 0.5
 }
-
-# ========================================================
-# WINDOWS ROLES
-# ========================================================
 
 $ADDS = Get-WindowsFeature AD-Domain-Services
 $DNSRole = Get-WindowsFeature DNS
-
-Add-Check `
-    "AD DS Role" `
-    "Installed" `
-    $ADDS.InstallState `
-    $ADDS.Installed `
-    0.5 `
-    0.5
-
-Add-Check `
-    "DNS Role" `
-    "Installed" `
-    $DNSRole.InstallState `
-    $DNSRole.Installed `
-    0.5 `
-    0.5
+Add-Check "AD DS Role" "Installed" $ADDS.InstallState $ADDS.Installed 0.5 0.5
+Add-Check "DNS Role" "Installed" $DNSRole.InstallState $DNSRole.Installed 0.5 0.5
 
 # ========================================================
-# DOMAIN
+# 2. ACTIVE DIRECTORY STRUKTUUR
 # ========================================================
+
+Add-Check "Domain Name" "*.lan" $DomainName ($DomainName -like "*.lan") 1 1
+
+$OU1 = Get-ADOrganizationalUnit -Filter 'Name -eq "KASUTAJAD"'
+$OU2 = Get-ADOrganizationalUnit -Filter 'Name -eq "WORDPRESS"'
+Add-Check "OU KASUTAJAD" "Exists" $(if($OU1){"Exists"}else{"Missing"}) ($OU1 -ne $null) 1 1
+Add-Check "OU WORDPRESS" "Exists" $(if($OU2){"Exists"}else{"Missing"}) ($OU2 -ne $null) 1 1
+
+$User1 = Get-ADUser -Filter 'SamAccountName -eq "pea.toimetaja" -or Name -like "*Pea Toimetaja*"' -Properties PasswordNeverExpires,Enabled | Select-Object -First 1
+$User2 = Get-ADUser -Filter 'SamAccountName -eq "abi.toimetaja" -or Name -like "*Abi Toimetaja*"' -Properties PasswordNeverExpires,Enabled | Select-Object -First 1
+
+function Get-UserLocation {
+    param($User)
+    if ($User) { return ($User.DistinguishedName -split ',', 2)[1] }
+    return "Not Found"
+}
+
+$U1Loc = Get-UserLocation $User1
+$U2Loc = Get-UserLocation $User2
+
+Add-Check "User pea.toimetaja" "Exists" "Found in: $U1Loc" ($User1 -ne $null -and $User1.Enabled -eq $true) 0.5 0.5
+Add-Check "User abi.toimetaja" "Exists" "Found in: $U2Loc" ($User2 -ne $null -and $User2.Enabled -eq $true) 0.5 0.5
+
+$PWNever = ($User1.PasswordNeverExpires -and $User2.PasswordNeverExpires)
+Add-Check "Password Never Expires" "True" "Status: $PWNever" $PWNever 0.5 0.5
+
+# ========================================================
+# 3. GRUPI JA LIIKMETE KONTROLL
+# ========================================================
+
+$MatchedGroup = $null
+$ActualGroupName = "Missing"
+$GroupExists = $false
+
+$AllGroups = Get-ADGroup -Filter * -Properties Member
+foreach ($g in $AllGroups) {
+    $CleanName = ($g.Name -replace '\s','').ToLower()
+    if ($CleanName -match "kodulehe" -and $CleanName -match "toim") {
+        $MatchedGroup = $g
+        $ActualGroupName = $g.Name
+        $GroupExists = $true
+        break 
+    }
+}
+Add-Check "Group KoduleheToimetajad" "Exists" $(if($GroupExists){"Exists ($ActualGroupName)"}else{"Missing"}) $GroupExists 0.5 0.5
 
 try {
-
-    Add-Check `
-        "Domain" `
-        "*.lan" `
-        $DomainName `
-        ($DomainName -like "*.lan") `
-        1 `
-        1
-}
-catch {
-
-    Add-Check `
-        "Domain" `
-        "*.lan" `
-        "NOT FOUND" `
-        $false `
-        1 `
-        1
+    if ($GroupExists -and $MatchedGroup) {
+        $MemberDNs = $MatchedGroup.Member
+        $HasPea = ($User1 -ne $null -and $MemberDNs -contains $User1.DistinguishedName)
+        $HasAbi = ($User2 -ne $null -and $MemberDNs -contains $User2.DistinguishedName)
+        
+        Add-Check "Group Member pea.toimetaja" "Added" $(if($HasPea){"YES"}else{"NO"}) $HasPea 0.5 0.5
+        Add-Check "Group Member abi.toimetaja" "Added" $(if($HasAbi){"YES"}else{"NO"}) $HasAbi 0.5 0.5
+    } else {
+        Add-Check "Group Member pea.toimetaja" "Added" "No Group" $false 0.5 0.5
+        Add-Check "Group Member abi.toimetaja" "Added" "No Group" $false 0.5 0.5
+    }
+} catch {
+    Add-Check "Group Members" "Failed" "ERROR" $false 1 1
 }
 
 # ========================================================
-# OUs
-# ========================================================
-
-$OU1 = Get-ADOrganizationalUnit `
-    -Filter 'Name -eq "KASUTAJAD"'
-
-$OU2 = Get-ADOrganizationalUnit `
-    -Filter 'Name -eq "WORDPRESS"'
-
-Add-Check `
-    "OU KASUTAJAD" `
-    "Exists" `
-    $(if($OU1){"Exists"}else{"Missing"}) `
-    ($OU1 -ne $null) `
-    1 `
-    1
-
-Add-Check `
-    "OU WORDPRESS" `
-    "Exists" `
-    $(if($OU2){"Exists"}else{"Missing"}) `
-    ($OU2 -ne $null) `
-    1 `
-    1
-
-# ========================================================
-# USERS
-# ========================================================
-
-$User1 = Get-ADUser `
-    pea.toimetaja `
-    -Properties PasswordNeverExpires,Enabled
-
-$User2 = Get-ADUser `
-    abi.toimetaja `
-    -Properties PasswordNeverExpires,Enabled
-
-Add-Check `
-    "User pea.toimetaja" `
-    "Exists + Enabled" `
-    $(if($User1){"Exists"}else{"Missing"}) `
-    ($User1.Enabled) `
-    0.5 `
-    0.5
-
-Add-Check `
-    "User abi.toimetaja" `
-    "Exists + Enabled" `
-    $(if($User2){"Exists"}else{"Missing"}) `
-    ($User2.Enabled) `
-    0.5 `
-    0.5
-
-# ========================================================
-# PASSWORD NEVER EXPIRES
-# ========================================================
-
-$PWNever = (
-    $User1.PasswordNeverExpires -and
-    $User2.PasswordNeverExpires
-)
-
-Add-Check `
-    "Password Never Expires" `
-    "True" `
-    "$($User1.PasswordNeverExpires), $($User2.PasswordNeverExpires)" `
-    $PWNever `
-    0.5 `
-    0.5
-
-# ========================================================
-# WORDPRESS GROUP
-# ========================================================
-
-try {
-
-    $SearchBase = "OU=WORDPRESS,$($Domain.DistinguishedName)"
-
-    $WPGroup = Get-ADGroup `
-        -Filter 'Name -eq "KoduleheToimetajad"' `
-        -SearchBase $SearchBase
-
-    $GroupExists = ($WPGroup -ne $null)
-
-    Add-Check `
-        "Group KoduleheToimetajad" `
-        "Exists in WORDPRESS OU" `
-        $(if($GroupExists){"Exists"}else{"Missing"}) `
-        $GroupExists `
-        0.5 `
-        0.5
-}
-catch {
-
-    Add-Check `
-        "Group KoduleheToimetajad" `
-        "Exists in WORDPRESS OU" `
-        "NOT FOUND" `
-        $false `
-        0.5 `
-        0.5
-}
-
-# ========================================================
-# GROUP MEMBERS
-# ========================================================
-
-try {
-
-    $Members = Get-ADGroupMember `
-        "KoduleheToimetajad"
-
-    $HasPea = (
-        $Members.SamAccountName `
-            -contains "pea.toimetaja"
-    )
-
-    $HasAbi = (
-        $Members.SamAccountName `
-            -contains "abi.toimetaja"
-    )
-
-    Add-Check `
-        "Group Member pea.toimetaja" `
-        "Added to group" `
-        $(if($HasPea){"YES"}else{"NO"}) `
-        $HasPea `
-        0.5 `
-        0.5
-
-    Add-Check `
-        "Group Member abi.toimetaja" `
-        "Added to group" `
-        $(if($HasAbi){"YES"}else{"NO"}) `
-        $HasAbi `
-        0.5 `
-        0.5
-}
-catch {
-
-    Add-Check `
-        "Group Members" `
-        "Users added" `
-        "ERROR" `
-        $false `
-        1 `
-        1
-}
-
-# ========================================================
-# DNS RECORD
+# 4. DNS JA VEEBI KONTROLL
 # ========================================================
 
 $ProjectHost = "projekt.$Surname.lan"
-
+$DNSValid = $false
 try {
-
-    $DNSResult = Resolve-DnsName `
-        $ProjectHost
-
-    $ProjectIP = (
-        $DNSResult |
-
-        Where-Object {
-            $_.Type -eq "A"
-        }
-    ).IPAddress
-
-    Add-Check `
-        "DNS Record" `
-        $ProjectHost `
-        $ProjectIP `
-        $true `
-        0.5 `
-        0.5
-}
-catch {
-
-    Add-Check `
-        "DNS Record" `
-        $ProjectHost `
-        "NOT FOUND" `
-        $false `
-        0.5 `
-        0.5
+    $DNSResult = Resolve-DnsName $ProjectHost -ErrorAction Stop
+    $DNSValid = $true
+    Add-Check "DNS Record" $ProjectHost ($DNSResult | Where-Object {$_.Type -eq "A"}).IPAddress $true 0.5 0.5
+} catch {
+    Add-Check "DNS Record" $ProjectHost "NOT FOUND" $false 0.5 0.5
 }
 
-# ========================================================
-# WORDPRESS WEBSITE
-# ========================================================
-
-try {
-
-    $Response = Invoke-WebRequest `
-        "http://$ProjectHost" `
-        -TimeoutSec 10
-
-    $WP = (
-        $Response.StatusCode -eq 200
-    )
-
-    Add-Check `
-        "WordPress Website" `
-        "Reachable" `
-        $Response.StatusCode `
-        $WP `
-        0.5 `
-        0.5
+$SiteReachable = $false
+foreach ($Proto in @("https", "http")) {
+    if ($SiteReachable) { break }
+    try {
+        $test = curl.exe -s -k -I "$($Proto)://$($ProjectHost)" --connect-timeout 5
+        if ($test -match "200 OK") { $SiteReachable = $true; $UsedProto = $Proto }
+    } catch { }
 }
-catch {
-
-    Add-Check `
-        "WordPress Website" `
-        "Reachable" `
-        "UNREACHABLE" `
-        $false `
-        0.5 `
-        0.5
-}
-
-# ========================================================
-# WORDPRESS LDAP LOGIN TEST
-# ========================================================
+Add-Check "WordPress Website" "Reachable" $(if($SiteReachable){"YES ($UsedProto)"}else{"UNREACHABLE"}) $SiteReachable 0.5 0.5
 
 $TestPassword = "Passw0rd!"
+$LoginSuccess = $false
+$CookieFile = "$env:TEMP\wp_grader_cookies.txt"
+if (Test-Path $CookieFile) { Remove-Item $CookieFile }
 
-try {
-
-    $LoginUrl = "http://$ProjectHost/wp-login.php"
-
-    # SESSION
-    $Session = New-Object `
-        Microsoft.PowerShell.Commands.WebRequestSession
-
-    # OPEN LOGIN PAGE
-    Invoke-WebRequest `
-        -Uri $LoginUrl `
-        -WebSession $Session | Out-Null
-
-    # LOGIN BODY
-    $Body = @{
-
-        log           = "pea.toimetaja@$DomainName"
-        pwd           = $TestPassword
-        "wp-submit"   = "Log In"
-        redirect_to   = "http://$ProjectHost/wp-admin/"
-        testcookie    = "1"
-    }
-
-    # LOGIN REQUEST
-    $Response = Invoke-WebRequest `
-        -Uri $LoginUrl `
-        -Method POST `
-        -Body $Body `
-        -WebSession $Session `
-        -MaximumRedirection 10
-
-    # COOKIE CHECK
-    $LoggedInCookie = (
-        $Session.Cookies.GetCookies($LoginUrl) |
-
-        Where-Object {
-            $_.Name -like "wordpress_logged_in*"
+foreach ($Proto in @("https", "http")) {
+    if ($LoginSuccess) { break }
+    $LoginUrl = "$($Proto)://$($ProjectHost)/wp-login.php"
+    $AdminUrl = "$($Proto)://$($ProjectHost)/wp-admin/index.php"
+    try {
+        curl.exe -s -k -c $CookieFile "$LoginUrl" --connect-timeout 5 | Out-Null
+        $PostData = "log=pea.toimetaja&pwd=$($TestPassword)&wp-submit=Log+In&testcookie=1"
+        curl.exe -s -k -b $CookieFile -c $CookieFile -X POST -d "$PostData" "$LoginUrl" --connect-timeout 5 | Out-Null
+        $AdminContent = curl.exe -s -k -b $CookieFile -L "$AdminUrl" --connect-timeout 5
+        if ($AdminContent -match "wpadminbar" -or $AdminContent -match "Dashboard") {
+            $LoginSuccess = $true
         }
-    )
-
-    $LoginSuccess = (
-        $LoggedInCookie.Count -gt 0
-    )
-
-    Add-Check `
-        "WordPress LDAP Login" `
-        "pea.toimetaja authenticates" `
-        $(if($LoginSuccess){"LOGIN SUCCESS"}else{"LOGIN FAILED"}) `
-        $LoginSuccess `
-        1 `
-        1
+    } catch { }
 }
-catch {
+Add-Check "WordPress LDAP Login" "pea.toimetaja authenticates" $(if($LoginSuccess){"OK"}else{"FAIL"}) $LoginSuccess 1 1
 
-    Add-Check `
-        "WordPress LDAP Login" `
-        "pea.toimetaja authenticates" `
-        $_.Exception.Message `
-        $false `
-        1 `
-        1
+# ========================================================
+# KOMPLEKSNE TAGASISIDE GENEREERIMINE
+# ========================================================
+
+$Passed = ($Checks | Where-Object { $_.Status -eq "PASS" }).Count
+$Total = $Checks.Count
+$ScorePercent = ($TotalPoints / $MaxTotalPoints) * 100
+
+# Alguslause
+$Feedback = "Töö tulemus: $Passed/$Total kontrolli läbitud ($ScorePercent%). "
+
+# 1. Serveri ja AD põhi
+$ServerFail = $Checks | Where-Object { $_.Category -match "Server|Domain|OU" -and $_.Status -eq "FAIL" }
+if ($ServerFail) {
+    $Feedback += "Serveri põhiseadistuses või AD struktuuris esines vigu (kontrolli nime, IP-d ja OU-sid). "
+} else {
+    $Feedback += "Serveri baasseadistus ja AD struktuur on eeskujulikud. "
+}
+
+# 2. Kasutajad ja asukoht
+$WrongOU = ($U1Loc -notmatch "WORDPRESS") -or ($U2Loc -notmatch "WORDPRESS")
+if ($WrongOU) {
+    $Feedback += "NB! Kasutajad on loodud, kuid nad ei asu korrektses WORDPRESS OU-s. "
+}
+
+# 3. Grupp ja liikmed
+if ($GroupExists) {
+    if ($ActualGroupName -ne "KoduleheToimetajad") {
+        $Feedback += "Grupinimes esines kirjaviga ($ActualGroupName), kuid grupp leiti üles. "
+    }
+    if ($HasPea -and $HasAbi) {
+        $Feedback += "Kasutajate lisamine gruppi õnnestus. "
+    } else {
+        $Feedback += "Kasutajad on grupi liikmeteks määramata. "
+    }
+} else {
+    $Feedback += "KoduleheToimetajate gruppi ei leitud. "
+}
+
+# 4. DNS ja Autentimine
+if ($DNSValid -and $LoginSuccess) {
+    $Feedback += "DNS kirje ja WordPressi LDAP autentimine toimivad suurepäraselt!"
+} elseif ($DNSValid -and !$LoginSuccess) {
+    $Feedback += "DNS on õige ja veeb avaneb, kuid LDAP autentimine ebaõnnestus (kontrolli pluginat)."
+} else {
+    $Feedback += "DNS kirje puudumise tõttu ei saanud veebilehte nimega avada."
 }
 
 # ========================================================
-# FINAL SCORE
-# ========================================================
-
-$TotalPoints = [math]::Round(
-    $TotalPoints,
-    2
-)
-
-$MaxTotalPoints = [math]::Round(
-    (
-        $Checks |
-
-        Measure-Object `
-            -Property MaxPoints `
-            -Sum
-    ).Sum,
-    2
-)
-
-# ========================================================
-# GRADE
-# ========================================================
-
-if ($TotalPoints -ge 9) {
-
-    $Grade = 5
-}
-elseif ($TotalPoints -ge 7) {
-
-    $Grade = 4
-}
-elseif ($TotalPoints -ge 5) {
-
-    $Grade = 3
-}
-else {
-
-    $Grade = "MA"
-}
-
-# ========================================================
-# RESULT OBJECT
+# EKSPORT
 # ========================================================
 
 $Result = [PSCustomObject]@{
-
-    Student = $Surname
-    Timestamp = Get-Date
-    TotalPoints = $TotalPoints
-    MaxTotalPoints = $MaxTotalPoints
-    Grade = $Grade
-    Checks = $Checks
+    Student = $Surname; Timestamp = Get-Date; TotalPoints = $TotalPoints; MaxTotalPoints = $MaxTotalPoints;
+    Grade = $Grade; Feedback = $Feedback; Checks = $Checks
 }
 
-# ========================================================
-# SAVE JSON
-# ========================================================
+$Folder = "$PSScriptRoot\Results"; if (!(Test-Path $Folder)) { New-Item -ItemType Directory -Path $Folder -Force | Out-Null }
+$File = Join-Path $Folder "$Surname-result.json"
+$Result | ConvertTo-Json -Depth 10 | Out-File $File -Encoding UTF8
 
-$Folder = "$PSScriptRoot\Results"
+Write-Host "Tagasiside genereeritud õpilasele $Surname." -ForegroundColor Green
 
-if (!(Test-Path $Folder)) {
-
-    New-Item `
-        -ItemType Directory `
-        -Path $Folder `
-        -Force | Out-Null
-}
-
-$File = Join-Path `
-    $Folder `
-    "$Surname-result.json"
-
-$Result |
-
-    ConvertTo-Json -Depth 10 |
-
-    Out-File `
-        $File `
-        -Encoding UTF8
-
-# ========================================================
-# OUTPUT
-# ========================================================
-
-Write-Host ""
-Write-Host "=================================="
-Write-Host "KONTROLL LÕPETATUD"
-Write-Host "=================================="
-Write-Host ""
-
-Write-Host "Õpilane: $Surname"
-Write-Host "Punktid: $TotalPoints / $MaxTotalPoints"
-Write-Host "Hinne: $Grade"
-
-Write-Host ""
-Write-Host "JSON:"
-Write-Host $File
-Write-Host ""
 ```
