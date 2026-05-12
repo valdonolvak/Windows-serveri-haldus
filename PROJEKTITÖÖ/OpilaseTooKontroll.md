@@ -3,7 +3,7 @@
 ```powershell
 # ========================================================
 # ACTIVE DIRECTORY + WORDPRESS AUTO GRADER
-# FULLY FIXED VERSION - ROBUST MEMBER & GROUP MATCHING
+# FINAL VERSION - USER OU TRACKING & ROBUST MATCHING
 # ========================================================
 
 $ErrorActionPreference = "Continue"
@@ -117,18 +117,31 @@ Add-Check "OU KASUTAJAD" "Exists" $(if($OU1){"Exists"}else{"Missing"}) ($OU1 -ne
 Add-Check "OU WORDPRESS" "Exists" $(if($OU2){"Exists"}else{"Missing"}) ($OU2 -ne $null) 1 1
 
 # ========================================================
-# USERS (GLOBAL SEARCH)
+# USERS (GLOBAL SEARCH WITH OU INFO)
 # ========================================================
 
-# Otsime kasutajad terve domeeni peale, et nesting ei segaks
+# Otsime kasutajad üle domeeni
 $User1 = Get-ADUser -Filter 'SamAccountName -eq "pea.toimetaja" -or Name -like "*Pea Toimetaja*"' -Properties PasswordNeverExpires,Enabled | Select-Object -First 1
 $User2 = Get-ADUser -Filter 'SamAccountName -eq "abi.toimetaja" -or Name -like "*Abi Toimetaja*"' -Properties PasswordNeverExpires,Enabled | Select-Object -First 1
 
-Add-Check "User pea.toimetaja" "Exists + Enabled" $(if($User1){"Exists"}else{"Missing"}) ($User1.Enabled -eq $true) 0.5 0.5
-Add-Check "User abi.toimetaja" "Exists + Enabled" $(if($User2){"Exists"}else{"Missing"}) ($User2.Enabled -eq $true) 0.5 0.5
+# Funktsioon asukoha leidmiseks
+function Get-UserLocation {
+    param($User)
+    if ($User) {
+        # Eemaldab kasutaja enda nime DN-st, jättes alles vaid OU tee
+        return ($User.DistinguishedName -split ',', 2)[1]
+    }
+    return "Not Found"
+}
+
+$User1OU = Get-UserLocation $User1
+$User2OU = Get-UserLocation $User2
+
+Add-Check "User pea.toimetaja" "Exists in WORDPRESS OU" "Found in: $User1OU" ($User1 -ne $null -and $User1.Enabled -eq $true) 0.5 0.5
+Add-Check "User abi.toimetaja" "Exists in WORDPRESS OU" "Found in: $User2OU" ($User2 -ne $null -and $User2.Enabled -eq $true) 0.5 0.5
 
 $PWNever = ($User1.PasswordNeverExpires -and $User2.PasswordNeverExpires)
-Add-Check "Password Never Expires" "True" "$($User1.PasswordNeverExpires), $($User2.PasswordNeverExpires)" $PWNever 0.5 0.5
+Add-Check "Password Never Expires" "True" "Status: $PWNever" $PWNever 0.5 0.5
 
 # ========================================================
 # WORDPRESS GROUP (FUZZY MATCHING)
@@ -160,14 +173,12 @@ try {
 
 try {
     if ($GroupExists -and $MatchedGroup) {
-        # Võtame grupi liikmete unikaalsed ID-d (DistinguishedName)
         $GroupMemberDNs = $MatchedGroup.Member
 
-        # Kontrollime, kas meie leitud kasutajate ID-d on selles nimekirjas
         $HasPea = ($User1 -ne $null -and $GroupMemberDNs -contains $User1.DistinguishedName)
         $HasAbi = ($User2 -ne $null -and $GroupMemberDNs -contains $User2.DistinguishedName)
 
-        # Kui DN ei andnud tulemust, proovime varuvariandina nimepõhist otsingut
+        # Tagavara tekstiline kontroll
         if (-not $HasPea -or -not $HasAbi) {
             $MembersObj = Get-ADGroupMember -Identity $MatchedGroup.DistinguishedName
             $MemberNames = $MembersObj.SamAccountName + $MembersObj.Name
@@ -213,7 +224,7 @@ Add-Check "WordPress Website" "Reachable" $(if($SiteReachable){"YES ($UsedProto)
 
 $TestPassword = "Passw0rd!"
 $LoginSuccess = $false
-$LoginMsg = "Vale parool või sisselogimine ebaõnnestus"
+$LoginMsg = "Autentimine ebaõnnestus"
 $CookieFile = "$env:TEMP\wp_strict_cookies.txt"
 if (Test-Path $CookieFile) { Remove-Item $CookieFile }
 
