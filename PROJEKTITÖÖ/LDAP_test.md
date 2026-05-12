@@ -3,7 +3,7 @@
 ```powershell
 # ========================================================
 # ACTIVE DIRECTORY + WORDPRESS AUTO GRADER
-# FULLY FIXED VERSION - HONEST AUTHENTICATION CHECK
+# FULLY FIXED VERSION - ULTIMATE TRUTH TEST
 # ========================================================
 
 $ErrorActionPreference = "Continue"
@@ -408,41 +408,44 @@ Add-Check `
     0.5
 
 # ========================================================
-# WORDPRESS LDAP LOGIN TEST (HONEST VALIDATION)
+# WORDPRESS LDAP LOGIN TEST (STRICT CONTENT CHECK)
 # ========================================================
 
 $TestPassword = "Passw0rd!"
 $LoginSuccess = $false
-$LoginMsg = "Autentimine ebaõnnestus (Vale parool või LDAP seadistus)"
-$CookieFile = "$env:TEMP\wp_cookies.txt"
+$LoginMsg = "Vale parool või sisselogimine ebaõnnestus"
+$CookieFile = "$env:TEMP\wp_strict_cookies.txt"
 
 if (Test-Path $CookieFile) { Remove-Item $CookieFile }
 
 foreach ($Proto in @("https", "http")) {
     if ($LoginSuccess) { break }
     
-    $Url = "$($Proto)://$($ProjectHost)/wp-login.php"
+    $LoginUrl = "$($Proto)://$($ProjectHost)/wp-login.php"
+    $AdminUrl = "$($Proto)://$($ProjectHost)/wp-admin/index.php"
     
     try {
-        # 1. SAMM: Külastame lehte, et saada sessiooni küpsised
-        curl.exe -s -k -c $CookieFile "$Url" --connect-timeout 10 | Out-Null
+        # 1. Hankige algsed küpsised
+        curl.exe -s -k -c $CookieFile "$LoginUrl" --connect-timeout 10 | Out-Null
         
-        # 2. SAMM: Saadame POST päringu
-        # Eemaldasime -L, et näha serveri vahetut vastust sisselogimisele
+        # 2. Proovige sisse logida
         $PostData = "log=pea.toimetaja&pwd=$($TestPassword)&wp-submit=Log+In&testcookie=1"
-        $ResponseHeaders = curl.exe -s -k -b $CookieFile -i -X POST -d "$PostData" "$Url" --connect-timeout 10
+        curl.exe -s -k -b $CookieFile -c $CookieFile -X POST -d "$PostData" "$LoginUrl" --connect-timeout 10 | Out-Null
         
-        # 3. RANGE KONTROLL: 
-        # Edukas sisselogimine tekitab 'Set-Cookie: wordpress_logged_in...' 
-        # JA suunab edasi (HTTP 302 Found)
-        if ($ResponseHeaders -match "Set-Cookie: wordpress_logged_in" -and $ResponseHeaders -match "302 Found") {
-            $LoginSuccess = $true
-            $LoginMsg = "OK ($($Proto.ToUpper()))"
-        }
-        elseif ($ResponseHeaders -match "302 Found" -and $ResponseHeaders -match "Location: .*wp-admin") {
-            # Mõned pluginad suunavad kohe, ilma et me näeks küpsist päises (aga suunamine on wp-adminisse)
-            $LoginSuccess = $true
-            $LoginMsg = "OK ($($Proto.ToUpper()))"
+        # 3. KONTROLL: Proovime avada admin-paneeli ja vaatame sisu
+        # Kui sisselogimine ebaõnnestus, suunatakse meid tagasi või näidatakse viga.
+        # Kui õnnestus, näeme WordPressi töölauda.
+        $AdminContent = curl.exe -s -k -b $CookieFile -L "$AdminUrl" --connect-timeout 10
+        
+        # Otsime tunnuseid, mis viitavad edule
+        # 'wpadminbar' on element, mis tekib sisseloginud kasutajale
+        # 'Dashboard' on tavaline pealkiri
+        if ($AdminContent -match "wpadminbar" -or $AdminContent -match "Dashboard" -or $AdminContent -match "Töölaud") {
+            # Topeltkontroll: sisselogimise vorm ei tohi seal olla
+            if ($AdminContent -notmatch "user_login" -and $AdminContent -notmatch "loginform") {
+                $LoginSuccess = $true
+                $LoginMsg = "OK ($($Proto.ToUpper()))"
+            }
         }
     } 
     catch {
