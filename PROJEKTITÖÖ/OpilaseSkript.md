@@ -1,7 +1,7 @@
 ```powershell
 # ========================================================
 # ACTIVE DIRECTORY + WORDPRESS AUTO GRADER
-# VERSIOON: FINAL ULTIMATE (Terviklik tagasiside süsteem)
+# VERSIOON: FINAL FIXED (JSON & Feedback Fix)
 # ========================================================
 
 $ErrorActionPreference = "Continue"
@@ -13,11 +13,11 @@ $ErrorActionPreference = "Continue"
 Import-Module ActiveDirectory
 
 # ========================================================
-# TULEMUSTE OBJEKT JA ABI-FUNKTSIOONID
+# RESULT OBJECT & HELPER
 # ========================================================
 
-$Checks = @()
-$TotalPoints = 0
+$global:Checks = @()
+$global:TotalPoints = 0
 
 function Add-Check {
     param(
@@ -50,7 +50,7 @@ function Add-Check {
 }
 
 # ========================================================
-# ÕPILASE TUVASTAMINE
+# DOMAIN / STUDENT
 # ========================================================
 
 try {
@@ -177,7 +177,6 @@ foreach ($Proto in @("https", "http")) {
 }
 Add-Check "WordPress Website" "Reachable" $(if($SiteReachable){"YES ($UsedProto)"}else{"UNREACHABLE"}) $SiteReachable 0.5 0.5
 
-$TestPassword = "Passw0rd!"
 $LoginSuccess = $false
 $CookieFile = "$env:TEMP\wp_grader_cookies.txt"
 if (Test-Path $CookieFile) { Remove-Item $CookieFile }
@@ -188,7 +187,7 @@ foreach ($Proto in @("https", "http")) {
     $AdminUrl = "$($Proto)://$($ProjectHost)/wp-admin/index.php"
     try {
         curl.exe -s -k -c $CookieFile "$LoginUrl" --connect-timeout 5 | Out-Null
-        $PostData = "log=pea.toimetaja&pwd=$($TestPassword)&wp-submit=Log+In&testcookie=1"
+        $PostData = "log=pea.toimetaja&pwd=Passw0rd!&wp-submit=Log+In&testcookie=1"
         curl.exe -s -k -b $CookieFile -c $CookieFile -X POST -d "$PostData" "$LoginUrl" --connect-timeout 5 | Out-Null
         $AdminContent = curl.exe -s -k -b $CookieFile -L "$AdminUrl" --connect-timeout 5
         if ($AdminContent -match "wpadminbar" -or $AdminContent -match "Dashboard") {
@@ -199,66 +198,48 @@ foreach ($Proto in @("https", "http")) {
 Add-Check "WordPress LDAP Login" "pea.toimetaja authenticates" $(if($LoginSuccess){"OK"}else{"FAIL"}) $LoginSuccess 1 1
 
 # ========================================================
-# KOMPLEKSNE TAGASISIDE GENEREERIMINE
+# KOKKUVÕTE, HINNE JA TAGASISIDE
 # ========================================================
 
-$Passed = ($Checks | Where-Object { $_.Status -eq "PASS" }).Count
-$Total = $Checks.Count
-$ScorePercent = ($TotalPoints / $MaxTotalPoints) * 100
+$MaxTotalPoints = [math]::Round(($global:Checks | Measure-Object -Property MaxPoints -Sum).Sum, 2)
+$TotalPoints = [math]::Round($global:TotalPoints, 2)
+$ScorePercent = if ($MaxTotalPoints -gt 0) { [math]::Round(($TotalPoints / $MaxTotalPoints) * 100, 1) } else { 0 }
 
-# Alguslause
-$Feedback = "Töö tulemus: $Passed/$Total kontrolli läbitud ($ScorePercent%). "
+if ($TotalPoints -ge 9) { $Grade = 5 }
+elseif ($TotalPoints -ge 7) { $Grade = 4 }
+elseif ($TotalPoints -ge 5) { $Grade = 3 }
+else { $Grade = "MA" }
 
-# 1. Serveri ja AD põhi
-$ServerFail = $Checks | Where-Object { $_.Category -match "Server|Domain|OU" -and $_.Status -eq "FAIL" }
-if ($ServerFail) {
-    $Feedback += "Serveri põhiseadistuses või AD struktuuris esines vigu (kontrolli nime, IP-d ja OU-sid). "
+# Põhjalik tagasiside
+$Passed = ($global:Checks | Where-Object { $_.Status -eq "PASS" }).Count
+$Feedback = "Töö tulemus: $Passed/$($global:Checks.Count) kontrolli läbitud ($ScorePercent%). "
+
+if ($MaxTotalPoints -le $TotalPoints + 0.1) {
+    $Feedback += "Kõik ülesanded on täidetud eeskujulikult! "
 } else {
-    $Feedback += "Serveri baasseadistus ja AD struktuur on eeskujulikud. "
-}
-
-# 2. Kasutajad ja asukoht
-$WrongOU = ($U1Loc -notmatch "WORDPRESS") -or ($U2Loc -notmatch "WORDPRESS")
-if ($WrongOU) {
-    $Feedback += "NB! Kasutajad on loodud, kuid nad ei asu korrektses WORDPRESS OU-s. "
-}
-
-# 3. Grupp ja liikmed
-if ($GroupExists) {
-    if ($ActualGroupName -ne "KoduleheToimetajad") {
-        $Feedback += "Grupinimes esines kirjaviga ($ActualGroupName), kuid grupp leiti üles. "
-    }
-    if ($HasPea -and $HasAbi) {
-        $Feedback += "Kasutajate lisamine gruppi õnnestus. "
-    } else {
-        $Feedback += "Kasutajad on grupi liikmeteks määramata. "
-    }
-} else {
-    $Feedback += "KoduleheToimetajate gruppi ei leitud. "
-}
-
-# 4. DNS ja Autentimine
-if ($DNSValid -and $LoginSuccess) {
-    $Feedback += "DNS kirje ja WordPressi LDAP autentimine toimivad suurepäraselt!"
-} elseif ($DNSValid -and !$LoginSuccess) {
-    $Feedback += "DNS on õige ja veeb avaneb, kuid LDAP autentimine ebaõnnestus (kontrolli pluginat)."
-} else {
-    $Feedback += "DNS kirje puudumise tõttu ei saanud veebilehte nimega avada."
+    if ($U1Loc -notmatch "WORDPRESS" -or $U2Loc -notmatch "WORDPRESS") { $Feedback += "Mõni kasutaja on vales OU-s. " }
+    if (!$LoginSuccess) { $Feedback += "LDAP sisselogimine ebaõnnestus (kontrolli pluginat). " }
+    if (!$DNSValid) { $Feedback += "DNS kirje puudub või on vale. " }
 }
 
 # ========================================================
-# EKSPORT
+# LÕPLIK JSON EKSPORT (image_e0f837.png järgi)
 # ========================================================
 
 $Result = [PSCustomObject]@{
-    Student = $Surname; Timestamp = Get-Date; TotalPoints = $TotalPoints; MaxTotalPoints = $MaxTotalPoints;
-    Grade = $Grade; Feedback = $Feedback; Checks = $Checks
+    Student        = $Surname
+    Timestamp      = Get-Date
+    TotalPoints    = $TotalPoints
+    MaxTotalPoints = $MaxTotalPoints
+    Grade          = $Grade
+    Feedback       = $Feedback
+    Checks         = $global:Checks
 }
 
 $Folder = "$PSScriptRoot\Results"; if (!(Test-Path $Folder)) { New-Item -ItemType Directory -Path $Folder -Force | Out-Null }
 $File = Join-Path $Folder "$Surname-result.json"
 $Result | ConvertTo-Json -Depth 10 | Out-File $File -Encoding UTF8
 
-Write-Host "Tagasiside genereeritud õpilasele $Surname." -ForegroundColor Green
+Write-Host "Tagasiside salvestatud õpilasele $Surname. Hinne: $Grade" -ForegroundColor Green
 
 ```
