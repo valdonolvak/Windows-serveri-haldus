@@ -1,7 +1,7 @@
 ```powershell
 # ========================================================
 # ACTIVE DIRECTORY + WORDPRESS AUTO GRADER
-# VERSIOON: FINAL FIXED (JSON & Feedback Fix)
+# VERSIOON: FINAL ULTIMATE (Rich Feedback System)
 # ========================================================
 
 $ErrorActionPreference = "Continue"
@@ -137,6 +137,8 @@ foreach ($g in $AllGroups) {
 }
 Add-Check "Group KoduleheToimetajad" "Exists" $(if($GroupExists){"Exists ($ActualGroupName)"}else{"Missing"}) $GroupExists 0.5 0.5
 
+$HasPea = $false
+$HasAbi = $false
 try {
     if ($GroupExists -and $MatchedGroup) {
         $MemberDNs = $MatchedGroup.Member
@@ -168,6 +170,7 @@ try {
 }
 
 $SiteReachable = $false
+$UsedProto = ""
 foreach ($Proto in @("https", "http")) {
     if ($SiteReachable) { break }
     try {
@@ -198,7 +201,7 @@ foreach ($Proto in @("https", "http")) {
 Add-Check "WordPress LDAP Login" "pea.toimetaja authenticates" $(if($LoginSuccess){"OK"}else{"FAIL"}) $LoginSuccess 1 1
 
 # ========================================================
-# KOKKUVÕTE, HINNE JA TAGASISIDE
+# PÕHJALIK TAGASISIDE GENEREERIMINE
 # ========================================================
 
 $MaxTotalPoints = [math]::Round(($global:Checks | Measure-Object -Property MaxPoints -Sum).Sum, 2)
@@ -210,20 +213,52 @@ elseif ($TotalPoints -ge 7) { $Grade = 4 }
 elseif ($TotalPoints -ge 5) { $Grade = 3 }
 else { $Grade = "MA" }
 
-# Põhjalik tagasiside
-$Passed = ($global:Checks | Where-Object { $_.Status -eq "PASS" }).Count
-$Feedback = "Töö tulemus: $Passed/$($global:Checks.Count) kontrolli läbitud ($ScorePercent%). "
+$FailedList = @()
+$PassedCount = ($global:Checks | Where-Object { $_.Status -eq "PASS" }).Count
+$TotalCount = $global:Checks.Count
 
-if ($MaxTotalPoints -le $TotalPoints + 0.1) {
-    $Feedback += "Kõik ülesanded on täidetud eeskujulikult! "
+# Analüüsime konkreetseid vigu
+foreach ($c in $global:Checks) {
+    if ($c.Status -eq "FAIL") {
+        switch ($c.Category) {
+            "Server Name" { $FailedList += "Serveri nimi peab olema AD1 (leiti: $($c.Actual))." }
+            "IP Address" { $FailedList += "Võrgukaardi IP peab olema 10.0.xxx.10." }
+            "DNS Servers" { $FailedList += "DNS serverid peavad olema 127.0.0.1 ja 1.1.1.1." }
+            "OU KASUTAJAD" { $FailedList += "OU KASUTAJAD on loomata." }
+            "OU WORDPRESS" { $FailedList += "OU WORDPRESS on loomata." }
+            "User pea.toimetaja" { $FailedList += "Kasutaja pea.toimetaja puudub või on keelatud." }
+            "User abi.toimetaja" { $FailedList += "Kasutaja abi.toimetaja puudub või on keelatud." }
+            "Group KoduleheToimetajad" { $FailedList += "Gruppi KoduleheToimetajad ei leitud." }
+            "Group Member pea.toimetaja" { $FailedList += "pea.toimetaja ei ole grupi liige." }
+            "Group Member abi.toimetaja" { $FailedList += "abi.toimetaja ei ole grupi liige." }
+            "DNS Record" { $FailedList += "DNS-is puudub projekt.$Surname.lan kirje." }
+            "WordPress Website" { $FailedList += "Veebileht ei avane nimega projekt.$Surname.lan." }
+            "WordPress LDAP Login" { $FailedList += "LDAP sisselogimine ebaõnnestus." }
+        }
+    }
+}
+
+# Koostame lõpliku tagasiside teksti
+$Feedback = "Töö tulemus: $PassedCount/$TotalCount kontrolli läbitud ($ScorePercent%). "
+
+if ($FailedList.Count -eq 0) {
+    $Feedback += "Kõik ülesanded on täidetud korrektselt. Suurepärane!"
 } else {
-    if ($U1Loc -notmatch "WORDPRESS" -or $U2Loc -notmatch "WORDPRESS") { $Feedback += "Mõni kasutaja on vales OU-s. " }
-    if (!$LoginSuccess) { $Feedback += "LDAP sisselogimine ebaõnnestus (kontrolli pluginat). " }
-    if (!$DNSValid) { $Feedback += "DNS kirje puudub või on vale. " }
+    $Feedback += "Leitud puudused: " + ($FailedList -join " ")
+    
+    # Erihoiatus asukoha kohta, kui sisu on olemas aga vales kohas
+    if (($U1Loc -ne "Not Found" -and $U1Loc -notmatch "WORDPRESS") -or ($U2Loc -ne "Not Found" -and $U2Loc -notmatch "WORDPRESS")) {
+        $Feedback += " NB! Kasutajad on loodud, kuid nad ei asu korrektses WORDPRESS OU-s."
+    }
+    
+    # Kirjavigade hoiatus grupiga
+    if ($GroupExists -and $ActualGroupName -ne "KoduleheToimetajad") {
+        $Feedback += " Grupi nimi on vigane ($ActualGroupName), paranda see vastavalt ülesandele."
+    }
 }
 
 # ========================================================
-# LÕPLIK JSON EKSPORT (image_e0f837.png järgi)
+# LÕPLIK JSON EKSPORT
 # ========================================================
 
 $Result = [PSCustomObject]@{
@@ -240,6 +275,6 @@ $Folder = "$PSScriptRoot\Results"; if (!(Test-Path $Folder)) { New-Item -ItemTyp
 $File = Join-Path $Folder "$Surname-result.json"
 $Result | ConvertTo-Json -Depth 10 | Out-File $File -Encoding UTF8
 
-Write-Host "Tagasiside salvestatud õpilasele $Surname. Hinne: $Grade" -ForegroundColor Green
+Write-Host "Põhjalik tagasiside salvestatud õpilasele $Surname." -ForegroundColor Green
 
 ```
