@@ -397,40 +397,53 @@ catch {
 # ========================================================
 
 # STANDARD TEST PASSWORD
-$TestPassword = "Parool123!"
+$TestPassword = "Passw0rd!"
+
+#$TestPassword = Read-Host "Sisesta AD/WordPress testparool"
 
 try {
 
     $LoginUrl = "http://$ProjectHost/wp-login.php"
 
+    # SESSION
+    $Session = New-Object Microsoft.PowerShell.Commands.WebRequestSession
+
+    # GET LOGIN PAGE FIRST (important for cookies)
+    Invoke-WebRequest `
+        -Uri $LoginUrl `
+        -WebSession $Session `
+        -UseBasicParsing | Out-Null
+
+    # LOGIN BODY
     $Body = @{
-        log = "pea.toimetaja"
-        pwd = $TestPassword
-        'wp-submit' = 'Log In'
-        redirect_to = "http://$ProjectHost/wp-admin/"
-        testcookie = '1'
+        log           = "pea.toimetaja"
+        pwd           = $TestPassword
+        wp-submit     = "Log In"
+        redirect_to   = "http://$ProjectHost/wp-admin/"
+        testcookie    = "1"
     }
 
-    $Session = New-Object `
-        Microsoft.PowerShell.Commands.WebRequestSession
-
-    $LoginResponse = Invoke-WebRequest `
+    # LOGIN REQUEST
+    $Response = Invoke-WebRequest `
         -Uri $LoginUrl `
         -Method POST `
         -Body $Body `
         -WebSession $Session `
-        -MaximumRedirection 5
+        -MaximumRedirection 10 `
+        -UseBasicParsing
 
-    $LoginSuccess = (
-        $LoginResponse.Content -match "dashboard" -or
-        $LoginResponse.BaseResponse.ResponseUri.AbsoluteUri `
-            -match "wp-admin"
-    )
+    # CHECK COOKIES
+    $LoggedInCookie = $Session.Cookies.GetCookies($LoginUrl) |
+        Where-Object {
+            $_.Name -like "wordpress_logged_in*"
+        }
+
+    $LoginSuccess = ($LoggedInCookie -ne $null)
 
     Add-Check `
         "WordPress LDAP Login" `
-        "pea.toimetaja can login" `
-        $(if($LoginSuccess){"LOGIN OK"}else{"LOGIN FAILED"}) `
+        "pea.toimetaja authenticates" `
+        $(if($LoginSuccess){"LOGIN SUCCESS"}else{"LOGIN FAILED"}) `
         $LoginSuccess `
         1 `
         1
@@ -439,13 +452,12 @@ catch {
 
     Add-Check `
         "WordPress LDAP Login" `
-        "pea.toimetaja can login" `
-        "ERROR" `
+        "pea.toimetaja authenticates" `
+        $_.Exception.Message `
         $false `
         1 `
         1
 }
-
 # ========================================================
 # FINAL SCORE
 # ========================================================
