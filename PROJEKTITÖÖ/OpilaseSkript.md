@@ -1,7 +1,7 @@
 ```powershell
 # ========================================================
 # ACTIVE DIRECTORY + WORDPRESS AUTO GRADER
-# VERSIOON: FINAL ULTIMATE (Rich Feedback System)
+# VERSIOON: FINAL ULTIMATE (Dynamic Comparison Feedback)
 # ========================================================
 
 $ErrorActionPreference = "Continue"
@@ -75,7 +75,8 @@ if ($NIC) {
     $IP = $NIC.IPAddress
     Add-Check "IP Address" "10.0.xxx.10" $IP ($IP -match "^10\.0\.\d+\.10$") 0.5 0.5
 
-    $Gateway = (Get-NetRoute -DestinationPrefix "0.0.0.0/0" | Select-Object -First 1).NextHop
+    $GatewayObj = Get-NetRoute -DestinationPrefix "0.0.0.0/0" | Select-Object -First 1
+    $Gateway = if ($GatewayObj) { $GatewayObj.NextHop } else { "Missing" }
     Add-Check "Gateway" "10.0.xxx.1" $Gateway ($Gateway -match "^10\.0\.\d+\.1$") 0.5 0.5
 
     $DNS = (Get-DnsClientServerAddress -InterfaceIndex $NIC.InterfaceIndex -AddressFamily IPv4).ServerAddresses
@@ -137,8 +138,6 @@ foreach ($g in $AllGroups) {
 }
 Add-Check "Group KoduleheToimetajad" "Exists" $(if($GroupExists){"Exists ($ActualGroupName)"}else{"Missing"}) $GroupExists 0.5 0.5
 
-$HasPea = $false
-$HasAbi = $false
 try {
     if ($GroupExists -and $MatchedGroup) {
         $MemberDNs = $MatchedGroup.Member
@@ -201,7 +200,7 @@ foreach ($Proto in @("https", "http")) {
 Add-Check "WordPress LDAP Login" "pea.toimetaja authenticates" $(if($LoginSuccess){"OK"}else{"FAIL"}) $LoginSuccess 1 1
 
 # ========================================================
-# PÕHJALIK TAGASISIDE GENEREERIMINE
+# PÕHJALIK DÜNAAMILINE TAGASISIDE
 # ========================================================
 
 $MaxTotalPoints = [math]::Round(($global:Checks | Measure-Object -Property MaxPoints -Sum).Sum, 2)
@@ -213,47 +212,50 @@ elseif ($TotalPoints -ge 7) { $Grade = 4 }
 elseif ($TotalPoints -ge 5) { $Grade = 3 }
 else { $Grade = "MA" }
 
-$FailedList = @()
-$PassedCount = ($global:Checks | Where-Object { $_.Status -eq "PASS" }).Count
-$TotalCount = $global:Checks.Count
+# Arvutame subneti dünaamilise tagasiside jaoks (nt 50 vmbr50 puhul)
+$CurrentSubnet = if ($Gateway -match "10\.0\.(\d+)\.") { $Matches[1] } else { "xxx" }
+$ExpectedIP = "10.0.$CurrentSubnet.10"
+$ExpectedGW = "10.0.$CurrentSubnet.1"
 
-# Analüüsime konkreetseid vigu
+$FailedList = @()
 foreach ($c in $global:Checks) {
     if ($c.Status -eq "FAIL") {
+        $msg = "[$($c.Category)]: "
         switch ($c.Category) {
-            "Server Name" { $FailedList += "Serveri nimi peab olema AD1 (leiti: $($c.Actual))." }
-            "IP Address" { $FailedList += "Võrgukaardi IP peab olema 10.0.xxx.10." }
-            "DNS Servers" { $FailedList += "DNS serverid peavad olema 127.0.0.1 ja 1.1.1.1." }
-            "OU KASUTAJAD" { $FailedList += "OU KASUTAJAD on loomata." }
-            "OU WORDPRESS" { $FailedList += "OU WORDPRESS on loomata." }
-            "User pea.toimetaja" { $FailedList += "Kasutaja pea.toimetaja puudub või on keelatud." }
-            "User abi.toimetaja" { $FailedList += "Kasutaja abi.toimetaja puudub või on keelatud." }
-            "Group KoduleheToimetajad" { $FailedList += "Gruppi KoduleheToimetajad ei leitud." }
-            "Group Member pea.toimetaja" { $FailedList += "pea.toimetaja ei ole grupi liige." }
-            "Group Member abi.toimetaja" { $FailedList += "abi.toimetaja ei ole grupi liige." }
-            "DNS Record" { $FailedList += "DNS-is puudub projekt.$Surname.lan kirje." }
-            "WordPress Website" { $FailedList += "Veebileht ei avane nimega projekt.$Surname.lan." }
-            "WordPress LDAP Login" { $FailedList += "LDAP sisselogimine ebaõnnestus." }
+            "Server Name" { $msg += "Oodati nime AD1, kuid leiti '$($c.Actual)'." }
+            "IP Address" { $msg += "Võrgukaardi IP peab olema $ExpectedIP, kuid leiti $($c.Actual)." }
+            "Gateway" { $msg += "Võrgu Gateway peab olema $ExpectedGW, kuid leiti $($c.Actual)." }
+            "DNS Servers" { $msg += "DNS serverid peavad olema 127.0.0.1 ja 1.1.1.1, kuid leiti $($c.Actual)." }
+            "OU KASUTAJAD" { $msg += "OU 'KASUTAJAD' puudub." }
+            "OU WORDPRESS" { $msg += "OU 'WORDPRESS' puudub." }
+            "User pea.toimetaja" { $msg += "Kasutaja pea.toimetaja puudub või on sisse logimine keelatud." }
+            "User abi.toimetaja" { $msg += "Kasutaja abi.toimetaja puudub või on sisse logimine keelatud." }
+            "Group KoduleheToimetajad" { $msg += "Gruppi 'KoduleheToimetajad' ei leitud (kontrolli kirjapilti)." }
+            "Group Member pea.toimetaja" { $msg += "pea.toimetaja ei ole KoduleheToimetajate grupi liige." }
+            "Group Member abi.toimetaja" { $msg += "abi.toimetaja ei ole KoduleheToimetajate grupi liige." }
+            "DNS Record" { $msg += "DNS-is puudub kirje projekt.$Surname.lan (ootasime suunamist WordPressile)." }
+            "WordPress Website" { $msg += "Veebileht nimega projekt.$Surname.lan ei avane (leitud staatus: $($c.Actual))." }
+            "WordPress LDAP Login" { $msg += "LDAP autentimine ebaõnnestus (kontrolli parooli ja WordPressi pluginat)." }
         }
+        $FailedList += $msg
     }
 }
 
-# Koostame lõpliku tagasiside teksti
-$Feedback = "Töö tulemus: $PassedCount/$TotalCount kontrolli läbitud ($ScorePercent%). "
+$Feedback = "Töö tulemus: $(($global:Checks | Where-Object {$_.Status -eq 'PASS'}).Count)/$($global:Checks.Count) kontrolli läbitud ($ScorePercent%). "
 
 if ($FailedList.Count -eq 0) {
     $Feedback += "Kõik ülesanded on täidetud korrektselt. Suurepärane!"
 } else {
     $Feedback += "Leitud puudused: " + ($FailedList -join " ")
     
-    # Erihoiatus asukoha kohta, kui sisu on olemas aga vales kohas
+    # Asukoha hoiatus
     if (($U1Loc -ne "Not Found" -and $U1Loc -notmatch "WORDPRESS") -or ($U2Loc -ne "Not Found" -and $U2Loc -notmatch "WORDPRESS")) {
-        $Feedback += " NB! Kasutajad on loodud, kuid nad ei asu korrektses WORDPRESS OU-s."
+        $Feedback += " NB! Kasutajad on küll olemas, kuid asuvad vales asukohas (Found in: $U1Loc ja $U2Loc)."
     }
     
-    # Kirjavigade hoiatus grupiga
+    # Grupinime hoiatus
     if ($GroupExists -and $ActualGroupName -ne "KoduleheToimetajad") {
-        $Feedback += " Grupi nimi on vigane ($ActualGroupName), paranda see vastavalt ülesandele."
+        $Feedback += " NB! Grupp leiti nimega '$ActualGroupName', kuid ülesanne nõuab täpset nime 'KoduleheToimetajad'."
     }
 }
 
@@ -275,6 +277,6 @@ $Folder = "$PSScriptRoot\Results"; if (!(Test-Path $Folder)) { New-Item -ItemTyp
 $File = Join-Path $Folder "$Surname-result.json"
 $Result | ConvertTo-Json -Depth 10 | Out-File $File -Encoding UTF8
 
-Write-Host "Põhjalik tagasiside salvestatud õpilasele $Surname." -ForegroundColor Green
+Write-Host "Põhjalik dünaamiline tagasiside genereeritud õpilasele $Surname." -ForegroundColor Green
 
 ```
