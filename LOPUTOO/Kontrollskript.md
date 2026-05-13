@@ -1,4 +1,6 @@
+##**Kopeeri selle faili sisu**
 
+```powershell
 # --- 0. ETTEVALMISTUS JA VÕRGU PROTOKOLLID ---
 # Sunnime TLS 1.2 kasutamise (Windows Serveri puhul sageli vajalik API-dega suhtlemiseks)
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
@@ -117,3 +119,4 @@ try {
     Write-Host "Palun kasuta veebilehe manuaalset 'Upload' vormi ja laadi üles fail: $FileName" -ForegroundColor Yellow
 }
 
+```
