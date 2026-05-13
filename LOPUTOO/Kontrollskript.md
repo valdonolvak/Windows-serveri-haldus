@@ -172,6 +172,4 @@ try {
 } catch {
     Write-Host "VIGA: Automaatne saatmine ebaõnnestus. Kasuta veebivormi." -ForegroundColor Red
 }
-
-
 ```
