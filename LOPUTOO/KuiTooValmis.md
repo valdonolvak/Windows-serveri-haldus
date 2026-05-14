@@ -1,4 +1,5 @@
-
+## Kui töö valmis, siis kopeeri see Powershelli skript ja läbi Powershell ISE salvesta see enda arvutisse  kausta C:\Temp" nimega Kontroll.ps1 ##
+## Seejärel käivita see Powershell ISE rakenduses ##
 
 ### Täielik ja detailne kontrollskript: `Kontroll.ps1`
 
@@ -227,19 +228,6 @@ try {
     Write-Host "`nSAATMINE EBAÕNNESTUS: $($_.Exception.Message)" -ForegroundColor Red
     Write-Host "Fail salvestati: $FullFilePath" -ForegroundColor Cyan
 }
-
-```
-
-Kuna `index.html` on nüüd seadistatud kuvama `Selgitus` välja akordioni sees, siis õpilane (ja õpetaja) näeb täpselt seda nimekirja, mis skriptis koostati.
-
-Tee Linuxi serveris teenusele restart (`sudo systemctl restart hindamine`) ja käivita AD1 masinas see uus skript!
-
-### Täiendatud PowerShell skript: `Kontroll.ps1`
-
-Lisasin `Remove-Item` käsu edukasse saatmise blokki.
-
-```powershell
-# ... (kõik kontrollid jäävad samaks kuni lõpuni) ...
 
 # --- 6. SAATMINE LINUX SERVERISSE ---
 $FullApiUrl = "http://$($ServerIP):5000/api/upload"
