@@ -329,8 +329,8 @@ foreach($res in $global:Results) {
 
 # --- 6. SALVESTAMINE JA SAATMINE SERVERISSE ---
 
-# 1. Kustutame vana faili masinast, kui see on olemas
-if (Test-Path $FullFilePath) { Remove-Item $FullFilePath -Force }
+# 1. Kontrollime, et kaust on olemas
+if (!(Test-Path "C:\Temp")) { New-Item -Path "C:\Temp" -ItemType Directory -Force | Out-Null }
 
 # 2. Koostame Payload objekti
 $PayloadObj = [PSCustomObject]@{
@@ -345,27 +345,30 @@ $PayloadObj = [PSCustomObject]@{
 # 3. Teeme objektist JSON teksti
 $JsonData = $PayloadObj | ConvertTo-Json -Depth 10
 
-# 4. SALVESTAMINE (Uue faili loomine / Ülekirjutamine)
-$JsonData | Set-Content -Path $FullFilePath -Encoding utf8
-Write-Host "`n✅ Uus raport loodud: $FullFilePath" -ForegroundColor Cyan
+# 4. SALVESTAMINE (Kasutame otse teed, et vältida tühja muutuja viga)
+try {
+    $JsonData | Set-Content -Path $FullFilePath -Encoding utf8 -Force
+    Write-Host "`n✅ Raport salvestatud: $FullFilePath" -ForegroundColor Cyan
+} catch {
+    Write-Host "`n❌ VIGA: Ei saanud faili salvestada asukohta $FullFilePath" -ForegroundColor Red
+}
 
 # 5. SAATMINE:
 try {
-    # Kasutame $DashboardIP muutujat, mille me alguses defineerisime (192.168.124.64)
     $FullApiUrl = "http://$DashboardIP:5000/api/upload"
     
-    # Saadame andmed
+    # Saadame andmed serverisse
     Invoke-RestMethod -Uri $FullApiUrl -Method Post -Body $JsonData -ContentType "application/json; charset=utf-8" -TimeoutSec 15 | Out-Null
-    Write-Host "✅ ANDMED SAADETUD DASHBOARD SERVERISSE (Vana info kirjutati üle)." -ForegroundColor Green
     
-    # 6. KORISTAMINE (Eemaldame faili arvutist peale edukat saatmist)
-    # Kui soovid, et fail jääks alles kontrolliks, pane sellele reale # ette
+    Write-Host "✅ ANDMED SAADETUD DASHBOARD SERVERISSE." -ForegroundColor Green
+    
+    # KORISTAMINE: Kui saadetud, siis võime lokaalse faili kustutada
     Remove-Item $FullFilePath -Force
-    Write-Host "🧹 Lokaalne temp-fail eemaldatud." -ForegroundColor Gray
+    Write-Host "🧹 Lokaalne fail eemaldatud, serveris on värske info." -ForegroundColor Gray
 
 } catch {
     Write-Host "❌ SERVERIGA ÜHENDUMINE EBAÕNNESTUS: $($_.Exception.Message)" -ForegroundColor Red
-    Write-Host "Fail säilitati manuaalseks kontrolliks: $FullFilePath" -ForegroundColor Yellow
+    Write-Host "Fail säilitati siin: $FullFilePath" -ForegroundColor Yellow
 }
 
 ```
