@@ -18,24 +18,36 @@ Import-Module ActiveDirectory, GroupPolicy, DhcpServer, WebAdministration -Error
 $TempPath = "C:\Temp"
 if (!(Test-Path $TempPath)) { New-Item -Path $TempPath -ItemType Directory -Force | Out-Null }
 
-# --- 1. KASUTAJA SISENDID ---
+# --- 1. KASUTAJA SISENDID JA NIMELAHELDUS ---
 $RawName = Read-Host "Sisesta oma nimi (Eesnimi Perekonnanimi)"
 $VNET = Read-Host "Sisesta oma vnet number (XXX)"
+
+# TUVASTAME PERENIME (Garanteerime, et see ei jää tühjaks)
+try {
+    $DomainInfo = Get-ADDomain -ErrorAction Stop
+    $FullDomain = $DomainInfo.DNSRoot
+    $script:Surname = $FullDomain.Split('.')[0] # Võtab 'maidla' domeenist 'maidla.local'
+} catch {
+    # Kui domeeni pole, võtame sisestatud nime teise sõna (Perekonnanimi)
+    $NameParts = $RawName.Split(' ')
+    $pName = if ($NameParts.Count -gt 1) { $NameParts[1] } else { $NameParts[0] }
+    $script:Surname = $pName.ToLower().Replace("ä","a").Replace("ö","o").Replace("ü","u").Replace("õ","o")
+}
+
+# DEFINEERIME URL-i (Nüüd on see skriptiüleselt kättesaadav)
+$script:TargetDomain = "veebileht.$($script:Surname).local"
+$script:TargetURL = "https://$($script:TargetDomain)"
+
+# Dashboardi seaded
+$DashboardIP = "192.168.124.64" 
+$script:AD1_IP = "192.168.$VNET.10"
 
 # Sinu algne failinime loogika
 $SafeName = $RawName.ToLower().Replace(" ","").Replace("ä","a").Replace("ö","o").Replace("ü","u").Replace("õ","o")
 $FileName = "$SafeName.json"
 $FullFilePath = Join-Path $TempPath $FileName
 
-$DashboardIP = "192.168.124.64" 
-$script:AD1_IP = "192.168.$VNET.10"
-
-# Defineerime selgelt veebilehe aadressi, mida kontrollime
-$TargetDomain = "veebileht.$Surname.local"
-$TargetURL = "https://$TargetDomain"
-Write-Host "Kontrollitav URL: $TargetURL" -ForegroundColor Cyan
-
-Write-Host "VNET: $VNET | Sinu IP: $script:AD1_IP | Perenimi: $script:Surname" -ForegroundColor Yellow
+Write-Host "`nInfo: Perenimi [$($script:Surname)] | URL [$($script:TargetURL)]" -ForegroundColor Yellow
 
 # --- 2. ABI-FUNKTSIOONID ---
 
