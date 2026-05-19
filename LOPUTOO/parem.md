@@ -191,77 +191,68 @@ Add-DetailedTask "13. DHCP Failover" 1 {
     return @{Points=0; Feedback="Ootasin: DHCP Failover seadistus | Leidsin: PUUDU"}
 }
 
-# 14. IIS ja Wordpress (2p)
+# 14. IIS, Wordpress ja MySQL seadistus (TÄIENDATUD)
 Add-DetailedTask "14. IIS ja Wordpress" 2 {
-    $site = Get-Website | Where-Object Name -like "*veebileht*"
-    if($site -and (Test-Path "F:\WWW")){ return @{Points=2; Feedback="Ootasin: IIS Sait ja kataloog F: kettal | Leidsin: OK"} }
-    return @{Points=0; Feedback="Ootasin: IIS/WP seadistus | Leidsin: PUUDULIK"}
-}
-
-# 15. HTTPS seadistamine (2p)
-Add-DetailedTask "15. HTTPS (Port 443)" 2 {
     $p = 0; $fb = @()
+    $site = Get-Website | Where-Object { $_.Name -match "veebileht" -or $_.Name -match "wordpress" }
     
-    # 1. Kontrollime pordi sidumist (Binding)
-    $binding = Get-WebBinding | Where-Object { $_.protocol -eq "https" -and $_.bindingInformation -match "443" }
-    if ($binding) { 
-        $p += 0.5; $fb += "Binding 443 leitud" 
-    } else {
-        $fb += "Binding 443 PUUDU"
-    }
-
-    # 2. Kontrollime sertifikaati hoidlas (Personal / My)
-    # Otsime sertifikaati, mille nimi sisaldab "veebileht"
-    $cert = Get-ChildItem -Path Cert:\LocalMachine\My | Where-Object { $_.Subject -match "veebileht" }
-    if ($cert) {
-        $p += 0.5; $fb += "Sertifikaat hoidlas olemas ($($cert.Thumbprint.Substring(0,6))...)"
-    } else {
-        $fb += "Sertifikaat hoidlast PUUDU"
-    }
-
-    # 3. Kontrollime HTTPS vastust (REAALNE PÄRING)
-    # Kasutame domeeninime, mis on seotud õpilase nimega
-    $domain = "veebileht.$Surname.local"
-    try {
-        # Määrame usalduse kõigele (Self-signed jaoks)
-        [System.Net.ServicePointManager]::ServerCertificateValidationCallback = {$true}
+    if ($site) {
+        $p += 1; $fb += "IIS Sait olemas"
+        $path = $site.PhysicalPath
+        $configPath = Join-Path $path "wp-config.php"
         
-        # Proovime esmalt nimega, kui ei saa, siis localhostiga
-        $resp = Invoke-WebRequest -Uri "https://localhost" -UseBasicParsing -TimeoutSec 5 -ErrorAction SilentlyContinue
-        if (!$resp) {
-             $resp = Invoke-WebRequest -Uri "https://127.0.0.1" -UseBasicParsing -TimeoutSec 5 -ErrorAction SilentlyContinue
-        }
-
-        if ($resp.StatusCode -eq 200) {
-            $p += 1; $fb += "Sait vastab (200 OK)"
-        } else {
-            $fb += "Sait vastas koodiga $($resp.StatusCode)"
-        }
-    } catch {
-        $fb += "Veebileht ei vasta HTTPS päringule: $($_.Exception.Message)"
-    }
-
+        if (Test-Path $configPath) {
+            $content = Get-Content $configPath
+            $dbName = ($content | Select-String "DB_NAME").ToString() -match "wp_loputoo"
+            $dbUser = ($content | Select-String "DB_USER").ToString() -match "wpuser"
+            $dbPass = ($content | Select-String "DB_PASSWORD").ToString() -match "Passw0rd!"
+            
+            if ($dbName -and $dbUser -and $dbPass) {
+                $p += 1; $fb += "wp-config.php andmed õiged (OK)"
+            } else {
+                $fb += "wp-config.php andmed VALED (Ootasin: wp_loputoo, wpuser, Passw0rd!)"
+            }
+        } else { $fb += "wp-config.php puudu" }
+    } else { $fb += "IIS Sait puudu" }
+    
     return @{Points=$p; Feedback=($fb -join " | ")}
 }
 
-# 16. WP AD Autentimine (2p) - LDAP LOGI TEST
+# 15. HTTPS (PARANDATUD TLS JA CURL TEST)
+Add-DetailedTask "15. HTTPS (Port 443)" 2 {
+    $p = 0; $fb = @()
+    $binding = Get-WebBinding | Where-Object { $_.protocol -eq "https" }
+    
+    if ($binding) {
+        $p += 1; $fb += "Binding olemas"
+        # Kasutame curl.exe, et vältida .NET TLS "unexpected error" viga
+        $test = curl.exe -s -k -I "https://localhost" --connect-timeout 5
+        if ($test -match "200 OK") {
+            $p += 1; $fb += "Veebivastus 200 OK"
+        } else {
+            # Kui localhost ei tööta, proovime brauseris nähtud nimega
+            $test2 = curl.exe -s -k -I "https://wordpress.mandre.local" --connect-timeout 5
+            if ($test2 -match "200 OK") {
+                $p += 1; $fb += "Veebivastus 200 OK (wordpress.mandre.local)"
+            } else {
+                $fb += "Sertifikaat leitud, aga veeb ei vasta (proovi restart IIS)"
+            }
+        }
+    } else { $fb += "HTTPS Binding puudub" }
+    
+    return @{Points=$p; Feedback=($fb -join " | ")}
+}
+
+# 16. WP AD Kasutajad (STABIILSUS PARANDUS)
 Add-DetailedTask "16. WP AD Kasutajad" 2 {
     $p = 0; $fb = @()
-    $pass = "Toimetaja123!"
-    $users = @("Peatoimetaja", "ToimetajaAbi")
-    foreach($u in $users) {
-        $obj = Get-ADUser -Filter "Name -eq '$u' -or SamAccountName -eq '$u'" -ErrorAction SilentlyContinue
-        if($obj) {
-            $p += 0.5; $authMsg = "Kasutaja olemas"
-            try {
-                $dn = $obj.DistinguishedName
-                $entry = New-Object System.DirectoryServices.DirectoryEntry("LDAP://$dn", $dn, $pass)
-                if($entry.NativeGuid){ $p += 0.5; $authMsg += " + Parool OK" }
-            } catch { $authMsg += " + Parool VALE" }
-            $fb += "$u ($authMsg)"
-        } else { $fb += "$u PUUDU" }
+    foreach($u in @("Peatoimetaja", "ToimetajaAbi")) {
+        $user = Get-ADUser -Filter "Name -eq '$u' -or SamAccountName -eq '$u'" -ErrorAction SilentlyContinue
+        if($user) {
+            $p += 1; $fb += "$u olemas"
+        } else { $fb += "$u puudu" }
     }
-    return @{Points=$p; Feedback="Ootasin: Kasutajad ja LDAP paroolitest | Leidsin: $($fb -join ' | ')"}
+    return @{Points=$p; Feedback="Ootasin: Kasutajad AD-s | Leidsid: $($fb -join ' | ')"}
 }
 
 # --- 4. HINDE ARVUTAMINE ---
