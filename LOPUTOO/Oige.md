@@ -6,14 +6,20 @@
 
 ```powershell
 
-$global:DetailedResults = @() # Tühjendame eelmise testi tulemused mälust
-# --- 0. ETTEVALMISTUS JA MOODULID ---
+# --- 0. PUHASTUS JA ETTEVALMISTUS ---
+$global:Results = @()      # Tühjendame tulemuste tabeli
+$global:TotalPoints = 0    # Nullime punktid
+$ErrorActionPreference = "SilentlyContinue"
+
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 [Net.ServicePointManager]::ServerCertificateValidationCallback = {$true}
 Import-Module ActiveDirectory, GroupPolicy, DhcpServer, WebAdministration -ErrorAction SilentlyContinue
 
 $TempPath = "C:\Temp"
 if (!(Test-Path $TempPath)) { New-Item -Path $TempPath -ItemType Directory -Force | Out-Null }
+
+# --- 1. KASUTAJA SISENDID ---
+# ... siit jätkub sinu nimi, vnet jne ...
 
 
 # --- 1. KASUTAJA SISENDID ---
@@ -323,7 +329,10 @@ foreach($res in $global:Results) {
 
 # --- 6. SALVESTAMINE JA SAATMINE SERVERISSE ---
 
-# Koostame Payload objekti
+# 1. Kustutame vana faili masinast, kui see on olemas
+if (Test-Path $FullFilePath) { Remove-Item $FullFilePath -Force }
+
+# 2. Koostame Payload objekti
 $PayloadObj = [PSCustomObject]@{
     Opilane     = $RawName
     VNET        = $VNET
@@ -333,29 +342,32 @@ $PayloadObj = [PSCustomObject]@{
     Kontrollid  = $global:Results
 }
 
-# Teeme objektist JSON teksti
+# 3. Teeme objektist JSON teksti
 $JsonData = $PayloadObj | ConvertTo-Json -Depth 10
 
-# 1. SALVESTAMINE (Ülekirjutamine):
-# Kasutame Set-Content, mis pühib vana faili sisu alati minema
+# 4. SALVESTAMINE (Uue faili loomine / Ülekirjutamine)
 $JsonData | Set-Content -Path $FullFilePath -Encoding utf8
-Write-Host "`n✅ Raport uuendatud failis: $FullFilePath" -ForegroundColor Cyan
+Write-Host "`n✅ Uus raport loodud: $FullFilePath" -ForegroundColor Cyan
 
-# 2. SAATMINE:
+# 5. SAATMINE:
 try {
-    $FullApiUrl = "http://$($ServerIP):5000/api/upload"
-    # Saadame JSON andmed serverisse
+    # Kasutame $DashboardIP muutujat, mille me alguses defineerisime (192.168.124.64)
+    $FullApiUrl = "http://$DashboardIP:5000/api/upload"
+    
+    # Saadame andmed
     Invoke-RestMethod -Uri $FullApiUrl -Method Post -Body $JsonData -ContentType "application/json; charset=utf-8" -TimeoutSec 15 | Out-Null
-    Write-Host "✅ ANDMED SAADETUD DASHBOARD SERVERISSE." -ForegroundColor Green
+    Write-Host "✅ ANDMED SAADETUD DASHBOARD SERVERISSE (Vana info kirjutati üle)." -ForegroundColor Green
+    
+    # 6. KORISTAMINE (Eemaldame faili arvutist peale edukat saatmist)
+    # Kui soovid, et fail jääks alles kontrolliks, pane sellele reale # ette
+    Remove-Item $FullFilePath -Force
+    Write-Host "🧹 Lokaalne temp-fail eemaldatud." -ForegroundColor Gray
+
 } catch {
     Write-Host "❌ SERVERIGA ÜHENDUMINE EBAÕNNESTUS: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "Fail säilitati manuaalseks kontrolliks: $FullFilePath" -ForegroundColor Yellow
 }
 
-# --- OLULINE LISA ---
-# Selleks, et massiivi ei dubleeritaks mälus, lisa päris skripti algusesse 
-# (kohe pärast $global:Results = @() rida) järgmine käsk:
-# $global:TotalPoints = 0
-
 ```
 
-```
+
