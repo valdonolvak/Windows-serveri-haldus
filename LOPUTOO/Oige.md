@@ -5,13 +5,6 @@
 ### Täielik ja detailne kontrollskript: `Kontroll.ps1`
 
 ```powershell
-#### Kui töö valmis, siis kopeeri see Powershelli skript ja läbi Powershell ISE salvesta see enda arvutisse  kausta **C:\Temp** nimega **Kontroll.ps1 **ja käivita ese Powershell ISE rakenduses ####
-
-----
-
-### Täielik ja detailne kontrollskript: `Kontroll.ps1`
-
-```powershell
 # --- 0. ETTEVALMISTUS JA MOODULID ---
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 [Net.ServicePointManager]::ServerCertificateValidationCallback = {$true}
