@@ -5,7 +5,12 @@
 ### Täielik ja detailne kontrollskript: `Kontroll.ps1`
 
 ```powershell
-# --- 0. ETTEVALMISTUS JA MOODULID ---
+
+# --- 0. PUHASTUS JA ETTEVALMISTUS ---
+$global:Results = @()      # Tühjendame tulemuste massiivi
+$global:TotalPoints = 0    # Nullime punktid
+$ErrorActionPreference = "SilentlyContinue"
+
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 [Net.ServicePointManager]::ServerCertificateValidationCallback = {$true}
 Import-Module ActiveDirectory, GroupPolicy, DhcpServer, WebAdministration -ErrorAction SilentlyContinue
@@ -16,14 +21,16 @@ if (!(Test-Path $TempPath)) { New-Item -Path $TempPath -ItemType Directory -Forc
 # --- 1. KASUTAJA SISENDID ---
 $RawName = Read-Host "Sisesta oma nimi (Eesnimi Perekonnanimi)"
 $VNET = Read-Host "Sisesta oma vnet number (XXX)"
-$ServerIP = "192.168.124.64" # DashBoard serveri IP
 
+# Sinu algne failinime loogika
 $SafeName = $RawName.ToLower().Replace(" ","").Replace("ä","a").Replace("ö","o").Replace("ü","u").Replace("õ","o")
 $FileName = "$SafeName.json"
 $FullFilePath = Join-Path $TempPath $FileName
 
-$global:Results = @()
-$global:TotalPoints = 0
+$DashboardIP = "192.168.124.64" 
+$script:AD1_IP = "192.168.$VNET.10"
+
+Write-Host "VNET: $VNET | Sinu IP: $script:AD1_IP | Perenimi: $script:Surname" -ForegroundColor Yellow
 
 # --- 2. ABI-FUNKTSIOONID ---
 
@@ -222,61 +229,72 @@ Add-DetailedTask "14. IIS ja Wordpress" 2 {
     return @{Points=$p; Feedback=($fb -join " | ")}
 }
 
-# 15. HTTPS (DÜNAAMILISELT PERENIMEGA)
+# 15. HTTPS (KONTROLL AINULT PÄRIS URL-iga)
 Add-DetailedTask "15. HTTPS (Port 443)" 2 {
     $p = 0; $fb = @()
+    $TargetUrl = "https://veebileht.$Surname.local"
+    
+    # 1. Kontrollime, kas IIS-is on üldse HTTPS binding olemas
     $binding = Get-WebBinding | Where-Object { $_.protocol -eq "https" -and $_.bindingInformation -match "443" }
     
     if ($binding) {
         $p += 1; $fb += "Binding 443 olemas"
-        $TargetUrl = "https://veebileht.$Surname.local"
-        # Testime nimega, kui ei saa, proovime localhosti
-        $test = curl.exe -s -k -I "$TargetUrl" --connect-timeout 5
-        if ($test -match "200 OK") {
-            $p += 1; $fb += "Veebivastus 200 OK ($TargetUrl)"
+        
+        # 2. Testime veebivastust kasutades AINULT õiget URL-i
+        # -s (silent), -k (ignore cert), -I (headers only)
+        $test = curl.exe -s -k -I "$TargetUrl" --connect-timeout 5 2>&1
+        
+        if ($test -match "200 OK" -or $test -match "301" -or $test -match "302") {
+            $p += 1; $fb += "Veebivastus OK ($TargetUrl)"
         } else {
-            $test2 = curl.exe -s -k -I "https://localhost" --connect-timeout 5
-            if ($test2 -match "200 OK") {
-                $p += 1; $fb += "Veebivastus 200 OK (localhost)"
-            } else {
-                $fb += "Sait ei vasta HTTPS päringule"
-            }
+            $fb += "VIGA: Sait ei vasta nimega $TargetUrl. Kontrolli DNS-i ja IIS Host Headerit!"
         }
-    } else { $fb += "HTTPS Binding 443 puudub" }
+    } else {
+        $fb += "VIGA: HTTPS sidumine (binding) pordil 443 puudub"
+    }
     
     return @{Points=$p; Feedback=($fb -join " | ")}
 }
 
-# 16. WP AD Autentimine (REAALNE SISSESÕIDU KONTROLL)
+# 16. WP AD Autentimine (KÜPSISEPÕHINE KONTROLL)
 Add-DetailedTask "16. WP AD Kasutajad" 2 {
     $p = 0; $fb = @()
     $testUser = "Peatoimetaja"
     $testPass = "Toimetaja123!"
     
-    $u1 = Get-ADUser -Filter "SamAccountName -eq '$testUser' -or Name -eq '$testUser'" -ErrorAction SilentlyContinue
-    $u2 = Get-ADUser -Filter "Name -eq 'ToimetajaAbi' -or SamAccountName -eq 'ToimetajaAbi'" -ErrorAction SilentlyContinue
-    
-    if ($u1 -and $u2) {
+    # 1. Kontrollime kasutajaid AD-s (0.5p)
+    $u1 = Get-ADUser -Filter "SamAccountName -eq '$testUser'" -ErrorAction SilentlyContinue
+    if ($u1) {
         $p += 0.5; $fb += "Kasutajad AD-s olemas"
         
         $TargetUrl = "https://veebileht.$Surname.local/wp-login.php"
-        $cookieFile = "$env:TEMP\wp_ldap_test.txt"
+        $cookieFile = "$env:TEMP\wp_ldap_cookie.txt"
         if (Test-Path $cookieFile) { Remove-Item $cookieFile }
 
         try {
-            $postData = "log=$testUser&pwd=$testPass&wp-submit=Log+In"
-            $result = curl.exe -s -k -L -c $cookieFile -d "$postData" "$TargetUrl" --connect-timeout 10
+            # Samm 1: Küsime sisselogimise lehte, et saada kätte algsed küpsised
+            curl.exe -s -k -c $cookieFile "$TargetUrl" --connect-timeout 5 | Out-Null
 
-            if ($result -match "wp-admin" -or $result -match "Dashboard" -or $result -match "Töölaud" -or $result -match "wpadminbar") {
-                $p += 1.5; $fb += "LDAP autentimine TESTITUD ja TOIMIB"
+            # Samm 2: Saadame sisselogimise andmed
+            # -L (follow redirects), -i (include headers), -b (read cookies), -c (write cookies)
+            $postData = "log=$testUser&pwd=$testPass&wp-submit=Log+In&testcookie=1"
+            $result = curl.exe -s -k -L -i -b $cookieFile -c $cookieFile -d "$postData" "$TargetUrl" --connect-timeout 10
+
+            # Samm 3: Kontrollime küpsisefaili sisu või vastust
+            # Kui sisselogimine õnnestub, peab küpsisefaili tekkima "wordpress_logged_in" rida
+            $cookieContent = if (Test-Path $cookieFile) { Get-Content $cookieFile } else { "" }
+
+            if ($cookieContent -match "wordpress_logged_in" -or $result -match "wp-admin" -or $result -match "location: .*wp-admin") {
+                $p += 1.5; $fb += "LDAP autentimine TOIMIB (Sisselogimine kinnitatud)"
             } else {
-                $fb += "LDAP sisselogimine ebaõnnestus (Kontrolli pluginat ja parooli)"
+                $fb += "Autentimine ebaõnnestus (WP ei väljastanud sessiooniküpsist)"
             }
-        } catch { $fb += "Viga testimisel: $($_.Exception.Message)" }
-    } else { $fb += "Kasutajad AD-st PUUDU" }
+        } catch { $fb += "Viga ühenduses: $($_.Exception.Message)" }
+    } else { $fb += "Kasutajat $testUser ei leitud AD-st" }
 
     return @{Points=$p; Feedback=($fb -join " | ")}
 }
+
 # --- 4. HINDE ARVUTAMINE ---
 $Hinne = switch ($global:TotalPoints) {
     {$_ -ge 22} { "5" }
@@ -297,19 +315,40 @@ foreach($res in $global:Results) {
     Write-Host "   -> $($res.Selgitus)" -ForegroundColor Gray
 }
 
-# --- 6. SAATMINE SERVERISSE ---
-$Payload = [PSCustomObject]@{
-    Opilane = $RawName; KokkuPunkte = $global:TotalPoints; Hinne = $Hinne; Kontrollid = $global:Results
-} | ConvertTo-Json -Depth 10
+# --- 6. SALVESTAMINE JA SAATMINE SERVERISSE ---
+
+# 1. Koostame andmepaketi
+$PayloadObj = [PSCustomObject]@{
+    Opilane     = $RawName
+    VNET        = $VNET
+    Aeg         = (Get-Date -Format "yyyy-MM-dd HH:mm:ss")
+    KokkuPunkte = $global:TotalPoints
+    Hinne       = $Hinne
+    Kontrollid  = $global:Results
+}
+$JsonData = $PayloadObj | ConvertTo-Json -Depth 10
 
 try {
+    # 2. SALVESTAMINE (Kasutame Set-Content, et vana sisu ÜLE KIRJUTADA)
+    $JsonData | Set-Content -Path $FullFilePath -Encoding utf8 -Force
+    Write-Host "`n✅ Uus raport loodud: $FullFilePath" -ForegroundColor Cyan
+
+    # 3. SAATMINE SERVERISSE (Kasutame Sinu algset $ServerIP muutujat)
     $FullApiUrl = "http://$($ServerIP):5000/api/upload"
-    Invoke-RestMethod -Uri $FullApiUrl -Method Post -Body $Payload -ContentType "application/json; charset=utf-8" -TimeoutSec 15 | Out-Null
-    Write-Host "`n✅ ANDMED SAADETUD DASHBOARD SERVERSISSE." -ForegroundColor Green
+    Invoke-RestMethod -Uri $FullApiUrl -Method Post -Body $JsonData -ContentType "application/json; charset=utf-8" -TimeoutSec 15 | Out-Null
+    Write-Host "✅ ANDMED SAADETUD DASHBOARD SERVERISSE." -ForegroundColor Green
+
+    # 4. EEMALDAMINE (Kustutame faili masinast peale õnnestunud saatmist)
+    if (Test-Path $FullFilePath) {
+        Remove-Item $FullFilePath -Force
+        Write-Host "🧹 Lokaalne fail $FileName eemaldatud (puhastus tehtud)." -ForegroundColor Gray
+    }
+
 } catch {
-    Write-Host "`n❌ SERVERIGA ÜHENDUMINE EBAÕNNESTUS. Fail salvestati: $FullFilePath" -ForegroundColor Red
-    $Payload | Out-File $FullFilePath -Encoding utf8
+    Write-Host "`n❌ VIGA: Saatmine ebaõnnestus ($($_.Exception.Message))" -ForegroundColor Red
+    Write-Host "Fail säilitati manuaalseks kontrolliks: $FullFilePath" -ForegroundColor Yellow
 }
+
 
 
 ```
