@@ -233,25 +233,43 @@ Add-DetailedTask "16 WP LDAP" 2 {
     return @{Points=$points; Feedback=($fb -join " | ")}
 }
 
-# --- PAYLOAD FIX ---
+# --- 5. SAATMINE ---
 $Payload = [PSCustomObject]@{
-    Opilane = $RawName
-    KokkuPunkte = $TotalPoints
-    Kontrollid = $Results
+    Opilane = $RawName; KokkuPunkte = $TotalPoints; Hinne = $HinneTekst; Kontrollid = $Results
 } | ConvertTo-Json -Depth 10
 
-$Payload | Out-File $FullFilePath -Encoding UTF8
-
-# --- FIXED URL (this solves your error) ---
-$FullApiUrl = "http://{0}:5000/api/upload" -f $ServerIP
-
-Write-Host "Saadan: $FullApiUrl"
+$Payload | Out-File $FullFilePath -Encoding utf8
 
 try {
-    Invoke-RestMethod -Uri $FullApiUrl -Method Post -Body $Payload -ContentType "application/json"
-    Write-Host "OK"
+    Write-Host "`nÜritan saata andmeid serverisse http://$ServerIP:5000..." -ForegroundColor Yellow
+    Invoke-RestMethod -Uri "http://$($ServerIP):5000/api/upload" -Method Post -Body $Payload -ContentType "application/json; charset=utf-8" -Proxy $null -TimeoutSec 15
+    Write-Host "EDUKAS! Punktid: $TotalPoints / 25 | Hinne: $HinneTekst" -ForegroundColor Green
 } catch {
-    Write-Host "FAIL: $($_.Exception.Message)"
+    Write-Host "`nSAATMINE EBAÕNNESTUS: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "Fail salvestati: $FullFilePath" -ForegroundColor Cyan
 }
 
+# --- 6. SAATMINE LINUX SERVERISSE ---
+$FullApiUrl = "http://$($ServerIP):5000/api/upload"
+Write-Host "Saadan andmeid serverisse..." -ForegroundColor Yellow
+
+try {
+    $Response = Invoke-RestMethod -Uri $FullApiUrl `
+                                  -Method Post `
+                                  -Body $Payload `
+                                  -ContentType "application/json; charset=utf-8" `
+                                  -Proxy $null `
+                                  -TimeoutSec 15
+    
+    Write-Host "EDUKAS! Punktid: $TotalPoints / 25 | Hinne: $HinneTekst" -ForegroundColor Green
+    
+    # --- UUS: FAILINIME EEMALDAMINE PÄRAST ÕNNESTUMIST ---
+    if (Test-Path $FullFilePath) {
+        Remove-Item $FullFilePath -Force
+        Write-Host "Lokaalne fail $FileName eemaldatud." -ForegroundColor Gray
+    }
+} catch {
+    Write-Host "VIGA: Serverile saatmine ebaõnnestus ($($_.Exception.Message))." -ForegroundColor Red
+    Write-Host "Fail salvestati manuaalseks üleslaadimiseks: $FullFilePath" -ForegroundColor Yellow
+}
 ```
