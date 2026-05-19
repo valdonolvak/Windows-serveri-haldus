@@ -329,24 +329,29 @@ $PayloadObj = [PSCustomObject]@{
 $JsonData = $PayloadObj | ConvertTo-Json -Depth 10
 
 try {
-    # 2. SALVESTAMINE (Kasutame Set-Content, et vana sisu ÜLE KIRJUTADA)
+    # 2. SALVESTAMINE (Ülekirjutamine)
     $JsonData | Set-Content -Path $FullFilePath -Encoding utf8 -Force
     Write-Host "`n✅ Uus raport loodud: $FullFilePath" -ForegroundColor Cyan
 
-    # 3. SAATMINE SERVERISSE (Kasutame Sinu algset $ServerIP muutujat)
-    $FullApiUrl = "http://$($ServerIP):5000/api/upload"
+    # 3. SAATMINE SERVERISSE 
+    # NB! Kasutame $DashboardIP muutujat (või $ServerIP, olenevalt kumba sa alguses defineerisid)
+    # Kui sul on alguses $DashboardIP = "192.168.124.64", siis kasuta seda:
+    $TargetIP = if ($DashboardIP) { $DashboardIP } else { "192.168.124.64" }
+    
+    $FullApiUrl = "http://$($TargetIP):5000/api/upload"
+    
     Invoke-RestMethod -Uri $FullApiUrl -Method Post -Body $JsonData -ContentType "application/json; charset=utf-8" -TimeoutSec 15 | Out-Null
-    Write-Host "✅ ANDMED SAADETUD DASHBOARD SERVERISSE." -ForegroundColor Green
+    Write-Host "✅ ANDMED SAADETUD DASHBOARD SERVERISSE ($TargetIP)." -ForegroundColor Green
 
-    # 4. EEMALDAMINE (Kustutame faili masinast peale õnnestunud saatmist)
+    # 4. EEMALDAMINE
     if (Test-Path $FullFilePath) {
         Remove-Item $FullFilePath -Force
-        Write-Host "🧹 Lokaalne fail $FileName eemaldatud (puhastus tehtud)." -ForegroundColor Gray
+        Write-Host "Sweep: Lokaalne fail eemaldatud." -ForegroundColor Gray
     }
 
 } catch {
     Write-Host "`n❌ VIGA: Saatmine ebaõnnestus ($($_.Exception.Message))" -ForegroundColor Red
-    Write-Host "Fail säilitati manuaalseks kontrolliks: $FullFilePath" -ForegroundColor Yellow
+    Write-Host "Fail säilitati siin: $FullFilePath" -ForegroundColor Yellow
 }
 
 ```
