@@ -22,19 +22,24 @@ if (!(Test-Path $TempPath)) { New-Item -Path $TempPath -ItemType Directory -Forc
 $RawName = Read-Host "Sisesta oma nimi (Eesnimi Perekonnanimi)"
 $VNET = Read-Host "Sisesta oma vnet number (XXX)"
 
-# TUVASTAME PERENIME (Garanteerime, et see ei jää tühjaks)
-try {
-    $DomainInfo = Get-ADDomain -ErrorAction Stop
-    $FullDomain = $DomainInfo.DNSRoot
-    $script:Surname = $FullDomain.Split('.')[0] # Võtab 'maidla' domeenist 'maidla.local'
-} catch {
-    # Kui domeeni pole, võtame sisestatud nime teise sõna (Perekonnanimi)
-    $NameParts = $RawName.Split(' ')
-    $pName = if ($NameParts.Count -gt 1) { $NameParts[1] } else { $NameParts[0] }
-    $script:Surname = $pName.ToLower().Replace("ä","a").Replace("ö","o").Replace("ü","u").Replace("õ","o")
+# Funktsioon täpitähtede eemaldamiseks
+function Clean-String {
+    param([string]$InputString)
+    return $InputString.ToLower().Replace("õ","o").Replace("ä","a").Replace("ö","o").Replace("ü","u").Replace(" ","")
 }
 
-# DEFINEERIME URL-i (Nüüd on see skriptiüleselt kättesaadav)
+# TUVASTAME JA PUHASTAME PERENIME
+try {
+    $DomainInfo = Get-ADDomain -ErrorAction Stop
+    $RawSurname = $DomainInfo.DNSRoot.Split('.')[0]
+    $script:Surname = Clean-String $RawSurname
+} catch {
+    $NameParts = $RawName.Split(' ')
+    $pName = if ($NameParts.Count -gt 1) { $NameParts[1] } else { $NameParts[0] }
+    $script:Surname = Clean-String $pName
+}
+
+# DEFINEERIME URL-id (Väiketähtedega ja täppideta)
 $script:TargetDomain = "veebileht.$($script:Surname).local"
 $script:TargetURL = "https://$($script:TargetDomain)"
 
@@ -42,12 +47,12 @@ $script:TargetURL = "https://$($script:TargetDomain)"
 $DashboardIP = "192.168.124.64" 
 $script:AD1_IP = "192.168.$VNET.10"
 
-# Sinu algne failinime loogika
-$SafeName = $RawName.ToLower().Replace(" ","").Replace("ä","a").Replace("ö","o").Replace("ü","u").Replace("õ","o")
-$FileName = "$SafeName.json"
-$FullFilePath = Join-Path $TempPath $FileName
+# Failinime loogika (kasutame sama puhastust)
+$SafeName = Clean-String $RawName
+$FullFilePath = Join-Path $TempPath "$SafeName.json"
 
-Write-Host "`nInfo: Perenimi [$($script:Surname)] | URL [$($script:TargetURL)]" -ForegroundColor Yellow
+Write-Host "`nInfo: Puhastatud perenimi [$($script:Surname)] | URL [$($script:TargetURL)]" -ForegroundColor Yellow
+
 
 # --- 2. ABI-FUNKTSIOONID ---
 
