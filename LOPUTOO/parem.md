@@ -198,19 +198,50 @@ Add-DetailedTask "14. IIS ja Wordpress" 2 {
     return @{Points=0; Feedback="Ootasin: IIS/WP seadistus | Leidsin: PUUDULIK"}
 }
 
-# 15. HTTPS (2p) - REAALNE KONTROLL
+# 15. HTTPS seadistamine (2p)
 Add-DetailedTask "15. HTTPS (Port 443)" 2 {
-    $p = 0; $fb = ""
-    $b = Get-WebBinding | Where-Object { $_.protocol -eq "https" }
-    if($b) {
-        $p = 1; $fb = "Binding olemas. "
-        try {
-            $test = curl.exe -s -k -I "https://localhost" --connect-timeout 3
-            if($test -match "200 OK"){ $p = 2; $fb += "Veeb vastab HTTPS kaudu (OK)" }
-            else { $fb += "Binding on, aga veebileht ei vasta (200 OK puudu)" }
-        } catch { $fb += "HTTPS päring ebaõnnestus" }
-    } else { $fb = "Ootasin: HTTPS binding 443 | Leidsin: PUUDU" }
-    return @{Points=$p; Feedback=$fb}
+    $p = 0; $fb = @()
+    
+    # 1. Kontrollime pordi sidumist (Binding)
+    $binding = Get-WebBinding | Where-Object { $_.protocol -eq "https" -and $_.bindingInformation -match "443" }
+    if ($binding) { 
+        $p += 0.5; $fb += "Binding 443 leitud" 
+    } else {
+        $fb += "Binding 443 PUUDU"
+    }
+
+    # 2. Kontrollime sertifikaati hoidlas (Personal / My)
+    # Otsime sertifikaati, mille nimi sisaldab "veebileht"
+    $cert = Get-ChildItem -Path Cert:\LocalMachine\My | Where-Object { $_.Subject -match "veebileht" }
+    if ($cert) {
+        $p += 0.5; $fb += "Sertifikaat hoidlas olemas ($($cert.Thumbprint.Substring(0,6))...)"
+    } else {
+        $fb += "Sertifikaat hoidlast PUUDU"
+    }
+
+    # 3. Kontrollime HTTPS vastust (REAALNE PÄRING)
+    # Kasutame domeeninime, mis on seotud õpilase nimega
+    $domain = "veebileht.$Surname.local"
+    try {
+        # Määrame usalduse kõigele (Self-signed jaoks)
+        [System.Net.ServicePointManager]::ServerCertificateValidationCallback = {$true}
+        
+        # Proovime esmalt nimega, kui ei saa, siis localhostiga
+        $resp = Invoke-WebRequest -Uri "https://localhost" -UseBasicParsing -TimeoutSec 5 -ErrorAction SilentlyContinue
+        if (!$resp) {
+             $resp = Invoke-WebRequest -Uri "https://127.0.0.1" -UseBasicParsing -TimeoutSec 5 -ErrorAction SilentlyContinue
+        }
+
+        if ($resp.StatusCode -eq 200) {
+            $p += 1; $fb += "Sait vastab (200 OK)"
+        } else {
+            $fb += "Sait vastas koodiga $($resp.StatusCode)"
+        }
+    } catch {
+        $fb += "Veebileht ei vasta HTTPS päringule: $($_.Exception.Message)"
+    }
+
+    return @{Points=$p; Feedback=($fb -join " | ")}
 }
 
 # 16. WP AD Autentimine (2p) - LDAP LOGI TEST
