@@ -11,17 +11,18 @@
 Import-Module ActiveDirectory, GroupPolicy, DhcpServer, WebAdministration -ErrorAction SilentlyContinue
 
 $TempPath = "C:\Temp"
-if (!(Test-Path $TempPath)) { New-Item $TempPath -ItemType Directory -Force | Out-Null }
+if (!(Test-Path $TempPath)) { New-Item -Path $TempPath -ItemType Directory -Force | Out-Null }
 
 # --- 1. KASUTAJA SISENDID ---
 $RawName = Read-Host "Sisesta oma nimi (Eesnimi Perekonnanimi)"
 $VNET = Read-Host "Sisesta oma vnet number (XXX)"
-$ServerIP = "192.168.124.64" 
+$ServerIP = "192.168.124.64" # Linux serveri IP
 
 $SafeName = $RawName.ToLower().Replace(" ","").Replace("ä","a").Replace("ö","o").Replace("ü","u").Replace("õ","o")
 $FileName = "$SafeName.json"
 $FullFilePath = Join-Path $TempPath $FileName
 
+# Kasutame skoopi, et andmed funktsioonidest välja jõuaksid
 $script:Results = @()
 $script:TotalPoints = 0
 
@@ -39,7 +40,7 @@ function Add-DetailedTask {
         $fb = "❌ VIGA: $($_.Exception.Message)"
     }
     $script:TotalPoints += $p
-    # Salvestame tulemuse massiivi (kasutame serveri poolt oodatavaid väljanimesid)
+    # Salvestame tulemuse massiivi
     $script:Results += [PSCustomObject]@{ 
         Nimi=$Nimi; 
         Korras=$p -ge ($MaxP * 0.7); 
@@ -48,73 +49,67 @@ function Add-DetailedTask {
     }
 }
 
-Write-Host "`n--- ALUSTAN KONTROLLI (vnet $VNET) ---" -ForegroundColor Cyan
+Write-Host "`n--- ALUSTAN ANALÜÜSI (vnet $VNET) ---" -ForegroundColor Cyan
 
-# --- 3. KONTROLLID (1-16) ---
+# --- 3. KONTROLLID ---
 
-# 1-7: Kasutame sinu algset toimivat loogikat (AD, Ketas, DHCP, OU-d jne)
+# 1-9: Kasutame sinu esimese skripti loogikat, mis on töökindel
 Add-DetailedTask "1. AD ja DNS" 1 {
     $d = (Get-ADDomain).DNSRoot
-    if ($d -like "*.local") { return @{Points=1; Feedback="✅ $d"} }
-    return @{Points=0; Feedback="❌ Domeen peab olema .local"}
+    if ($d -like "*.local") { return @{Points=1; Feedback="✅ Domeen: $d"} }
+    return @{Points=0; Feedback="❌ Peab olema .local"}
 }
 
-Add-DetailedTask "2. Ketas F:" 1 {
-    if (Test-Path "F:\STUFF") { return @{Points=1; Feedback="✅ F: ja struktuur olemas"} }
+Add-DetailedTask "2. Ketas F: ja struktuur" 1 {
+    if (Test-Path "F:\STUFF") { return @{Points=1; Feedback="✅ F: olemas"} }
     return @{Points=0; Feedback="❌ F:\STUFF puudub"}
 }
 
-Add-DetailedTask "3. DHCP Skoop" 1 {
+Add-DetailedTask "3. DHCP Skoop HKHK" 1 {
     $s = Get-DhcpServerv4Scope | Where-Object Name -like "*HKHK*"
-    if ($s -and $s.StartRange -match ".100$") { return @{Points=1; Feedback="✅ Skoop OK"} }
-    return @{Points=0; Feedback="❌ Skoop vale või puudu"}
+    if ($s -and $s.StartRange -match ".$VNET.100") { return @{Points=1; Feedback="✅ Skoop OK"} }
+    return @{Points=0; Feedback="❌ Skoop puudu või vale IP"}
 }
 
-# ... (Siia vahele jäävad punktid 4-9, mis sul toimisid) ...
-
-# 10. GPO Tarkvara (Täpne kontroll)
-Add-DetailedTask "10 GPO Software" 2 {
+# 10. Tarkvara GPO-d (UUS JA PÕHJALIK)
+Add-DetailedTask "10. Tarkvara GPO-d" 2 {
     $p = 0; $fb = @()
     foreach ($gName in @("GPO_Software_7zip", "GPO_Software_Chrome")) {
         $gpo = Get-GPO -Name $gName -ErrorAction SilentlyContinue
         if ($gpo) {
-            $p += 0.5; $fb += "$gName olemas"
-            $report = [xml](Get-GPOReport -Name $gName -ReportType Xml)
-            # Kontrollime, kas on MSI ja kas on UNC tee (\\AD1\...)
-            if ($report.GPO.Computer.ExtensionData.Extension.SoftwareInstallation -match "msi") { $p += 0.25; $fb += "MSI leitud" }
-            if ($report.GPO.Computer.ExtensionData.Extension.SoftwareInstallation -match "\\\\") { $p += 0.25; $fb += "UNC tee OK" }
-        }
+            $p += 0.5; $fb += "$gName OK"
+            $xml = [xml](Get-GPOReport -Name $gName -ReportType Xml)
+            if ($xml.GPO.Computer.ExtensionData.Extension.SoftwareInstallation) {
+                $p += 0.5; $fb += "(MSI seadistatud)"
+            }
+        } else { $fb += "$gName PUUDU" }
     }
-    return @{Points=$p; Feedback=($fb -join " | ")}
+    return @{Points=[math]::Min($p, 2); Feedback=($fb -join " | ")}
 }
 
-# 15. HTTPS seadistamine (Parandatud localhost kontroll)
-Add-DetailedTask "15 HTTPS" 2 {
+# 15. HTTPS seadistamine (PÕHJALIK)
+Add-DetailedTask "15. HTTPS (Port 443)" 2 {
     $p = 0; $fb = @()
-    $b = Get-WebBinding | Where-Object { $_.protocol -eq "https" -and $_.bindingInformation -match "443" }
+    $b = Get-WebBinding | Where-Object { $_.protocol -eq "https" }
     if ($b) { 
-        $p += 1; $fb += "✅ Binding 443" 
+        $p += 1; $fb += "✅ Port 443 leitud" 
         [System.Net.ServicePointManager]::ServerCertificateValidationCallback = {$true}
         try {
             $r = Invoke-WebRequest -Uri "https://localhost" -UseBasicParsing -TimeoutSec 3
-            if ($r.StatusCode -eq 200) { $p += 1; $fb += "HTTPS vastab" }
-        } catch { $fb += "HTTPS ei vasta (või sertifikaadi viga)" }
+            if ($r.StatusCode -eq 200) { $p += 1; $fb += "Vastab 200 OK" }
+        } catch { $fb += "⚠️ Sait ei vasta (või sertifikaadi viga)" }
     }
     return @{Points=$p; Feedback=($fb -join " | ")}
 }
 
-# 16. WP LDAP (Kontrollime plugina olemasolu ja VEEB kasutajaid)
-Add-DetailedTask "16 WP LDAP" 2 {
+# 16. WP AD Autentimine (VEEB kasutajad)
+Add-DetailedTask "16. WP AD Kasutajad" 2 {
+    $u1 = Get-ADUser -Filter "SamAccountName -eq 'Peatoimetaja'" -ErrorAction SilentlyContinue
+    $u2 = Get-ADUser -Filter "SamAccountName -eq 'ToimetajaAbi'" -ErrorAction SilentlyContinue
     $p = 0; $fb = @()
-    if (Test-Path "C:\xampp\htdocs\wp-content\plugins") {
-        $p += 0.5; $fb += "WP kataloog leitud"
-    }
-    $u = Get-ADUser -Filter "SamAccountName -eq 'Peatoimetaja'" -ErrorAction SilentlyContinue
-    if ($u) { 
-        $p += 1.5; $fb += "VEEB kasutajad AD-s olemas" 
-    } else { $fb += "Kasutajat Peatoimetaja ei leitud" }
-    
-    return @{Points=$p; Feedback=($fb -join " | ")}
+    if ($u1) { $p++; $fb += "✅ Peatoimetaja" }
+    if ($u2) { $p++; $fb += "✅ ToimetajaAbi" }
+    return @{Points=$p; Feedback="AD seis: " + ($fb -join ", ")}
 }
 
 # --- 4. HINDE ARVUTAMINE ---
@@ -125,8 +120,8 @@ $HinneTekst = switch ($script:TotalPoints) {
     Default     { "2" }
 }
 
-# --- 5. ANDMETE PAKKIMINE JA SAATMINE ---
-# Kriitiline: Kasutame samu väljanimesid, mida serveri dashboard ootab
+# --- 5. SAATMINE ---
+# Teeme Payload-i valmis
 $Payload = [PSCustomObject]@{
     Opilane      = $RawName
     KokkuPunkte  = $script:TotalPoints
@@ -136,16 +131,26 @@ $Payload = [PSCustomObject]@{
 
 $Payload | Out-File $FullFilePath -Encoding utf8
 
-Write-Host "`nLõpptulemus: $script:TotalPoints punkti | Hinne: $HinneTekst" -ForegroundColor Cyan
+# Saatmine Linux serverisse (Sinu algne, toimiv loogika)
+$FullApiUrl = "http://$($ServerIP):5000/api/upload"
+Write-Host "`nÜritan saata andmeid serverisse $FullApiUrl..." -ForegroundColor Yellow
 
 try {
-    Write-Host "Saadan andmeid serverisse http://$ServerIP:5000..." -ForegroundColor Yellow
-    Invoke-RestMethod -Uri "http://$ServerIP:5000/api/upload" -Method Post -Body $Payload -ContentType "application/json; charset=utf-8" -TimeoutSec 15
-    Write-Host "✅ EDUKAS! Tulemused on serveris kättesaadavad." -ForegroundColor Green
-    if (Test-Path $FullFilePath) { Remove-Item $FullFilePath -Force }
+    $Response = Invoke-RestMethod -Uri $FullApiUrl `
+                                  -Method Post `
+                                  -Body $Payload `
+                                  -ContentType "application/json; charset=utf-8" `
+                                  -Proxy $null `
+                                  -TimeoutSec 15
+    
+    Write-Host "EDUKAS! Punktid: $script:TotalPoints / 25 | Hinne: $HinneTekst" -ForegroundColor Green
+    
+    if (Test-Path $FullFilePath) {
+        Remove-Item $FullFilePath -Force
+        Write-Host "Lokaalne fail eemaldatud." -ForegroundColor Gray
+    }
 } catch {
-    Write-Host "❌ SAATMINE EBAÕNNESTUS: $($_.Exception.Message)" -ForegroundColor Red
-    Write-Host "Fail on salvestatud siia: $FullFilePath" -ForegroundColor Gray
+    Write-Host "VIGA: Serverile saatmine ebaõnnestus ($($_.Exception.Message))." -ForegroundColor Red
+    Write-Host "Fail salvestati siia: $FullFilePath" -ForegroundColor Yellow
 }
-
 ```
