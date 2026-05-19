@@ -256,7 +256,7 @@ Add-DetailedTask "15. HTTPS (Port 443)" 2 {
     } else { $fb += "HTTPS Binding 443 puudub IIS-is" }
     
     return @{Points=$p; Feedback=($fb -join " | ")}
-}
+}    
 
 # 16. WP AD Autentimine (REAALNE SISSESÕIDU KONTROLL)
 Add-DetailedTask "16. WP AD Kasutajad" 2 {
