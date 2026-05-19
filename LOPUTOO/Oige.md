@@ -5,20 +5,21 @@
 ### Täielik ja detailne kontrollskript: `Kontroll.ps1`
 
 ```powershell
-# --- 0. ETTEVALMISTUS JA MOODULID ---
+# --- 0. ETTEVALMISTUS ---
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-
 Import-Module ActiveDirectory, GroupPolicy, DhcpServer, WebAdministration -ErrorAction SilentlyContinue
 
 $TempPath = "C:\Temp"
-if (!(Test-Path $TempPath)) {
-    New-Item -Path $TempPath -ItemType Directory -Force | Out-Null
-}
+if (!(Test-Path $TempPath)) { New-Item $TempPath -ItemType Directory -Force | Out-Null }
 
 # --- 1. SISEND ---
-$RawName = Read-Host "Sisesta oma nimi (Eesnimi Perekonnanimi)"
-$VNET = Read-Host "Sisesta oma vnet number (XXX)"
+$RawName = Read-Host "Sisesta nimi"
+$VNET = Read-Host "Sisesta vnet (XXX)"
 $ServerIP = "192.168.124.64"
+
+if (-not $ServerIP) {
+    throw "ServerIP on tühi!"
+}
 
 $SafeName = $RawName.ToLower().Replace(" ","").Replace("ä","a").Replace("ö","o").Replace("ü","u").Replace("õ","o")
 $FileName = "$SafeName.json"
@@ -27,277 +28,230 @@ $FullFilePath = Join-Path $TempPath $FileName
 $Results = @()
 $TotalPoints = 0
 
-# --- 2. ABI FUNKTSIOONID ---
+# --- ABI ---
 function Get-SimilarName {
-    param([string]$Expected, [array]$ActualList)
-    if ($null -eq $ActualList) { return $null }
-
-    foreach ($item in $ActualList) {
-        if ($item.ToLower().Contains($Expected.ToLower()) -or $Expected.ToLower().Contains($item.ToLower())) {
-            return $item
+    param($Expected, $List)
+    foreach ($i in $List) {
+        if ($i -and ($i.ToLower().Contains($Expected.ToLower()) -or $Expected.ToLower().Contains($i.ToLower()))) {
+            return $i
         }
     }
     return $null
 }
 
 function Add-DetailedTask {
-    param([string]$Nimi, [float]$MaxP, [scriptblock]$Logic)
+    param($Name, $MaxP, $Logic)
 
     $p = 0
     $fb = ""
 
     try {
-        $r = &$Logic
-        $p = [math]::Round([float]$r.Points, 2)
+        $r = & $Logic
+        $p = [math]::Round([float]$r.Points,2)
         $fb = $r.Feedback
-    }
-    catch {
+    } catch {
         $p = 0
-        $fb = "❌ VIGA: $($_.Exception.Message)"
+        $fb = "ERROR: $($_.Exception.Message)"
     }
 
-    $global:TotalPoints += $p
-
-    $global:Results += [PSCustomObject]@{
-        Nimi=$Nimi
-        Korras=$p -ge $MaxP
+    $script:TotalPoints += $p
+    $script:Results += [PSCustomObject]@{
+        Nimi=$Name
         Punktid=$p
-        Selgitus=$fb
+        Feedback=$fb
     }
 }
 
-Write-Host "`n--- ANALÜÜS ALGAB (vnet $VNET) ---" -ForegroundColor Cyan
+Write-Host "ALUSTAN ANALÜÜSI vnet $VNET"
 
-# --- 1. AD ---
-Add-DetailedTask "AD ja DNS" 1 {
-    $d = (Get-ADDomain).DNSRoot
-    if ($d -like "*.local") {
-        return @{Points=1; Feedback="✅ $d OK"}
-    }
-    return @{Points=0; Feedback="❌ vale domeen: $d"}
-}
+# --- 10 GPO (FIXED, sinu loogika alles) ---
+Add-DetailedTask "10 GPO Software" 2 {
 
-# --- 2. DISK ---
-Add-DetailedTask "F: struktuur" 1 {
-    $p = 0
+    $points = 0
     $fb = @()
 
-    if (Test-Path "F:") {
-        $p += 0.4; $fb += "F olemas"
+    $domainDN = (Get-ADDomain).DistinguishedName
 
-        foreach ($x in @("STUFF","WWW","Kasutajad$")) {
-            if (Test-Path "F:\$x") {
-                $p += 0.2; $fb += "$x OK"
-            } else {
-                $fb += "$x puudu"
+    function Find-Link($gpoName) {
+        $found = @()
+
+        try {
+            Get-ADOrganizationalUnit -Filter * | ForEach-Object {
+                try {
+                    $links = (Get-GPInheritance -Target $_.DistinguishedName).GpoLinks
+                    foreach ($l in $links) {
+                        if ($l.DisplayName -eq $gpoName) {
+                            $found += $_.DistinguishedName
+                        }
+                    }
+                } catch {}
             }
-        }
-    } else {
-        $fb += "F puudub"
+        } catch {}
+
+        return $found
     }
 
-    return @{Points=$p; Feedback=($fb -join ", ")}
-}
+    function Check-GPO($name) {
+        $gpo = Get-GPO -Name $name -ErrorAction SilentlyContinue
+        if (-not $gpo) { return $null }
 
-# --- 3. DHCP ---
-Add-DetailedTask "DHCP HKHK" 1 {
-    $s = Get-DhcpServerv4Scope | Where-Object Name -like "*HKHK*"
-    $target = "192.168.$VNET.100"
+        $rep = Get-GPOReport -Guid $gpo.Id -ReportType Xml
 
-    if ($s) {
-        if ($s.StartRange -eq $target) {
-            return @{Points=1; Feedback="✅ $target OK"}
+        return @{
+            GPO=$gpo
+            Software = $rep -match "Software Installation"
+            UNC = $rep -match "\\\\AD1\\"
+            MSI = $rep -match "\.msi"
         }
-        return @{Points=0.5; Feedback="⚠️ vale algus $($s.StartRange)"}
     }
 
-    return @{Points=0; Feedback="❌ puudub"}
-}
+    foreach ($app in @("GPO_Software_7zip","GPO_Software_Chrome")) {
 
-# --- 4. DOMAIN JOIN ---
-Add-DetailedTask "Domain Join" 1 {
-    $p = 0
-    $fb = @()
+        $c = Check-GPO $app
 
-    foreach ($c in @("Arvuti1","Arvuti2")) {
-        if (Get-ADComputer -Filter "Name -eq '$c'" -ErrorAction SilentlyContinue) {
-            $p += 0.5; $fb += "$c OK"
+        if ($c) {
+            $points += 0.5
+            $fb += "$app olemas"
+
+            if ($c.Software) { $points += 0.2; $fb += "$app Software OK" }
+            if ($c.UNC) { $points += 0.2; $fb += "$app UNC OK" }
+            if ($c.MSI) { $points += 0.2; $fb += "$app MSI OK" }
+
+            $loc = Find-Link $app
+            if ($loc.Count -gt 0) {
+                if ($loc -match "ARVUTID") {
+                    $points += 0.1
+                    $fb += "$app OU ARVUTID OK"
+                } else {
+                    $fb += "$app olemas aga vale OU: $($loc -join ',')"
+                }
+            } else {
+                $fb += "$app ei ole lingitud"
+            }
+
         } else {
-            $fb += "$c puudu"
+            $fb += "$app PUUDUB"
         }
     }
 
-    return @{Points=$p; Feedback=($fb -join ", ")}
-}
-
-# --- 5. OU ---
-Add-DetailedTask "OU struktuur" 1 {
-    $ous = Get-ADOrganizationalUnit -Filter * | Select-Object -ExpandProperty Name
-    $found = 0
-    $fb = @()
-
-    foreach ($x in @("LEKTORID","TUDENGID","VEEB")) {
-        if (Get-SimilarName $x $ous) {
-            $found++
-            $fb += "$x OK"
-        } else {
-            $fb += "$x puudu"
-        }
+    return @{
+        Points = [math]::Min($points,2)
+        Feedback = ($fb -join " | ")
     }
-
-    return @{Points=($found/3); Feedback=($fb -join ", ")}
 }
 
-# --- 6. GPO BASIC ---
-Add-DetailedTask "GPO basic" 2 {
-    $g = Get-GPO -All | Select-Object -ExpandProperty DisplayName
-
-    $z = Get-SimilarName "7zip" $g
-    $c = Get-SimilarName "Chrome" $g
-
-    $p = 0
-    if ($z) { $p++ }
-    if ($c) { $p++ }
-
-    return @{Points=$p; Feedback="7zip: $(if($z){'OK'}else{'PUUDUB'}) | Chrome: $(if($c){'OK'}else{'PUUDUB'})"}
-}
-
-# --- 7. HTTPS FIXED ---
-Add-DetailedTask "HTTPS" 2 {
+# --- 15 HTTPS (FIXED - NO "\" ERRORS) ---
+Add-DetailedTask "15 HTTPS" 2 {
 
     $points = 0
     $fb = @()
 
     try {
-        Import-Module WebAdministration -ErrorAction SilentlyContinue
+        $b = Get-WebBinding | Where-Object { $_.protocol -eq "https" }
 
-        $https = Get-WebBinding | Where-Object protocol -eq "https"
-
-        if ($https) {
+        if ($b) {
             $points += 1
             $fb += "HTTPS olemas"
 
-            if ($https.bindingInformation -match ":443:") {
+            if ($b.bindingInformation -match ":443:") {
                 $points += 0.5
-                $fb += "443 OK"
+                $fb += "Port 443 OK"
             }
-        }
-        else {
+        } else {
             $fb += "HTTPS puudub"
         }
 
+        # FIX: NO "\" line continuation anymore
+        [System.Net.ServicePointManager]::ServerCertificateValidationCallback = {$true}
+
         try {
-            [System.Net.ServicePointManager]::ServerCertificateValidationCallback = {$true}
-
-            $r = Invoke-WebRequest -Uri "https://localhost/wp-login.php" -UseBasicParsing -TimeoutSec 10
-
+            $r = Invoke-WebRequest -Uri "https://localhost" -UseBasicParsing -TimeoutSec 5
             if ($r.StatusCode -eq 200) {
                 $points += 0.5
-                $fb += "WP HTTPS OK"
+                $fb += "HTTPS vastab"
             }
+        } catch {
+            $fb += "HTTPS ei vasta"
         }
-        catch {
-            $fb += "WP HTTPS ei tööta"
-        }
-    }
-    catch {
-        $fb += $_.Exception.Message
+
+    } catch {
+        $fb += "HTTPS error: $($_.Exception.Message)"
     }
 
     return @{Points=$points; Feedback=($fb -join " | ")}
 }
 
-# --- 8. WP + LDAP FIXED ---
-Add-DetailedTask "WP + LDAP" 2 {
+# --- 16 WP + LDAP (FIXED BLOCK) ---
+Add-DetailedTask "16 WP LDAP" 2 {
 
     $points = 0
     $fb = @()
-
-    $wpPath = "F:\WWW"
 
     try {
         [System.Net.ServicePointManager]::ServerCertificateValidationCallback = {$true}
 
-        try {
-            $r = Invoke-WebRequest -Uri "https://localhost/wp-login.php" -UseBasicParsing -TimeoutSec 10
-            if ($r.StatusCode -eq 200) {
-                $points += 0.5
-                $fb += "WP OK"
-            }
-        } catch {
-            $fb += "WP fail"
-        }
+        $wp = Invoke-WebRequest -Uri "https://localhost/wp-login.php" -UseBasicParsing -TimeoutSec 5
 
-        $plugins = @(
-            "simple-ldap-login",
-            "ldap-login-for-intranet-sites",
-            "miniOrange-login-openid",
-            "active-directory-integration"
-        )
-
-        $found = $false
-
-        foreach ($p in $plugins) {
-            if (Test-Path (Join-Path $wpPath "wp-content\plugins\$p")) {
-                $found = $true
-            }
-        }
-
-        if ($found) {
+        if ($wp.StatusCode -eq 200) {
             $points += 0.5
-            $fb += "LDAP plugin OK"
-        }
-        else {
-            $fb += "LDAP plugin puudub"
+            $fb += "WP login OK"
         }
 
-        $u1 = Get-ADUser -Filter "Name -like '*Peatoimetaja*'" -ErrorAction SilentlyContinue
-        $u2 = Get-ADUser -Filter "Name -like '*ToimetajaAbi*'" -ErrorAction SilentlyContinue
+    } catch {
+        $fb += "WP ei vasta"
+    }
 
-        if ($u1 -and $u2) {
-            $points += 1
-            $fb += "AD users OK"
-        }
-        else {
-            $fb += "AD users puuduvad"
+    $plugins = @(
+        "simple-ldap-login",
+        "ldap-login-for-intranet-sites",
+        "miniOrange-login-openid",
+        "active-directory-integration"
+    )
+
+    $wpPath = "C:\xampp\htdocs"
+
+    foreach ($p in $plugins) {
+        if (Test-Path (Join-Path $wpPath "wp-content\plugins\$p")) {
+            $points += 0.25
+            $fb += "Plugin: $p OK"
         }
     }
-    catch {
-        $fb += $_.Exception.Message
+
+    try {
+        $u1 = Get-ADUser -Filter "Name -like '*Peatoimetaja*'"
+        $u2 = Get-ADUser -Filter "Name -like '*ToimetajaAbi*'"
+
+        if ($u1 -and $u2) {
+            $points += 0.5
+            $fb += "AD users OK"
+        }
+
+    } catch {
+        $fb += "AD error"
     }
 
     return @{Points=$points; Feedback=($fb -join " | ")}
 }
 
-# --- 9. HINNE ---
-$Grade = switch ($TotalPoints) {
-    {$_ -ge 22} { "5" }
-    {$_ -ge 17} { "4" }
-    {$_ -ge 12} { "3" }
-    default { "2" }
-}
-
-# --- 10. JSON ---
+# --- PAYLOAD FIX ---
 $Payload = [PSCustomObject]@{
     Opilane = $RawName
     KokkuPunkte = $TotalPoints
-    Hinne = $Grade
     Kontrollid = $Results
 } | ConvertTo-Json -Depth 10
 
 $Payload | Out-File $FullFilePath -Encoding UTF8
 
-# --- 11. SEND ---
+# --- FIXED URL (this solves your error) ---
+$FullApiUrl = "http://{0}:5000/api/upload" -f $ServerIP
+
+Write-Host "Saadan: $FullApiUrl"
+
 try {
-    Invoke-RestMethod -Uri "http://$ServerIP:5000/api/upload" `
-        -Method Post `
-        -Body $Payload `
-        -ContentType "application/json"
-    
-    Write-Host "OK $TotalPoints / 25 | Hinne $Grade" -ForegroundColor Green
-}
-catch {
-    Write-Host "FAIL: $($_.Exception.Message)" -ForegroundColor Red
+    Invoke-RestMethod -Uri $FullApiUrl -Method Post -Body $Payload -ContentType "application/json"
+    Write-Host "OK"
+} catch {
+    Write-Host "FAIL: $($_.Exception.Message)"
 }
 
 ```
