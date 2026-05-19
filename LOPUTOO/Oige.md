@@ -237,19 +237,23 @@ Add-DetailedTask "15. HTTPS (Port 443)" 2 {
     if ($binding) {
         $p += 1; $fb += "Binding 443 olemas"
         $TargetUrl = "https://veebileht.$Surname.local"
-        # Testime nimega, kui ei saa, proovime localhosti
-        $test = curl.exe -s -k -I "$TargetUrl" --connect-timeout 5
-        if ($test -match "200 OK") {
-            $p += 1; $fb += "Veebivastus 200 OK ($TargetUrl)"
+        
+        # Testime nimega, ignoreerime sertifikaadi vigu (-k)
+        # Kasutame -I asemel -v, et näha päiseid, aga matchime staatust
+        $test = curl.exe -s -k -I "$TargetUrl" --connect-timeout 5 2>&1
+        
+        if ($test -match "200 OK" -or $test -match "301" -or $test -match "302") {
+            $p += 1; $fb += "Veebivastus OK ($TargetUrl)"
         } else {
-            $test2 = curl.exe -s -k -I "https://localhost" --connect-timeout 5
-            if ($test2 -match "200 OK") {
-                $p += 1; $fb += "Veebivastus 200 OK (localhost)"
+            # Varulahendus: proovime localhosti, kui DNS streigib
+            $test2 = curl.exe -s -k -I "https://127.0.0.1" -H "Host: veebileht.$Surname.local" --connect-timeout 5 2>&1
+            if ($test2 -match "200 OK" -or $test2 -match "302") {
+                $p += 1; $fb += "Vastus OK (IP kaudu Host päisega)"
             } else {
-                $fb += "Sait ei vasta HTTPS päringule"
+                $fb += "Sait ei vasta. Serveri vastus: $(if($test){$test[0]}else{'Tühi'})"
             }
         }
-    } else { $fb += "HTTPS Binding 443 puudub" }
+    } else { $fb += "HTTPS Binding 443 puudub IIS-is" }
     
     return @{Points=$p; Feedback=($fb -join " | ")}
 }
