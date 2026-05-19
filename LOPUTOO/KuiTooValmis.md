@@ -6,6 +6,7 @@
 
 ```powershell
 
+
 # --- 0. PUHASTUS JA ETTEVALMISTUS ---
 $global:Results = @()      # Tühjendame tulemuste massiivi
 $global:TotalPoints = 0    # Nullime punktid
@@ -18,19 +19,41 @@ Import-Module ActiveDirectory, GroupPolicy, DhcpServer, WebAdministration -Error
 $TempPath = "C:\Temp"
 if (!(Test-Path $TempPath)) { New-Item -Path $TempPath -ItemType Directory -Force | Out-Null }
 
-# --- 1. KASUTAJA SISENDID ---
+# --- 1. KASUTAJA SISENDID JA NIMELAHELDUS ---
 $RawName = Read-Host "Sisesta oma nimi (Eesnimi Perekonnanimi)"
 $VNET = Read-Host "Sisesta oma vnet number (XXX)"
 
-# Sinu algne failinime loogika
-$SafeName = $RawName.ToLower().Replace(" ","").Replace("ä","a").Replace("ö","o").Replace("ü","u").Replace("õ","o")
-$FileName = "$SafeName.json"
-$FullFilePath = Join-Path $TempPath $FileName
+# Funktsioon täpitähtede eemaldamiseks
+function Clean-String {
+    param([string]$InputString)
+    return $InputString.ToLower().Replace("õ","o").Replace("ä","a").Replace("ö","o").Replace("ü","u").Replace(" ","")
+}
 
+# TUVASTAME JA PUHASTAME PERENIME
+try {
+    $DomainInfo = Get-ADDomain -ErrorAction Stop
+    $RawSurname = $DomainInfo.DNSRoot.Split('.')[0]
+    $script:Surname = Clean-String $RawSurname
+} catch {
+    $NameParts = $RawName.Split(' ')
+    $pName = if ($NameParts.Count -gt 1) { $NameParts[1] } else { $NameParts[0] }
+    $script:Surname = Clean-String $pName
+}
+
+# DEFINEERIME URL-id (Väiketähtedega ja täppideta)
+$script:TargetDomain = "veebileht.$($script:Surname).local"
+$script:TargetURL = "https://$($script:TargetDomain)"
+
+# Dashboardi seaded
 $DashboardIP = "192.168.124.64" 
 $script:AD1_IP = "192.168.$VNET.10"
 
-Write-Host "VNET: $VNET | Sinu IP: $script:AD1_IP | Perenimi: $script:Surname" -ForegroundColor Yellow
+# Failinime loogika (kasutame sama puhastust)
+$SafeName = Clean-String $RawName
+$FullFilePath = Join-Path $TempPath "$SafeName.json"
+
+Write-Host "`nInfo: Puhastatud perenimi [$($script:Surname)] | URL [$($script:TargetURL)]" -ForegroundColor Yellow
+
 
 # --- 2. ABI-FUNKTSIOONID ---
 
@@ -232,26 +255,21 @@ Add-DetailedTask "14. IIS ja Wordpress" 2 {
 # 15. HTTPS (KONTROLL AINULT PÄRIS URL-iga)
 Add-DetailedTask "15. HTTPS (Port 443)" 2 {
     $p = 0; $fb = @()
-    $TargetUrl = "https://veebileht.$Surname.local"
     
-    # 1. Kontrollime, kas IIS-is on üldse HTTPS binding olemas
     $binding = Get-WebBinding | Where-Object { $_.protocol -eq "https" -and $_.bindingInformation -match "443" }
     
     if ($binding) {
         $p += 1; $fb += "Binding 443 olemas"
         
-        # 2. Testime veebivastust kasutades AINULT õiget URL-i
-        # -s (silent), -k (ignore cert), -I (headers only)
-        $test = curl.exe -s -k -I "$TargetUrl" --connect-timeout 5 2>&1
+        # Testime päris URL-i, mille me alguses kokku panime
+        $test = curl.exe -s -k -I "$TargetURL" --connect-timeout 5 2>&1
         
         if ($test -match "200 OK" -or $test -match "301" -or $test -match "302") {
-            $p += 1; $fb += "Veebivastus OK ($TargetUrl)"
+            $p += 1; $fb += "Veebivastus OK ($TargetURL)"
         } else {
-            $fb += "VIGA: Sait ei vasta nimega $TargetUrl. Kontrolli DNS-i ja IIS Host Headerit!"
+            $fb += "VIGA: Sait ei vasta nimega $TargetURL"
         }
-    } else {
-        $fb += "VIGA: HTTPS sidumine (binding) pordil 443 puudub"
-    }
+    } else { $fb += "VIGA: HTTPS sidumine puudub" }
     
     return @{Points=$p; Feedback=($fb -join " | ")}
 }
@@ -262,39 +280,32 @@ Add-DetailedTask "16. WP AD Kasutajad" 2 {
     $testUser = "Peatoimetaja"
     $testPass = "Toimetaja123!"
     
-    # 1. Kontrollime kasutajaid AD-s (0.5p)
     $u1 = Get-ADUser -Filter "SamAccountName -eq '$testUser'" -ErrorAction SilentlyContinue
     if ($u1) {
         $p += 0.5; $fb += "Kasutajad AD-s olemas"
         
-        $TargetUrl = "https://veebileht.$Surname.local/wp-login.php"
+        # Lisame URL-ile sisselogimise tee
+        $LoginURL = "$TargetURL/wp-login.php"
         $cookieFile = "$env:TEMP\wp_ldap_cookie.txt"
         if (Test-Path $cookieFile) { Remove-Item $cookieFile }
 
         try {
-            # Samm 1: Küsime sisselogimise lehte, et saada kätte algsed küpsised
-            curl.exe -s -k -c $cookieFile "$TargetUrl" --connect-timeout 5 | Out-Null
-
-            # Samm 2: Saadame sisselogimise andmed
-            # -L (follow redirects), -i (include headers), -b (read cookies), -c (write cookies)
+            curl.exe -s -k -c $cookieFile "$LoginURL" --connect-timeout 5 | Out-Null
             $postData = "log=$testUser&pwd=$testPass&wp-submit=Log+In&testcookie=1"
-            $result = curl.exe -s -k -L -i -b $cookieFile -c $cookieFile -d "$postData" "$TargetUrl" --connect-timeout 10
+            $result = curl.exe -s -k -L -i -b $cookieFile -c $cookieFile -d "$postData" "$LoginURL" --connect-timeout 10
 
-            # Samm 3: Kontrollime küpsisefaili sisu või vastust
-            # Kui sisselogimine õnnestub, peab küpsisefaili tekkima "wordpress_logged_in" rida
             $cookieContent = if (Test-Path $cookieFile) { Get-Content $cookieFile } else { "" }
 
-            if ($cookieContent -match "wordpress_logged_in" -or $result -match "wp-admin" -or $result -match "location: .*wp-admin") {
-                $p += 1.5; $fb += "LDAP autentimine TOIMIB (Sisselogimine kinnitatud)"
+            if ($cookieContent -match "wordpress_logged_in" -or $result -match "location: .*wp-admin") {
+                $p += 1.5; $fb += "LDAP autentimine TOIMIB ($TargetURL)"
             } else {
-                $fb += "Autentimine ebaõnnestus (WP ei väljastanud sessiooniküpsist)"
+                $fb += "Autentimine ebaõnnestus aadressil $LoginURL"
             }
         } catch { $fb += "Viga ühenduses: $($_.Exception.Message)" }
     } else { $fb += "Kasutajat $testUser ei leitud AD-st" }
 
     return @{Points=$p; Feedback=($fb -join " | ")}
 }
-
 # --- 4. HINDE ARVUTAMINE ---
 $Hinne = switch ($global:TotalPoints) {
     {$_ -ge 22} { "5" }
@@ -329,24 +340,29 @@ $PayloadObj = [PSCustomObject]@{
 $JsonData = $PayloadObj | ConvertTo-Json -Depth 10
 
 try {
-    # 2. SALVESTAMINE (Kasutame Set-Content, et vana sisu ÜLE KIRJUTADA)
+    # 2. SALVESTAMINE (Ülekirjutamine)
     $JsonData | Set-Content -Path $FullFilePath -Encoding utf8 -Force
     Write-Host "`n✅ Uus raport loodud: $FullFilePath" -ForegroundColor Cyan
 
-    # 3. SAATMINE SERVERISSE (Kasutame Sinu algset $ServerIP muutujat)
-    $FullApiUrl = "http://$($ServerIP):5000/api/upload"
+    # 3. SAATMINE SERVERISSE 
+    # NB! Kasutame $DashboardIP muutujat (või $ServerIP, olenevalt kumba sa alguses defineerisid)
+    # Kui sul on alguses $DashboardIP = "192.168.124.64", siis kasuta seda:
+    $TargetIP = if ($DashboardIP) { $DashboardIP } else { "192.168.124.64" }
+    
+    $FullApiUrl = "http://$($TargetIP):5000/api/upload"
+    
     Invoke-RestMethod -Uri $FullApiUrl -Method Post -Body $JsonData -ContentType "application/json; charset=utf-8" -TimeoutSec 15 | Out-Null
-    Write-Host "✅ ANDMED SAADETUD DASHBOARD SERVERISSE." -ForegroundColor Green
+    Write-Host "✅ ANDMED SAADETUD DASHBOARD SERVERISSE ($TargetIP)." -ForegroundColor Green
 
-    # 4. EEMALDAMINE (Kustutame faili masinast peale õnnestunud saatmist)
+    # 4. EEMALDAMINE
     if (Test-Path $FullFilePath) {
         Remove-Item $FullFilePath -Force
-        Write-Host "🧹 Lokaalne fail $FileName eemaldatud (puhastus tehtud)." -ForegroundColor Gray
+        Write-Host "Sweep: Lokaalne fail eemaldatud." -ForegroundColor Gray
     }
 
 } catch {
     Write-Host "`n❌ VIGA: Saatmine ebaõnnestus ($($_.Exception.Message))" -ForegroundColor Red
-    Write-Host "Fail säilitati manuaalseks kontrolliks: $FullFilePath" -ForegroundColor Yellow
+    Write-Host "Fail säilitati siin: $FullFilePath" -ForegroundColor Yellow
 }
 
 
