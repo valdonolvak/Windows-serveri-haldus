@@ -119,13 +119,30 @@ Add-DetailedTask "6. OU KASUTAJAD" 1 {
 # 7. Kasutajad ja grupid (2p)
 Add-DetailedTask "7. Kasutajad ja grupid" 2 {
     $p = 0; $fb = @()
-    # Grupid
-    foreach($g in @("Lektorid", "Tudengid")){
-        if(Get-ADGroup -Filter "Name -eq '$g'" -ErrorAction SilentlyContinue){ $p += 0.25; $fb += "Grupp $g OK" }
+    
+    # 1. Gruppide kontroll (0.5p)
+    $gL = Get-ADGroup -Filter "Name -eq 'Lektorid'" -ErrorAction SilentlyContinue
+    $gT = Get-ADGroup -Filter "Name -eq 'Tudengid'" -ErrorAction SilentlyContinue
+    if($gL){ $p += 0.25; $fb += "Grupp Lektorid OK" }
+    if($gT){ $p += 0.25; $fb += "Grupp Tudengid OK" }
+    
+    # 2. Kasutajate olemasolu kontroll (0.5p)
+    $users = @("oppejoud1", "oppejoud2", "tudeng1", "tudeng2")
+    $foundUsers = 0
+    foreach($u in $users){
+        if(Get-ADUser -Filter "SamAccountName -eq '$u'" -ErrorAction SilentlyContinue){ $foundUsers++ }
     }
-    # Logon Hours
-    $t1 = Get-ADUser -Filter "Name -like '*tudeng1*'" -Properties LogonHours -ErrorAction SilentlyContinue
-    if($t1.LogonHours -and $t1.LogonHours[0] -ne 255){ $p += 1; $fb += "Logon Hours OK" }
+    if($foundUsers -ge 4){ $p += 0.5; $fb += "Kasutajad loodud" }
+    
+    # 3. Logon Hours kontroll (1p)
+    $t1 = Get-ADUser -Filter "SamAccountName -eq 'tudeng1'" -Properties LogonHours -ErrorAction SilentlyContinue
+    if($t1 -and $t1.LogonHours -and $t1.LogonHours[0] -ne 255){ 
+        $p += 1; $fb += "Logon Hours OK" 
+    } else {
+        $fb += "Logon Hours PUUDU"
+    }
+
+    # Tagame, et kui kõik on olemas, on tulemus täpselt 2.0
     return @{Points=$p; Feedback="Ootasin: Grupid ja Tudengite tööaja piirang | Leidsin: $($fb -join ' | ')"}
 }
 
