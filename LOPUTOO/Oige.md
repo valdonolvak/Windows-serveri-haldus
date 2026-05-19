@@ -5,6 +5,8 @@
 ### Täielik ja detailne kontrollskript: `Kontroll.ps1`
 
 ```powershell
+
+$global:DetailedResults = @() # Tühjendame eelmise testi tulemused mälust
 # --- 0. ETTEVALMISTUS JA MOODULID ---
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 [Net.ServicePointManager]::ServerCertificateValidationCallback = {$true}
