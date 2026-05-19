@@ -321,20 +321,40 @@ foreach($res in $global:Results) {
     Write-Host "   -> $($res.Selgitus)" -ForegroundColor Gray
 }
 
-# --- 6. SAATMINE SERVERISSE ---
-$Payload = [PSCustomObject]@{
-    Opilane = $RawName; KokkuPunkte = $global:TotalPoints; Hinne = $Hinne; Kontrollid = $global:Results
-} | ConvertTo-Json -Depth 10
+# --- 6. SALVESTAMINE JA SAATMINE SERVERISSE ---
 
-try {
-    $FullApiUrl = "http://$($ServerIP):5000/api/upload"
-    Invoke-RestMethod -Uri $FullApiUrl -Method Post -Body $Payload -ContentType "application/json; charset=utf-8" -TimeoutSec 15 | Out-Null
-    Write-Host "`n✅ ANDMED SAADETUD DASHBOARD SERVERSISSE." -ForegroundColor Green
-} catch {
-    Write-Host "`n❌ SERVERIGA ÜHENDUMINE EBAÕNNESTUS. Fail salvestati: $FullFilePath" -ForegroundColor Red
-    $Payload | Out-File $FullFilePath -Encoding utf8
+# Koostame Payload objekti
+$PayloadObj = [PSCustomObject]@{
+    Opilane     = $RawName
+    VNET        = $VNET
+    Aeg         = (Get-Date -Format "yyyy-MM-dd HH:mm:ss")
+    KokkuPunkte = $global:TotalPoints
+    Hinne       = $Hinne
+    Kontrollid  = $global:Results
 }
 
+# Teeme objektist JSON teksti
+$JsonData = $PayloadObj | ConvertTo-Json -Depth 10
+
+# 1. SALVESTAMINE (Ülekirjutamine):
+# Kasutame Set-Content, mis pühib vana faili sisu alati minema
+$JsonData | Set-Content -Path $FullFilePath -Encoding utf8
+Write-Host "`n✅ Raport uuendatud failis: $FullFilePath" -ForegroundColor Cyan
+
+# 2. SAATMINE:
+try {
+    $FullApiUrl = "http://$($ServerIP):5000/api/upload"
+    # Saadame JSON andmed serverisse
+    Invoke-RestMethod -Uri $FullApiUrl -Method Post -Body $JsonData -ContentType "application/json; charset=utf-8" -TimeoutSec 15 | Out-Null
+    Write-Host "✅ ANDMED SAADETUD DASHBOARD SERVERISSE." -ForegroundColor Green
+} catch {
+    Write-Host "❌ SERVERIGA ÜHENDUMINE EBAÕNNESTUS: $($_.Exception.Message)" -ForegroundColor Red
+}
+
+# --- OLULINE LISA ---
+# Selleks, et massiivi ei dubleeritaks mälus, lisa päris skripti algusesse 
+# (kohe pärast $global:Results = @() rida) järgmine käsk:
+# $global:TotalPoints = 0
 
 ```
 
