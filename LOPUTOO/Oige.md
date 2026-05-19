@@ -13,17 +13,28 @@ Import-Module ActiveDirectory, GroupPolicy, DhcpServer, WebAdministration -Error
 $TempPath = "C:\Temp"
 if (!(Test-Path $TempPath)) { New-Item -Path $TempPath -ItemType Directory -Force | Out-Null }
 
+
 # --- 1. KASUTAJA SISENDID ---
 $RawName = Read-Host "Sisesta oma nimi (Eesnimi Perekonnanimi)"
 $VNET = Read-Host "Sisesta oma vnet number (XXX)"
-$ServerIP = "192.168.124.64" # DashBoard serveri IP
 
-$SafeName = $RawName.ToLower().Replace(" ","").Replace("ä","a").Replace("ö","o").Replace("ü","u").Replace("õ","o")
-$FileName = "$SafeName.json"
-$FullFilePath = Join-Path $TempPath $FileName
+# See on DASHBOARD serveri IP - JÄTA SEE SAMAKS!
+$DashboardIP = "192.168.124.64" 
 
-$global:Results = @()
-$global:TotalPoints = 0
+# See on sinu AD1 serveri IP, mida skript kasutab testimiseks
+$script:AD1_IP = "192.168.$VNET.10"
+
+# TUVASTAME PERENIME DOMEENIST (Selleks peab domeen olema loodud!)
+try {
+    $DomainInfo = Get-ADDomain -ErrorAction Stop
+    $FullDomain = $DomainInfo.DNSRoot
+    $script:Surname = $FullDomain.Split('.')[0]
+} catch {
+    # Varulahendus kui domeeni veel pole - tuletame nime sisestatud nimest
+    $script:Surname = ($RawName.Split(' ')[1]).ToLower().Replace("ä","a").Replace("ö","o").Replace("ü","u").Replace("õ","o")
+}
+
+Write-Host "VNET: $VNET | Sinu IP: $script:AD1_IP | Perenimi: $script:Surname" -ForegroundColor Yellow
 
 # --- 2. ABI-FUNKTSIOONID ---
 
