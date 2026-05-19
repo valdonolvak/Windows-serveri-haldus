@@ -7,6 +7,7 @@
 ```powershell
 # --- 0. ETTEVALMISTUS JA MOODULID ---
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+[Net.ServicePointManager]::ServerCertificateValidationCallback = {$true}
 Import-Module ActiveDirectory, GroupPolicy, DhcpServer, WebAdministration -ErrorAction SilentlyContinue
 
 $TempPath = "C:\Temp"
@@ -15,14 +16,14 @@ if (!(Test-Path $TempPath)) { New-Item -Path $TempPath -ItemType Directory -Forc
 # --- 1. KASUTAJA SISENDID ---
 $RawName = Read-Host "Sisesta oma nimi (Eesnimi Perekonnanimi)"
 $VNET = Read-Host "Sisesta oma vnet number (XXX)"
-$ServerIP = "192.168.124.64" # Linux serveri IP
+$ServerIP = "192.168.124.64" # DashBoard serveri IP
 
 $SafeName = $RawName.ToLower().Replace(" ","").Replace("ä","a").Replace("ö","o").Replace("ü","u").Replace("õ","o")
 $FileName = "$SafeName.json"
 $FullFilePath = Join-Path $TempPath $FileName
 
-$Results = @()
-$TotalPoints = 0
+$global:Results = @()
+$global:TotalPoints = 0
 
 # --- 2. ABI-FUNKTSIOONID ---
 
@@ -47,30 +48,36 @@ function Add-DetailedTask {
         $fb = "❌ SÜSTEEMNE VIGA: $($_.Exception.Message)"
     }
     $global:TotalPoints += $p
-    $global:Results += [PSCustomObject]@{ Nimi=$Nimi; Korras=$p -ge $MaxP; Punktid=$p; Selgitus=$fb }
+    $global:Results += [PSCustomObject]@{ 
+        Nimi=$Nimi; 
+        Korras=$p -ge ($MaxP * 0.8); # 80% punktidest märgib ülesande sooritatuks
+        Punktid=$p; 
+        Selgitus=$fb 
+    }
 }
 
-Write-Host "`n--- ALUSTAN LÕPUTÖÖ DETAILSET SÜVAANALÜÜSI (vnet $VNET) ---" -ForegroundColor Cyan
+Write-Host "`n--- ALUSTAN LÕPUTÖÖ DETAILSET KONTROLLI (vnet $VNET) ---" -ForegroundColor Cyan
 
-# --- 3. DETAILSED KONTROLLID (1-16) ---
+# --- 3. KONTROLLID (1-16) ---
 
 # 1. AD ja DNS (1p)
-Add-DetailedTask "1. AD ja DNS seadistus" 1 {
+Add-DetailedTask "1. AD ja DNS" 1 {
     $d = (Get-ADDomain).DNSRoot
-    if ($d -like "*.local") { return @{Points=1; Feedback="✅ Domeenikonfiguratsioon korras: $d"} }
-    return @{Points=0; Feedback="❌ VIGA: Domeen on $d, peab lõppema .local liitega"}
+    if ($d -like "*.local") { return @{Points=1; Feedback="Ootasin: .local domeeni | Leidsin: $d (OK)"} }
+    return @{Points=0; Feedback="Ootasin: .local domeeni | Leidsin: $d (VALE)"}
 }
 
 # 2. Ketta F: ja struktuur (1p)
 Add-DetailedTask "2. Ketas F: ja struktuur" 1 {
-    $p = 0; $fb = @()
-    if (Test-Path "F:") { 
-        $p += 0.4; $fb += "✅ Ketas F: olemas"
+    $found = @(); $missing = @()
+    if (Test-Path "F:") {
         foreach($f in @("STUFF", "WWW", "Kasutajad$")) {
-            if (Test-Path "F:\$f") { $p += 0.2; $fb += "✅ $f" } else { $fb += "❌ $f puudu" }
+            if (Test-Path "F:\$f") { $found += $f } else { $missing += $f }
         }
-    } else { $fb += "❌ Ketas F: puudub" }
-    return @{Points=$p; Feedback=($fb -join " | ")}
+        $p = 0.4 + ($found.Count * 0.2)
+        return @{Points=$p; Feedback="Ootasin: STUFF, WWW, Kasutajad$ | Leidsin: $($found -join ',') | Puudu: $($missing -join ',')"}
+    }
+    return @{Points=0; Feedback="Ootasin: Ketas F: | Leidsin: PUUDUB"}
 }
 
 # 3. DHCP Skoop (1p)
@@ -78,180 +85,253 @@ Add-DetailedTask "3. DHCP Skoop HKHK" 1 {
     $s = Get-DhcpServerv4Scope | Where-Object Name -like "*HKHK*"
     $target = "192.168.$VNET.100"
     if ($s) {
-        if ($s.StartRange -eq $target) { return @{Points=1; Feedback="✅ Skoop HKHK olemas ($target - $($s.EndRange))"} }
-        return @{Points=0.5; Feedback="⚠️ Skoop olemas, aga algusaadress on $($s.StartRange) (oodatud $target)"}
+        if ($s.StartRange -eq $target) { return @{Points=1; Feedback="Ootasin algust: $target | Leidsin: $($s.StartRange) (OK)"} }
+        return @{Points=0.5; Feedback="Ootasin algust: $target | Leidsin: $($s.StartRange) (VALE IP)"}
     }
-    return @{Points=0; Feedback="❌ Skoop HKHK puudub"}
+    return @{Points=0; Feedback="Ootasin skoopi 'HKHK' | Leidsin: EI LEIDNUD"}
 }
 
 # 4. Domeeniga liitumine (1p)
-Add-DetailedTask "4. Klientide domeeniga liitumine" 1 {
+Add-DetailedTask "4. Klientide domeeniliitumine" 1 {
     $p = 0; $fb = @()
     foreach($c in @("Arvuti1", "Arvuti2")){
-        if(Get-ADComputer -Filter "Name -eq '$c'" -ErrorAction SilentlyContinue){ $p += 0.5; $fb += "✅ $c liidetud" } else { $fb += "❌ $c puudu" }
+        if(Get-ADComputer -Filter "Name -eq '$c'" -ErrorAction SilentlyContinue){ $p += 0.5; $fb += "$c OK" } else { $fb += "$c PUUDU" }
     }
-    return @{Points=$p; Feedback=($fb -join ", ")}
+    return @{Points=$p; Feedback="Ootasin: Arvuti1 ja Arvuti2 domeenis | Leidsin: $($fb -join ', ')"}
 }
 
 # 5. OU Arvutid paigutus (1p)
-Add-DetailedTask "5. OU ARVUTID ja masinate asukoht" 1 {
-    $p = 0; $fb = @()
+Add-DetailedTask "5. OU ARVUTID" 1 {
     $c1 = Get-ADComputer -Identity "Arvuti1" -Properties DistinguishedName -ErrorAction SilentlyContinue
     $c2 = Get-ADComputer -Identity "Arvuti2" -Properties DistinguishedName -ErrorAction SilentlyContinue
-    if($c1.DistinguishedName -like "*OU=Win10,OU=ARVUTID*"){$p += 0.5; $fb += "✅ Arvuti1 (Win10) OK"} else {$fb += "❌ Arvuti1 vales OU-s"}
-    if($c2.DistinguishedName -like "*OU=Win11,OU=ARVUTID*"){$p += 0.5; $fb += "✅ Arvuti2 (Win11) OK"} else {$fb += "❌ Arvuti2 vales OU-s"}
-    return @{Points=$p; Feedback=($fb -join " | ")}
+    $p = 0; $fb = @()
+    if($c1.DistinguishedName -like "*OU=Win10,OU=ARVUTID*"){$p += 0.5; $fb += "Arvuti1 OK"} else {$fb += "Arvuti1 VALE OU"}
+    if($c2.DistinguishedName -like "*OU=Win11,OU=ARVUTID*"){$p += 0.5; $fb += "Arvuti2 OK"} else {$fb += "Arvuti2 VALE OU"}
+    return @{Points=$p; Feedback="Ootasin: OU=Win10/Win11,OU=ARVUTID | Leidsin: $($fb -join ' | ')"}
 }
 
 # 6. OU KASUTAJAD (1p)
-Add-DetailedTask "6. OU KASUTAJAD struktuur" 1 {
+Add-DetailedTask "6. OU KASUTAJAD" 1 {
     $ous = Get-ADOrganizationalUnit -Filter * | Select-Object -ExpandProperty Name
-    $fb = @(); $f = 0
+    $f = 0; $fb = @()
     foreach($o in @("LEKTORID", "TUDENGID", "VEEB")){
-        if(Get-SimilarName $o $ous){ $f++; $fb += "✅ $o" } else { $fb += "❌ $o" }
+        if(Get-SimilarName $o $ous){ $f++; $fb += "$o OK" } else { $fb += "$o PUUDU" }
     }
-    return @{Points=($f/3); Feedback="Leitud struktuur: " + ($fb -join ", ")}
+    return @{Points=($f/3); Feedback="Ootasin: LEKTORID, TUDENGID, VEEB | Leidsin: $($fb -join ', ')"}
 }
 
 # 7. Kasutajad ja grupid (2p)
-Add-DetailedTask "7. Kasutajad, grupid ja piirangud" 2 {
+Add-DetailedTask "7. Kasutajad ja grupid" 2 {
     $p = 0; $fb = @()
-    # Grupid (0.5p)
-    foreach($g in @("Lektorid", "Tudengid")){
-        if(Get-ADGroup -Filter "Name -eq '$g'" -ErrorAction SilentlyContinue){ $p += 0.25; $fb += "✅ Grupp $g" } else { $fb += "❌ Grupp $g" }
-    }
-    # Kasutajad (0.5p)
+    
+    # 1. Gruppide kontroll (0.5p)
+    $gL = Get-ADGroup -Filter "Name -eq 'Lektorid'" -ErrorAction SilentlyContinue
+    $gT = Get-ADGroup -Filter "Name -eq 'Tudengid'" -ErrorAction SilentlyContinue
+    if($gL){ $p += 0.25; $fb += "Grupp Lektorid OK" }
+    if($gT){ $p += 0.25; $fb += "Grupp Tudengid OK" }
+    
+    # 2. Kasutajate olemasolu kontroll (0.5p)
     $users = @("oppejoud1", "oppejoud2", "tudeng1", "tudeng2")
-    $foundUsers = @()
+    $foundUsers = 0
     foreach($u in $users){
-        $check = Get-ADUser -Filter "Name -like '*$u*' -or SamAccountName -like '*$u*'" -ErrorAction SilentlyContinue
-        if($check){ $foundUsers += "✅ $u"; $p += 0.125 } else { $foundUsers += "❌ $u" }
+        if(Get-ADUser -Filter "SamAccountName -eq '$u'" -ErrorAction SilentlyContinue){ $foundUsers++ }
     }
-    $fb += ($foundUsers -join ", ")
-    # Logon Hours (1p)
-    $t1 = Get-ADUser -Filter "Name -like '*tudeng1*'" -Properties LogonHours -ErrorAction SilentlyContinue
-    if($t1 -and $t1.LogonHours -and $t1.LogonHours[0] -ne 255){ $p += 1; $fb += " | ✅ Logon Hours seadistatud" } else { $fb += " | ❌ Logon Hours puudu" }
-    return @{Points=$p; Feedback=($fb -join " | ")}
+    if($foundUsers -ge 4){ $p += 0.5; $fb += "Kasutajad loodud" }
+    
+    # 3. Logon Hours kontroll (1p)
+    $t1 = Get-ADUser -Filter "SamAccountName -eq 'tudeng1'" -Properties LogonHours -ErrorAction SilentlyContinue
+    if($t1 -and $t1.LogonHours -and $t1.LogonHours[0] -ne 255){ 
+        $p += 1; $fb += "Logon Hours OK" 
+    } else {
+        $fb += "Logon Hours PUUDU"
+    }
+
+    # Tagame, et kui kõik on olemas, on tulemus täpselt 2.0
+    return @{Points=$p; Feedback="Ootasin: Grupid ja Tudengite tööaja piirang | Leidsin: $($fb -join ' | ')"}
 }
 
 # 8. GPO Taustapildid (2p)
 Add-DetailedTask "8. GPO Taustapildid" 2 {
-    $all = Get-GPO -All | Select-Object -ExpandProperty DisplayName
-    $found = Get-SimilarName "Taustapildid" $all
-    if($found){ return @{Points=2; Feedback="✅ Leitud: $found"} }
-    return @{Points=0; Feedback="❌ GPO_Taustapildid puudub"}
+    $g = Get-GPO -All | Where-Object DisplayName -match "Taustapildid"
+    if($g){ return @{Points=2; Feedback="Ootasin: GPO_Taustapildid | Leidsin: $($g.DisplayName) (OK)"} }
+    return @{Points=0; Feedback="Ootasin: GPO_Taustapildid | Leidsin: PUUDU"}
 }
 
 # 9. GPO Folder Redirection (2p)
 Add-DetailedTask "9. GPO Folder Redirection" 2 {
-    $all = Get-GPO -All | Select-Object -ExpandProperty DisplayName
-    $found = Get-SimilarName "Redirection" $all
-    if($found){ return @{Points=2; Feedback="✅ Leitud: $found"} }
-    return @{Points=0; Feedback="❌ GPO_Folder_Redirection puudub"}
+    $g = Get-GPO -All | Where-Object DisplayName -match "Redirection"
+    if($g){ return @{Points=2; Feedback="Ootasin: GPO_Folder_Redirection | Leidsin: $($g.DisplayName) (OK)"} }
+    return @{Points=0; Feedback="Ootasin: GPO_Folder_Redirection | Leidsin: PUUDU"}
 }
 
 # 10. Tarkvara GPO-d (2p)
-Add-DetailedTask "10. Tarkvara GPO-d (7zip/Chrome)" 2 {
-    $all = Get-GPO -All | Select-Object -ExpandProperty DisplayName
-    $z = Get-SimilarName "7zip" $all; $c = Get-SimilarName "Chrome" $all
-    $p = 0; if($z){$p++}; if($c){$p++}
-    return @{Points=$p; Feedback="Staatus: $(if($z){'✅ 7zip'}else{'❌ 7zip'}), $(if($c){'✅ Chrome'}else{'❌ Chrome'})"}
+Add-DetailedTask "10. Tarkvara GPO-d" 2 {
+    $p = 0; $fb = @()
+    $g7 = Get-GPO -All | Where-Object { $_.DisplayName -match "7zip" }
+    $gC = Get-GPO -All | Where-Object { $_.DisplayName -match "Chrome" }
+    if($g7){$p++; $fb += "7zip OK"}
+    if($gC){$p++; $fb += "Chrome OK"}
+    return @{Points=$p; Feedback="Ootasin: 7zip ja Chrome MSI poliitikaid | Leidsin: $($fb -join ', ')"}
 }
 
 # 11. Chrome seadistamine (2p)
 Add-DetailedTask "11. GPO Chrome Settings" 2 {
-    $all = Get-GPO -All | Select-Object -ExpandProperty DisplayName
-    $found = Get-SimilarName "Chrome_Settings" $all
-    if($found){ return @{Points=2; Feedback="✅ Leitud: $found"} }
-    return @{Points=0; Feedback="❌ GPO_Chrome_Settings puudub"}
+    $g = Get-GPO -All | Where-Object DisplayName -match "Chrome_Settings"
+    if($g){ return @{Points=2; Feedback="Ootasin: ADMX põhine Chrome poliitika | Leidsin: $($g.DisplayName) (OK)"} }
+    return @{Points=0; Feedback="Ootasin: Chrome_Settings GPO | Leidsin: PUUDU"}
 }
 
 # 12. Teine DC (AD2) (2p)
-Add-DetailedTask "12. Teine DC (AD2) staatus" 2 {
+Add-DetailedTask "12. Teine DC (AD2)" 2 {
     $ad2 = Get-ADDomainController -Identity "AD2" -ErrorAction SilentlyContinue
-    if($ad2){ return @{Points=2; Feedback="✅ AD2 on domeenikontroller"} }
-    return @{Points=0; Feedback="❌ AD2 ei ole DC või pole kättesaadav"}
+    if($ad2){ return @{Points=2; Feedback="Ootasin: AD2 on domeenikontroller | Leidsin: OK"} }
+    return @{Points=0; Feedback="Ootasin: AD2 staatus | Leidsin: AD2 ei ole DC või on maas"}
 }
 
 # 13. DHCP Failover (1p)
 Add-DetailedTask "13. DHCP Failover" 1 {
     $f = Get-DhcpServerv4Failover -ErrorAction SilentlyContinue
-    if($f){ return @{Points=1; Feedback="✅ Failover seadistatud (Režiim: $($f.Mode))"} }
-    return @{Points=0; Feedback="❌ Failover seadistamata"}
+    if($f){ return @{Points=1; Feedback="Ootasin: Load Balance failover | Leidsin: Režiim $($f.Mode) (OK)"} }
+    return @{Points=0; Feedback="Ootasin: DHCP Failover seadistus | Leidsin: PUUDU"}
 }
 
-# 14. IIS ja Wordpress (2p)
+# 14. IIS, Wordpress ja MySQL seadistus (TÄIENDATUD)
 Add-DetailedTask "14. IIS ja Wordpress" 2 {
-    $site = Get-Website | Where-Object Name -like "*veebileht*"
     $p = 0; $fb = @()
-    if($site){ $p += 1; $fb += "✅ IIS Sait olemas" } else { $fb += "❌ IIS Sait puudu" }
-    if(Test-Path "F:\WWW") { $p += 1; $fb += "✅ Kaust F: kettal" } else { $fb += "❌ Kaust F:\WWW puudu" }
-    return @{Points=$p; Feedback=($fb -join ", ")}
+    $site = Get-Website | Where-Object { $_.Name -match "veebileht" -or $_.Name -match "wordpress" }
+    
+    if ($site) {
+        $p += 1; $fb += "IIS Sait olemas"
+        $path = $site.PhysicalPath
+        $configPath = Join-Path $path "wp-config.php"
+        
+        if (Test-Path $configPath) {
+            $content = Get-Content $configPath
+            $dbName = ($content | Select-String "DB_NAME").ToString() -match "wp_loputoo"
+            $dbUser = ($content | Select-String "DB_USER").ToString() -match "wpuser"
+            $dbPass = ($content | Select-String "DB_PASSWORD").ToString() -match "Passw0rd!"
+            
+            if ($dbName -and $dbUser -and $dbPass) {
+                $p += 1; $fb += "wp-config.php andmed õiged (OK)"
+            } else {
+                $fb += "wp-config.php andmed VALED (Ootasin: wp_loputoo, wpuser, Passw0rd!)"
+            }
+        } else { $fb += "wp-config.php puudu" }
+    } else { $fb += "IIS Sait puudu" }
+    
+    return @{Points=$p; Feedback=($fb -join " | ")}
 }
 
-# 15. HTTPS seadistamine (2p)
+# 15. HTTPS (PARANDATUD TLS JA CURL TEST)
 Add-DetailedTask "15. HTTPS (Port 443)" 2 {
-    $b = Get-WebBinding -Name "*veebileht*" | Where-Object protocol -eq "https"
-    if($b){ return @{Points=2; Feedback="✅ HTTPS sidumine leitud (443)"} }
-    return @{Points=0; Feedback="❌ HTTPS (Port 443) puudub"}
+    $p = 0; $fb = @()
+    $binding = Get-WebBinding | Where-Object { $_.protocol -eq "https" }
+    
+    if ($binding) {
+        $p += 1; $fb += "Binding olemas"
+        # Kasutame curl.exe, et vältida .NET TLS "unexpected error" viga
+        $test = curl.exe -s -k -I "https://localhost" --connect-timeout 5
+        if ($test -match "200 OK") {
+            $p += 1; $fb += "Veebivastus 200 OK"
+        } else {
+            # Kui localhost ei tööta, proovime brauseris nähtud nimega
+            $test2 = curl.exe -s -k -I "https://wordpress.mandre.local" --connect-timeout 5
+            if ($test2 -match "200 OK") {
+                $p += 1; $fb += "Veebivastus 200 OK (wordpress.mandre.local)"
+            } else {
+                $fb += "Sertifikaat leitud, aga veeb ei vasta (proovi restart IIS)"
+            }
+        }
+    } else { $fb += "HTTPS Binding puudub" }
+    
+    return @{Points=$p; Feedback=($fb -join " | ")}
 }
 
-# 16. WP AD Autentimine (2p)
-Add-DetailedTask "16. WP AD Kasutajad (VEEB)" 2 {
-    $u1 = Get-ADUser -Filter "Name -like '*Peatoimetaja*'" -ErrorAction SilentlyContinue
-    $u2 = Get-ADUser -Filter "Name -like '*ToimetajaAbi*'" -ErrorAction SilentlyContinue
+# 16. WP AD Autentimine (REAALNE SISSESÕIDU KONTROLL)
+Add-DetailedTask "16. WP AD Kasutajad" 2 {
     $p = 0; $fb = @()
-    if($u1){ $p++; $fb += "✅ Peatoimetaja" } else { $fb += "❌ Peatoimetaja" }
-    if($u2){ $p++; $fb += "✅ ToimetajaAbi" } else { $fb += "❌ ToimetajaAbi" }
-    return @{Points=$p; Feedback="Leitud: " + ($fb -join ", ")}
+    $testUser = "Peatoimetaja"
+    $testPass = "Toimetaja123!"
+    
+    # 1. Kontrollime esmalt, kas kasutajad on AD-s üldse olemas (0.5p)
+    $u1 = Get-ADUser -Filter "SamAccountName -eq '$testUser' -or Name -eq '$testUser'" -ErrorAction SilentlyContinue
+    $u2 = Get-ADUser -Filter "Name -eq 'ToimetajaAbi' -or SamAccountName -eq 'ToimetajaAbi'" -ErrorAction SilentlyContinue
+    
+    if ($u1 -and $u2) {
+        $p += 0.5
+        $fb += "Kasutajad AD-s olemas"
+    } else {
+        $fb += "Kasutajad AD-st PUUDU"
+    }
+
+    # 2. Kontrollime reaalselt sisselogimist läbi WordPressi (1.5p)
+    # Leiame saidi URL-i IIS-ist (kasutame localhosti või leitud nime)
+    $site = Get-Website | Where-Object { $_.Name -match "veebileht" -or $_.Name -match "wordpress" }
+    $url = "http://localhost/wp-login.php" # Vaikimisi test-aadress
+    
+    # Kui on HTTPS sidumine, eelistame seda
+    if (Get-WebBinding -Name $site.Name | Where-Object protocol -eq "https") {
+        $url = "https://localhost/wp-login.php"
+    }
+
+    $cookieFile = "$env:TEMP\wp_ldap_test.txt"
+    if (Test-Path $cookieFile) { Remove-Item $cookieFile }
+
+    try {
+        # Teeme POST päringu wordpressi sisselogimisele
+        # -k lubab self-signed sertifikaate
+        # -L jälgib redirecte
+        # -d saadab kasutaja ja parooli
+        $postData = "log=$testUser&pwd=$testPass&wp-submit=Log+In"
+        $result = curl.exe -s -k -L -c $cookieFile -d "$postData" "$url" --connect-timeout 10
+
+        # Kui vastuses on "wp-admin" või "Dashboard" (või "Töölaud"), siis LDAP toimib
+        if ($result -match "wp-admin" -or $result -match "Dashboard" -or $result -match "Töölaud" -or $result -match "wpadminbar") {
+            $p += 1.5
+            $fb += "WordPress LDAP autentimine TESTITUD ja TOIMIB (OK)"
+        } else {
+            $fb += "WordPress LDAP autentimine EBAÕNNESTUS (Vale seadistus või plugin puudu)"
+        }
+    } catch {
+        $fb += "Viga autentimise testimisel: $($_.Exception.Message)"
+    }
+
+    return @{Points=$p; Feedback=($fb -join " | ")}
 }
 
 # --- 4. HINDE ARVUTAMINE ---
-$HinneTekst = switch ($TotalPoints) {
+$Hinne = switch ($global:TotalPoints) {
     {$_ -ge 22} { "5" }
     {$_ -ge 17} { "4" }
     {$_ -ge 12} { "3" }
     Default     { "2" }
 }
 
-# --- 5. SAATMINE ---
+# --- 5. KOONDKOKKUVÕTE ÕPILASELE KONSOOLIS ---
+Write-Host "`n" + "="*60 -ForegroundColor Gray
+Write-Host " KOKKUVÕTE: $RawName | PUNKTID: $global:TotalPoints / 25 | HINNE: $Hinne" -ForegroundColor Yellow
+Write-Host "="*60 -ForegroundColor Gray
+
+foreach($res in $global:Results) {
+    $color = if($res.Korras){"Green"}else{"Red"}
+    $sym = if($res.Korras){"✅"}else{"❌"}
+    Write-Host "$sym $($res.Nimi): $($res.Punktid)p" -ForegroundColor $color
+    Write-Host "   -> $($res.Selgitus)" -ForegroundColor Gray
+}
+
+# --- 6. SAATMINE SERVERISSE ---
 $Payload = [PSCustomObject]@{
-    Opilane = $RawName; KokkuPunkte = $TotalPoints; Hinne = $HinneTekst; Kontrollid = $Results
+    Opilane = $RawName; KokkuPunkte = $global:TotalPoints; Hinne = $Hinne; Kontrollid = $global:Results
 } | ConvertTo-Json -Depth 10
 
-$Payload | Out-File $FullFilePath -Encoding utf8
-
 try {
-    Write-Host "`nÜritan saata andmeid serverisse http://$ServerIP:5000..." -ForegroundColor Yellow
-    Invoke-RestMethod -Uri "http://$($ServerIP):5000/api/upload" -Method Post -Body $Payload -ContentType "application/json; charset=utf-8" -Proxy $null -TimeoutSec 15
-    Write-Host "EDUKAS! Punktid: $TotalPoints / 25 | Hinne: $HinneTekst" -ForegroundColor Green
+    $FullApiUrl = "http://$($ServerIP):5000/api/upload"
+    Invoke-RestMethod -Uri $FullApiUrl -Method Post -Body $Payload -ContentType "application/json; charset=utf-8" -TimeoutSec 15 | Out-Null
+    Write-Host "`n✅ ANDMED SAADETUD DASHBOARD SERVERSISSE." -ForegroundColor Green
 } catch {
-    Write-Host "`nSAATMINE EBAÕNNESTUS: $($_.Exception.Message)" -ForegroundColor Red
-    Write-Host "Fail salvestati: $FullFilePath" -ForegroundColor Cyan
+    Write-Host "`n❌ SERVERIGA ÜHENDUMINE EBAÕNNESTUS. Fail salvestati: $FullFilePath" -ForegroundColor Red
+    $Payload | Out-File $FullFilePath -Encoding utf8
 }
 
-# --- 6. SAATMINE LINUX SERVERISSE ---
-$FullApiUrl = "http://$($ServerIP):5000/api/upload"
-Write-Host "Saadan andmeid serverisse..." -ForegroundColor Yellow
-
-try {
-    $Response = Invoke-RestMethod -Uri $FullApiUrl `
-                                  -Method Post `
-                                  -Body $Payload `
-                                  -ContentType "application/json; charset=utf-8" `
-                                  -Proxy $null `
-                                  -TimeoutSec 15
-    
-    Write-Host "EDUKAS! Punktid: $TotalPoints / 25 | Hinne: $HinneTekst" -ForegroundColor Green
-    
-    # --- UUS: FAILINIME EEMALDAMINE PÄRAST ÕNNESTUMIST ---
-    if (Test-Path $FullFilePath) {
-        Remove-Item $FullFilePath -Force
-        Write-Host "Lokaalne fail $FileName eemaldatud." -ForegroundColor Gray
-    }
-} catch {
-    Write-Host "VIGA: Serverile saatmine ebaõnnestus ($($_.Exception.Message))." -ForegroundColor Red
-    Write-Host "Fail salvestati manuaalseks üleslaadimiseks: $FullFilePath" -ForegroundColor Yellow
-}
 
 ```
