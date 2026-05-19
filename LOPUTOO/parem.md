@@ -12,6 +12,8 @@ $RawName = Read-Host "Sisesta õpilase nimi"
 $VNET = Read-Host "Sisesta oma vnet number"
 $ServerIP = "192.168.124.64"
 
+# --- 1. ABI-FUNKTSIOONID ---
+
 function Add-DetailedTask {
     param([string]$Nimi, [float]$MaxP, [scriptblock]$Logic)
     $p = 0; $fb = ""
@@ -19,24 +21,35 @@ function Add-DetailedTask {
         $r = &$Logic
         $p = [math]::Round([float]$r.Points, 2)
         $fb = $r.Feedback
-    } catch { $p = 0; $fb = "❌ VIGA: $($_.Exception.Message)" }
+    } catch { 
+        $p = 0
+        $fb = "❌ VIGA: $($_.Exception.Message)" 
+    }
     
     $script:TotalPoints += $p
-    # Märgime OK-ks, kui on saadud vähemalt 70% punktidest
+    # Märgime OK-ks, kui on saadud arvestatav osa punkte
     $isOk = $p -ge ($MaxP * 0.7)
-    $script:Results += [PSCustomObject]@{ Nimi=$Nimi; Korras=$isOk; Punktid=$p; Max=$MaxP; Selgitus=$fb }
+    $script:Results += [PSCustomObject]@{ 
+        Nimi=$Nimi; 
+        Korras=$isOk; 
+        Punktid=$p; 
+        Max=$MaxP; 
+        Selgitus=$fb 
+    }
 }
 
-Write-Host "`n--- ALUSTAN ANALÜÜSI: $RawName ---" -ForegroundColor Cyan
+Write-Host "`n--- ALUSTAN ANALÜÜSI: $RawName (vnet $VNET) ---" -ForegroundColor Cyan
 
-# --- 1. AD JA DNS ---
+# --- 2. KONTROLLID ---
+
+# 1. AD ja DNS
 Add-DetailedTask "1. AD ja DNS" 1 {
     $d = (Get-ADDomain).DNSRoot
     if ($d -like "*.local") { return @{Points=1; Feedback="Ootasin: .local | Leidsin: $d (OK)"} }
     return @{Points=0; Feedback="Ootasin: .local | Leidsin: $d (VALE)"}
 }
 
-# --- 2. KETAS F: ---
+# 2. Ketas F:
 Add-DetailedTask "2. Ketas F: ja struktuur" 1 {
     if (Test-Path "F:") {
         $found = @(); foreach($f in @("STUFF", "WWW", "Kasutajad$")) { if(Test-Path "F:\$f"){$found += $f} }
@@ -46,7 +59,7 @@ Add-DetailedTask "2. Ketas F: ja struktuur" 1 {
     return @{Points=0; Feedback="Ketas F: puudub"}
 }
 
-# --- 3. DHCP ---
+# 3. DHCP
 Add-DetailedTask "3. DHCP Skoop HKHK" 1 {
     $s = Get-DhcpServerv4Scope | Where-Object Name -like "*HKHK*"
     if ($s) {
@@ -56,18 +69,14 @@ Add-DetailedTask "3. DHCP Skoop HKHK" 1 {
     return @{Points=0; Feedback="Skoop HKHK puudub"}
 }
 
-# --- 8. TAUSTAPILDID (PARANDATUD) ---
+# 8. Taustapildid
 Add-DetailedTask "8. GPO Taustapildid" 2 {
     $g = Get-GPO -All | Where-Object DisplayName -match "Taustapildid"
-    if ($g) {
-        # Kontrollime, kas on lingitud mõne OU külge
-        $linked = Get-ADOrganizationalUnit -Filter * | ForEach-Object { if((Get-GPInheritance -Target $_.DistinguishedName).GpoLinks.DisplayName -contains $g.DisplayName){$_.Name} }
-        return @{Points=2; Feedback="Leitud GPO: $($g.DisplayName) | Lingitud OU-dele: $($linked -join ',')"}
-    }
+    if ($g) { return @{Points=2; Feedback="Leitud GPO: $($g.DisplayName) (OK)"} }
     return @{Points=0; Feedback="GPO-d nimega 'Taustapildid' ei leitud"}
 }
 
-# --- 10. TARKVARA ---
+# 10. Tarkvara
 Add-DetailedTask "10. Tarkvara GPO-d" 2 {
     $p = 0; $fb = @()
     foreach($name in @("7zip", "Chrome")) {
@@ -77,54 +86,66 @@ Add-DetailedTask "10. Tarkvara GPO-d" 2 {
     return @{Points=$p; Feedback=($fb -join " | ")}
 }
 
-# --- 15. HTTPS (REAALNE KONTROLL) ---
+# 15. HTTPS
 Add-DetailedTask "15. HTTPS (Port 443)" 2 {
     $b = Get-WebBinding | Where-Object { $_.protocol -eq "https" }
     if ($b) {
         try {
             $test = curl.exe -s -k -I "https://localhost" --connect-timeout 2
             if($test -match "200 OK") { return @{Points=2; Feedback="HTTPS vastab (200 OK)"} }
-            return @{Points=1; Feedback="HTTPS binding olemas, aga veebileht ei vasta"}
-        } catch { return @{Points=1; Feedback="Binding on, aga curl viga"} }
+            return @{Points=1; Feedback="HTTPS binding olemas, aga veeb ei vasta"}
+        } catch { return @{Points=1; Feedback="Binding on, aga ühendusviga"} }
     }
-    return @{Points=0; Feedback="HTTPS seadistus puudub"}
+    return @{Points=0; Feedback="HTTPS seadistus (binding) puudub"}
 }
 
-# --- 16. WP AD (LDAP PAROOLI KONTROLL) ---
+# 16. WP AD (LDAP PAROOLI KONTROLL)
 Add-DetailedTask "16. WP AD Kasutajad" 2 {
     $p = 0; $fb = @()
     $pass = "Toimetaja123!"
     foreach($u in @("Peatoimetaja", "ToimetajaAbi")) {
         $user = Get-ADUser -Filter "Name -eq '$u' -or SamAccountName -eq '$u'" -ErrorAction SilentlyContinue
         if($user) {
-            $p += 0.5; $fb += "$u olemas"
+            $p += 0.5; $authStatus = "Kasutaja olemas"
             try {
                 $auth = New-Object System.DirectoryServices.DirectoryEntry("LDAP://$($user.DistinguishedName)", $user.DistinguishedName, $pass)
-                if($auth.NativeGuid){ $p += 0.5; $fb += " (Parool OK)" }
-            } catch { $fb += " (Vale parool)" }
+                if($auth.NativeGuid){ $p += 0.5; $authStatus += " + Parool OK" }
+            } catch { $authStatus += " + Vale parool" }
+            $fb += "$u ($authStatus)"
         } else { $fb += "$u puudu" }
     }
     return @{Points=$p; Feedback=($fb -join " | ")}
 }
 
-# --- KOKKUVÕTE JA SAATMINE ---
+# --- 3. KOKKUVÕTE JA SAATMINE ---
 $Hinne = switch ($script:TotalPoints) { {$_ -ge 22}{5} {$_ -ge 17}{4} {$_ -ge 12}{3} Default{2} }
 
-# Kuvame tulemuse ekraanil
-Write-Host "`n" + "="*50 -ForegroundColor Gray
+Write-Host "`n" + ("="*50) -ForegroundColor Gray
 foreach($res in $script:Results) {
-    $c = if($res.Korras){"Green"}else{"Red"}
-    Write-Host ("[{0}] {1}: {2}p" -f (if($res.Korras){"V"}else{"X"}), $res.Nimi, $res.Punktid) -ForegroundColor $c
+    $statusChar = if($res.Korras) { "V" } else { "X" }
+    $statusColor = if($res.Korras) { "Green" } else { "Red" }
+    
+    Write-Host "[$statusChar] $($res.Nimi): $($res.Punktid)p" -ForegroundColor $statusColor
     Write-Host "    -> $($res.Selgitus)" -ForegroundColor Gray
 }
+Write-Host ("="*50) -ForegroundColor Gray
 Write-Host "KOKKU: $script:TotalPoints / 25 | HINNE: $Hinne" -ForegroundColor Cyan
 
-# Saame JSON-i ja saadame
-$Payload = [PSCustomObject]@{ Opilane=$RawName; KokkuPunkte=$script:TotalPoints; Hinne=$Hinne; Kontrollid=$script:Results } | ConvertTo-Json -Depth 10
+$Payload = [PSCustomObject]@{ 
+    Opilane=$RawName; 
+    KokkuPunkte=$script:TotalPoints; 
+    Hinne=$Hinne; 
+    Kontrollid=$script:Results 
+} | ConvertTo-Json -Depth 10
+
 try {
     Invoke-RestMethod -Uri "http://$($ServerIP):5000/api/upload" -Method Post -Body $Payload -ContentType "application/json; charset=utf-8" -TimeoutSec 10 | Out-Null
     Write-Host "✅ Andmed saadetud serverisse." -ForegroundColor DarkGreen
-} catch { Write-Host "❌ Serveri viga." -ForegroundColor Red }
+} catch { 
+    Write-Host "❌ Serveri viga saatmisel." -ForegroundColor Red 
+}
+
+
 ```
 
 ### Mida see skript teisiti teeb?
