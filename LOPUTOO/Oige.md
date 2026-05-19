@@ -222,34 +222,32 @@ Add-DetailedTask "14. IIS ja Wordpress" 2 {
     return @{Points=$p; Feedback=($fb -join " | ")}
 }
 
-# 15. HTTPS (DÜNAAMILISELT PERENIMEGA)
+# 15. HTTPS (KONTROLL AINULT PÄRIS URL-iga)
 Add-DetailedTask "15. HTTPS (Port 443)" 2 {
     $p = 0; $fb = @()
+    $TargetUrl = "https://veebileht.$Surname.local"
+    
+    # 1. Kontrollime, kas IIS-is on üldse HTTPS binding olemas
     $binding = Get-WebBinding | Where-Object { $_.protocol -eq "https" -and $_.bindingInformation -match "443" }
     
     if ($binding) {
         $p += 1; $fb += "Binding 443 olemas"
-        $TargetUrl = "https://veebileht.$Surname.local"
         
-        # Testime nimega, ignoreerime sertifikaadi vigu (-k)
-        # Kasutame -I asemel -v, et näha päiseid, aga matchime staatust
+        # 2. Testime veebivastust kasutades AINULT õiget URL-i
+        # -s (silent), -k (ignore cert), -I (headers only)
         $test = curl.exe -s -k -I "$TargetUrl" --connect-timeout 5 2>&1
         
         if ($test -match "200 OK" -or $test -match "301" -or $test -match "302") {
             $p += 1; $fb += "Veebivastus OK ($TargetUrl)"
         } else {
-            # Varulahendus: proovime localhosti, kui DNS streigib
-            $test2 = curl.exe -s -k -I "https://127.0.0.1" -H "Host: veebileht.$Surname.local" --connect-timeout 5 2>&1
-            if ($test2 -match "200 OK" -or $test2 -match "302") {
-                $p += 1; $fb += "Vastus OK (IP kaudu Host päisega)"
-            } else {
-                $fb += "Sait ei vasta. Serveri vastus: $(if($test){$test[0]}else{'Tühi'})"
-            }
+            $fb += "VIGA: Sait ei vasta nimega $TargetUrl. Kontrolli DNS-i ja IIS Host Headerit!"
         }
-    } else { $fb += "HTTPS Binding 443 puudub IIS-is" }
+    } else {
+        $fb += "VIGA: HTTPS sidumine (binding) pordil 443 puudub"
+    }
     
     return @{Points=$p; Feedback=($fb -join " | ")}
-}    
+}
 
 # 16. WP AD Autentimine (KÜPSISEPÕHINE KONTROLL)
 Add-DetailedTask "16. WP AD Kasutajad" 2 {
