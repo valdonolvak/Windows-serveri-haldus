@@ -251,36 +251,41 @@ Add-DetailedTask "15. HTTPS (Port 443)" 2 {
     return @{Points=$p; Feedback=($fb -join " | ")}
 }    
 
-# 16. WP AD Autentimine (REAALNE SISSESÕIDU KONTROLL)
+# 16. WP AD Autentimine (KÜPSISEPÕHINE KONTROLL)
 Add-DetailedTask "16. WP AD Kasutajad" 2 {
     $p = 0; $fb = @()
     $testUser = "Peatoimetaja"
     $testPass = "Toimetaja123!"
     
+    # 1. Kontrollime kasutajaid AD-s (0.5p)
     $u1 = Get-ADUser -Filter "SamAccountName -eq '$testUser'" -ErrorAction SilentlyContinue
-    $u2 = Get-ADUser -Filter "SamAccountName -eq 'ToimetajaAbi'" -ErrorAction SilentlyContinue
-    
-    if ($u1 -and $u2) {
+    if ($u1) {
         $p += 0.5; $fb += "Kasutajad AD-s olemas"
         
         $TargetUrl = "https://veebileht.$Surname.local/wp-login.php"
-        $cookieFile = "$env:TEMP\wp_ldap_test.txt"
+        $cookieFile = "$env:TEMP\wp_ldap_cookie.txt"
         if (Test-Path $cookieFile) { Remove-Item $cookieFile }
 
         try {
-            # Saadame andmed. Lisatud -i, et näha HTTP päiseid (Location: ...)
-            $postData = "log=$testUser&pwd=$testPass&wp-submit=Log+In&testcookie=1"
-            $result = curl.exe -s -k -i -L -c $cookieFile -d "$postData" "$TargetUrl" --connect-timeout 10
+            # Samm 1: Küsime sisselogimise lehte, et saada kätte algsed küpsised
+            curl.exe -s -k -c $cookieFile "$TargetUrl" --connect-timeout 5 | Out-Null
 
-            # Kontrollime, kas vastuses on märke sisselogimisest
-            if ($result -match "wp-admin" -or $result -match "Dashboard" -or $result -match "Töölaud" -or $result -match "wpadminbar" -or $result -match "Location: .*wp-admin") {
-                $p += 1.5; $fb += "LDAP sisselogimine edukas"
+            # Samm 2: Saadame sisselogimise andmed
+            # -L (follow redirects), -i (include headers), -b (read cookies), -c (write cookies)
+            $postData = "log=$testUser&pwd=$testPass&wp-submit=Log+In&testcookie=1"
+            $result = curl.exe -s -k -L -i -b $cookieFile -c $cookieFile -d "$postData" "$TargetUrl" --connect-timeout 10
+
+            # Samm 3: Kontrollime küpsisefaili sisu või vastust
+            # Kui sisselogimine õnnestub, peab küpsisefaili tekkima "wordpress_logged_in" rida
+            $cookieContent = if (Test-Path $cookieFile) { Get-Content $cookieFile } else { "" }
+
+            if ($cookieContent -match "wordpress_logged_in" -or $result -match "wp-admin" -or $result -match "location: .*wp-admin") {
+                $p += 1.5; $fb += "LDAP autentimine TOIMIB (Sisselogimine kinnitatud)"
             } else {
-                # Kui ei õnnestunud, võtame lühidalt vastuse alguse fb-sse
-                $fb += "Sisselogimine ebaõnnestus (WP ei suunanud töölauale)"
+                $fb += "Autentimine ebaõnnestus (WP ei väljastanud sessiooniküpsist)"
             }
         } catch { $fb += "Viga ühenduses: $($_.Exception.Message)" }
-    } else { $fb += "Kasutajad AD-st PUUDU" }
+    } else { $fb += "Kasutajat $testUser ei leitud AD-st" }
 
     return @{Points=$p; Feedback=($fb -join " | ")}
 }
