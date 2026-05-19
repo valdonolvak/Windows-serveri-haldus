@@ -222,27 +222,27 @@ Add-DetailedTask "14. IIS ja Wordpress" 2 {
     return @{Points=$p; Feedback=($fb -join " | ")}
 }
 
-# 15. HTTPS (PARANDATUD TLS JA CURL TEST)
+# 15. HTTPS (DÜNAAMILISELT PERENIMEGA)
 Add-DetailedTask "15. HTTPS (Port 443)" 2 {
     $p = 0; $fb = @()
-    $binding = Get-WebBinding | Where-Object { $_.protocol -eq "https" }
+    $binding = Get-WebBinding | Where-Object { $_.protocol -eq "https" -and $_.bindingInformation -match "443" }
     
     if ($binding) {
-        $p += 1; $fb += "Binding olemas"
-        # Kasutame curl.exe, et vältida .NET TLS "unexpected error" viga
-        $test = curl.exe -s -k -I "https://localhost" --connect-timeout 5
+        $p += 1; $fb += "Binding 443 olemas"
+        $TargetUrl = "https://veebileht.$Surname.local"
+        # Testime nimega, kui ei saa, proovime localhosti
+        $test = curl.exe -s -k -I "$TargetUrl" --connect-timeout 5
         if ($test -match "200 OK") {
-            $p += 1; $fb += "Veebivastus 200 OK"
+            $p += 1; $fb += "Veebivastus 200 OK ($TargetUrl)"
         } else {
-            # Kui localhost ei tööta, proovime brauseris nähtud nimega
-            $test2 = curl.exe -s -k -I "https://wordpress.mandre.local" --connect-timeout 5
+            $test2 = curl.exe -s -k -I "https://localhost" --connect-timeout 5
             if ($test2 -match "200 OK") {
-                $p += 1; $fb += "Veebivastus 200 OK (wordpress.mandre.local)"
+                $p += 1; $fb += "Veebivastus 200 OK (localhost)"
             } else {
-                $fb += "Sertifikaat leitud, aga veeb ei vasta (proovi restart IIS)"
+                $fb += "Sait ei vasta HTTPS päringule"
             }
         }
-    } else { $fb += "HTTPS Binding puudub" }
+    } else { $fb += "HTTPS Binding 443 puudub" }
     
     return @{Points=$p; Feedback=($fb -join " | ")}
 }
@@ -253,52 +253,30 @@ Add-DetailedTask "16. WP AD Kasutajad" 2 {
     $testUser = "Peatoimetaja"
     $testPass = "Toimetaja123!"
     
-    # 1. Kontrollime esmalt, kas kasutajad on AD-s üldse olemas (0.5p)
     $u1 = Get-ADUser -Filter "SamAccountName -eq '$testUser' -or Name -eq '$testUser'" -ErrorAction SilentlyContinue
     $u2 = Get-ADUser -Filter "Name -eq 'ToimetajaAbi' -or SamAccountName -eq 'ToimetajaAbi'" -ErrorAction SilentlyContinue
     
     if ($u1 -and $u2) {
-        $p += 0.5
-        $fb += "Kasutajad AD-s olemas"
-    } else {
-        $fb += "Kasutajad AD-st PUUDU"
-    }
+        $p += 0.5; $fb += "Kasutajad AD-s olemas"
+        
+        $TargetUrl = "https://veebileht.$Surname.local/wp-login.php"
+        $cookieFile = "$env:TEMP\wp_ldap_test.txt"
+        if (Test-Path $cookieFile) { Remove-Item $cookieFile }
 
-    # 2. Kontrollime reaalselt sisselogimist läbi WordPressi (1.5p)
-    # Leiame saidi URL-i IIS-ist (kasutame localhosti või leitud nime)
-    $site = Get-Website | Where-Object { $_.Name -match "veebileht" -or $_.Name -match "wordpress" }
-    $url = "http://localhost/wp-login.php" # Vaikimisi test-aadress
-    
-    # Kui on HTTPS sidumine, eelistame seda
-    if (Get-WebBinding -Name $site.Name | Where-Object protocol -eq "https") {
-        $url = "https://localhost/wp-login.php"
-    }
+        try {
+            $postData = "log=$testUser&pwd=$testPass&wp-submit=Log+In"
+            $result = curl.exe -s -k -L -c $cookieFile -d "$postData" "$TargetUrl" --connect-timeout 10
 
-    $cookieFile = "$env:TEMP\wp_ldap_test.txt"
-    if (Test-Path $cookieFile) { Remove-Item $cookieFile }
-
-    try {
-        # Teeme POST päringu wordpressi sisselogimisele
-        # -k lubab self-signed sertifikaate
-        # -L jälgib redirecte
-        # -d saadab kasutaja ja parooli
-        $postData = "log=$testUser&pwd=$testPass&wp-submit=Log+In"
-        $result = curl.exe -s -k -L -c $cookieFile -d "$postData" "$url" --connect-timeout 10
-
-        # Kui vastuses on "wp-admin" või "Dashboard" (või "Töölaud"), siis LDAP toimib
-        if ($result -match "wp-admin" -or $result -match "Dashboard" -or $result -match "Töölaud" -or $result -match "wpadminbar") {
-            $p += 1.5
-            $fb += "WordPress LDAP autentimine TESTITUD ja TOIMIB (OK)"
-        } else {
-            $fb += "WordPress LDAP autentimine EBAÕNNESTUS (Vale seadistus või plugin puudu)"
-        }
-    } catch {
-        $fb += "Viga autentimise testimisel: $($_.Exception.Message)"
-    }
+            if ($result -match "wp-admin" -or $result -match "Dashboard" -or $result -match "Töölaud" -or $result -match "wpadminbar") {
+                $p += 1.5; $fb += "LDAP autentimine TESTITUD ja TOIMIB"
+            } else {
+                $fb += "LDAP sisselogimine ebaõnnestus (Kontrolli pluginat ja parooli)"
+            }
+        } catch { $fb += "Viga testimisel: $($_.Exception.Message)" }
+    } else { $fb += "Kasutajad AD-st PUUDU" }
 
     return @{Points=$p; Feedback=($fb -join " | ")}
 }
-
 # --- 4. HINDE ARVUTAMINE ---
 $Hinne = switch ($global:TotalPoints) {
     {$_ -ge 22} { "5" }
