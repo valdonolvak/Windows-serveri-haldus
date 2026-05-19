@@ -7,7 +7,7 @@
 ```powershell
 
 # --- 0. PUHASTUS JA ETTEVALMISTUS ---
-$global:Results = @()      # Tühjendame tulemuste tabeli
+$global:Results = @()      # Tühjendame tulemuste massiivi
 $global:TotalPoints = 0    # Nullime punktid
 $ErrorActionPreference = "SilentlyContinue"
 
@@ -19,28 +19,16 @@ $TempPath = "C:\Temp"
 if (!(Test-Path $TempPath)) { New-Item -Path $TempPath -ItemType Directory -Force | Out-Null }
 
 # --- 1. KASUTAJA SISENDID ---
-# ... siit jätkub sinu nimi, vnet jne ...
-
-
-# --- 1. KASUTAJA SISENDID ---
 $RawName = Read-Host "Sisesta oma nimi (Eesnimi Perekonnanimi)"
 $VNET = Read-Host "Sisesta oma vnet number (XXX)"
 
-# See on DASHBOARD serveri IP - JÄTA SEE SAMAKS!
+# Sinu algne failinime loogika
+$SafeName = $RawName.ToLower().Replace(" ","").Replace("ä","a").Replace("ö","o").Replace("ü","u").Replace("õ","o")
+$FileName = "$SafeName.json"
+$FullFilePath = Join-Path $TempPath $FileName
+
 $DashboardIP = "192.168.124.64" 
-
-# See on sinu AD1 serveri IP, mida skript kasutab testimiseks
 $script:AD1_IP = "192.168.$VNET.10"
-
-# TUVASTAME PERENIME DOMEENIST (Selleks peab domeen olema loodud!)
-try {
-    $DomainInfo = Get-ADDomain -ErrorAction Stop
-    $FullDomain = $DomainInfo.DNSRoot
-    $script:Surname = $FullDomain.Split('.')[0]
-} catch {
-    # Varulahendus kui domeeni veel pole - tuletame nime sisestatud nimest
-    $script:Surname = ($RawName.Split(' ')[1]).ToLower().Replace("ä","a").Replace("ö","o").Replace("ü","u").Replace("õ","o")
-}
 
 Write-Host "VNET: $VNET | Sinu IP: $script:AD1_IP | Perenimi: $script:Surname" -ForegroundColor Yellow
 
@@ -329,10 +317,7 @@ foreach($res in $global:Results) {
 
 # --- 6. SALVESTAMINE JA SAATMINE SERVERISSE ---
 
-# 1. Kontrollime, et kaust on olemas
-if (!(Test-Path "C:\Temp")) { New-Item -Path "C:\Temp" -ItemType Directory -Force | Out-Null }
-
-# 2. Koostame Payload objekti
+# Koostame andmepaketi
 $PayloadObj = [PSCustomObject]@{
     Opilane     = $RawName
     VNET        = $VNET
@@ -341,36 +326,28 @@ $PayloadObj = [PSCustomObject]@{
     Hinne       = $Hinne
     Kontrollid  = $global:Results
 }
-
-# 3. Teeme objektist JSON teksti
 $JsonData = $PayloadObj | ConvertTo-Json -Depth 10
 
-# 4. SALVESTAMINE (Kasutame otse teed, et vältida tühja muutuja viga)
 try {
+    # 1. SALVESTAMINE (Kasutame Set-Content, et vana sisu ÜLE KIRJUTADA)
     $JsonData | Set-Content -Path $FullFilePath -Encoding utf8 -Force
-    Write-Host "`n✅ Raport salvestatud: $FullFilePath" -ForegroundColor Cyan
-} catch {
-    Write-Host "`n❌ VIGA: Ei saanud faili salvestada asukohta $FullFilePath" -ForegroundColor Red
-}
+    Write-Host "`n✅ Uus raport loodud: $FullFilePath" -ForegroundColor Cyan
 
-# 5. SAATMINE:
-try {
+    # 2. SAATMINE SERVERISSE
     $FullApiUrl = "http://$DashboardIP:5000/api/upload"
-    
-    # Saadame andmed serverisse
     Invoke-RestMethod -Uri $FullApiUrl -Method Post -Body $JsonData -ContentType "application/json; charset=utf-8" -TimeoutSec 15 | Out-Null
-    
     Write-Host "✅ ANDMED SAADETUD DASHBOARD SERVERISSE." -ForegroundColor Green
-    
-    # KORISTAMINE: Kui saadetud, siis võime lokaalse faili kustutada
-    Remove-Item $FullFilePath -Force
-    Write-Host "🧹 Lokaalne fail eemaldatud, serveris on värske info." -ForegroundColor Gray
+
+    # 3. EEMALDAMINE (Kustutame faili masinast peale õnnestunud saatmist)
+    if (Test-Path $FullFilePath) {
+        Remove-Item $FullFilePath -Force
+        Write-Host "🧹 Lokaalne fail $FileName eemaldatud (puhastus tehtud)." -ForegroundColor Gray
+    }
 
 } catch {
-    Write-Host "❌ SERVERIGA ÜHENDUMINE EBAÕNNESTUS: $($_.Exception.Message)" -ForegroundColor Red
-    Write-Host "Fail säilitati siin: $FullFilePath" -ForegroundColor Yellow
+    Write-Host "`n❌ VIGA: Saatmine ebaõnnestus ($($_.Exception.Message))" -ForegroundColor Red
+    Write-Host "Fail säilitati manuaalseks kontrolliks: $FullFilePath" -ForegroundColor Yellow
 }
-
 ```
 
 
