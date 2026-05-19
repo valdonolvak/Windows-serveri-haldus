@@ -1,7 +1,16 @@
-Siin on täiendatud skript, mis on koostatud põhimõttel **"Ootasin vs Leidsin"**. See skript käib läbi kõik 16 punkti, kontrollib nende sisu ja väljastab lõpus õpilasele selge koondraporti (Dashboardi stiilis), kus on välja toodud nii õnnestumised kui ka puudajäägid.
+#### Kui töö valmis, siis kopeeri see Powershelli skript ja läbi Powershell ISE salvesta see enda arvutisse  kausta **C:\Temp** nimega **Kontroll.ps1 **ja käivita ese Powershell ISE rakenduses ####
+
+----
+
+### Täielik ja detailne kontrollskript: `Kontroll.ps1`
 
 ```powershell
-# --- 0. ETTEVALMISTUS JA MOODULID ---
+
+# --- 0. PUHASTUS JA ETTEVALMISTUS ---
+$global:Results = @()      # Tühjendame tulemuste massiivi
+$global:TotalPoints = 0    # Nullime punktid
+$ErrorActionPreference = "SilentlyContinue"
+
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 [Net.ServicePointManager]::ServerCertificateValidationCallback = {$true}
 Import-Module ActiveDirectory, GroupPolicy, DhcpServer, WebAdministration -ErrorAction SilentlyContinue
@@ -12,14 +21,21 @@ if (!(Test-Path $TempPath)) { New-Item -Path $TempPath -ItemType Directory -Forc
 # --- 1. KASUTAJA SISENDID ---
 $RawName = Read-Host "Sisesta oma nimi (Eesnimi Perekonnanimi)"
 $VNET = Read-Host "Sisesta oma vnet number (XXX)"
-$ServerIP = "192.168.124.64" # DashBoard serveri IP
 
+# Sinu algne failinime loogika
 $SafeName = $RawName.ToLower().Replace(" ","").Replace("ä","a").Replace("ö","o").Replace("ü","u").Replace("õ","o")
 $FileName = "$SafeName.json"
 $FullFilePath = Join-Path $TempPath $FileName
 
-$global:Results = @()
-$global:TotalPoints = 0
+$DashboardIP = "192.168.124.64" 
+$script:AD1_IP = "192.168.$VNET.10"
+
+# Defineerime selgelt veebilehe aadressi, mida kontrollime
+$TargetDomain = "veebileht.$Surname.local"
+$TargetURL = "https://$TargetDomain"
+Write-Host "Kontrollitav URL: $TargetURL" -ForegroundColor Cyan
+
+Write-Host "VNET: $VNET | Sinu IP: $script:AD1_IP | Perenimi: $script:Surname" -ForegroundColor Yellow
 
 # --- 2. ABI-FUNKTSIOONID ---
 
@@ -218,83 +234,60 @@ Add-DetailedTask "14. IIS ja Wordpress" 2 {
     return @{Points=$p; Feedback=($fb -join " | ")}
 }
 
-# 15. HTTPS (PARANDATUD TLS JA CURL TEST)
+# 15. HTTPS (KONTROLL AINULT PÄRIS URL-iga)
 Add-DetailedTask "15. HTTPS (Port 443)" 2 {
     $p = 0; $fb = @()
-    $binding = Get-WebBinding | Where-Object { $_.protocol -eq "https" }
+    
+    $binding = Get-WebBinding | Where-Object { $_.protocol -eq "https" -and $_.bindingInformation -match "443" }
     
     if ($binding) {
-        $p += 1; $fb += "Binding olemas"
-        # Kasutame curl.exe, et vältida .NET TLS "unexpected error" viga
-        $test = curl.exe -s -k -I "https://localhost" --connect-timeout 5
-        if ($test -match "200 OK") {
-            $p += 1; $fb += "Veebivastus 200 OK"
+        $p += 1; $fb += "Binding 443 olemas"
+        
+        # Testime päris URL-i, mille me alguses kokku panime
+        $test = curl.exe -s -k -I "$TargetURL" --connect-timeout 5 2>&1
+        
+        if ($test -match "200 OK" -or $test -match "301" -or $test -match "302") {
+            $p += 1; $fb += "Veebivastus OK ($TargetURL)"
         } else {
-            # Kui localhost ei tööta, proovime brauseris nähtud nimega
-            $test2 = curl.exe -s -k -I "https://wordpress.mandre.local" --connect-timeout 5
-            if ($test2 -match "200 OK") {
-                $p += 1; $fb += "Veebivastus 200 OK (wordpress.mandre.local)"
-            } else {
-                $fb += "Sertifikaat leitud, aga veeb ei vasta (proovi restart IIS)"
-            }
+            $fb += "VIGA: Sait ei vasta nimega $TargetURL"
         }
-    } else { $fb += "HTTPS Binding puudub" }
+    } else { $fb += "VIGA: HTTPS sidumine puudub" }
     
     return @{Points=$p; Feedback=($fb -join " | ")}
 }
 
-# 16. WP AD Autentimine (REAALNE SISSESÕIDU KONTROLL)
+# 16. WP AD Autentimine (KÜPSISEPÕHINE KONTROLL)
 Add-DetailedTask "16. WP AD Kasutajad" 2 {
     $p = 0; $fb = @()
     $testUser = "Peatoimetaja"
     $testPass = "Toimetaja123!"
     
-    # 1. Kontrollime esmalt, kas kasutajad on AD-s üldse olemas (0.5p)
-    $u1 = Get-ADUser -Filter "SamAccountName -eq '$testUser' -or Name -eq '$testUser'" -ErrorAction SilentlyContinue
-    $u2 = Get-ADUser -Filter "Name -eq 'ToimetajaAbi' -or SamAccountName -eq 'ToimetajaAbi'" -ErrorAction SilentlyContinue
-    
-    if ($u1 -and $u2) {
-        $p += 0.5
-        $fb += "Kasutajad AD-s olemas"
-    } else {
-        $fb += "Kasutajad AD-st PUUDU"
-    }
+    $u1 = Get-ADUser -Filter "SamAccountName -eq '$testUser'" -ErrorAction SilentlyContinue
+    if ($u1) {
+        $p += 0.5; $fb += "Kasutajad AD-s olemas"
+        
+        # Lisame URL-ile sisselogimise tee
+        $LoginURL = "$TargetURL/wp-login.php"
+        $cookieFile = "$env:TEMP\wp_ldap_cookie.txt"
+        if (Test-Path $cookieFile) { Remove-Item $cookieFile }
 
-    # 2. Kontrollime reaalselt sisselogimist läbi WordPressi (1.5p)
-    # Leiame saidi URL-i IIS-ist (kasutame localhosti või leitud nime)
-    $site = Get-Website | Where-Object { $_.Name -match "veebileht" -or $_.Name -match "wordpress" }
-    $url = "http://localhost/wp-login.php" # Vaikimisi test-aadress
-    
-    # Kui on HTTPS sidumine, eelistame seda
-    if (Get-WebBinding -Name $site.Name | Where-Object protocol -eq "https") {
-        $url = "https://localhost/wp-login.php"
-    }
+        try {
+            curl.exe -s -k -c $cookieFile "$LoginURL" --connect-timeout 5 | Out-Null
+            $postData = "log=$testUser&pwd=$testPass&wp-submit=Log+In&testcookie=1"
+            $result = curl.exe -s -k -L -i -b $cookieFile -c $cookieFile -d "$postData" "$LoginURL" --connect-timeout 10
 
-    $cookieFile = "$env:TEMP\wp_ldap_test.txt"
-    if (Test-Path $cookieFile) { Remove-Item $cookieFile }
+            $cookieContent = if (Test-Path $cookieFile) { Get-Content $cookieFile } else { "" }
 
-    try {
-        # Teeme POST päringu wordpressi sisselogimisele
-        # -k lubab self-signed sertifikaate
-        # -L jälgib redirecte
-        # -d saadab kasutaja ja parooli
-        $postData = "log=$testUser&pwd=$testPass&wp-submit=Log+In"
-        $result = curl.exe -s -k -L -c $cookieFile -d "$postData" "$url" --connect-timeout 10
-
-        # Kui vastuses on "wp-admin" või "Dashboard" (või "Töölaud"), siis LDAP toimib
-        if ($result -match "wp-admin" -or $result -match "Dashboard" -or $result -match "Töölaud" -or $result -match "wpadminbar") {
-            $p += 1.5
-            $fb += "WordPress LDAP autentimine TESTITUD ja TOIMIB (OK)"
-        } else {
-            $fb += "WordPress LDAP autentimine EBAÕNNESTUS (Vale seadistus või plugin puudu)"
-        }
-    } catch {
-        $fb += "Viga autentimise testimisel: $($_.Exception.Message)"
-    }
+            if ($cookieContent -match "wordpress_logged_in" -or $result -match "location: .*wp-admin") {
+                $p += 1.5; $fb += "LDAP autentimine TOIMIB ($TargetURL)"
+            } else {
+                $fb += "Autentimine ebaõnnestus aadressil $LoginURL"
+            }
+        } catch { $fb += "Viga ühenduses: $($_.Exception.Message)" }
+    } else { $fb += "Kasutajat $testUser ei leitud AD-st" }
 
     return @{Points=$p; Feedback=($fb -join " | ")}
 }
-
 # --- 4. HINDE ARVUTAMINE ---
 $Hinne = switch ($global:TotalPoints) {
     {$_ -ge 22} { "5" }
@@ -315,39 +308,44 @@ foreach($res in $global:Results) {
     Write-Host "   -> $($res.Selgitus)" -ForegroundColor Gray
 }
 
-# --- 6. SAATMINE SERVERISSE ---
-$Payload = [PSCustomObject]@{
-    Opilane = $RawName; KokkuPunkte = $global:TotalPoints; Hinne = $Hinne; Kontrollid = $global:Results
-} | ConvertTo-Json -Depth 10
+# --- 6. SALVESTAMINE JA SAATMINE SERVERISSE ---
+
+# 1. Koostame andmepaketi
+$PayloadObj = [PSCustomObject]@{
+    Opilane     = $RawName
+    VNET        = $VNET
+    Aeg         = (Get-Date -Format "yyyy-MM-dd HH:mm:ss")
+    KokkuPunkte = $global:TotalPoints
+    Hinne       = $Hinne
+    Kontrollid  = $global:Results
+}
+$JsonData = $PayloadObj | ConvertTo-Json -Depth 10
 
 try {
-    $FullApiUrl = "http://$($ServerIP):5000/api/upload"
-    Invoke-RestMethod -Uri $FullApiUrl -Method Post -Body $Payload -ContentType "application/json; charset=utf-8" -TimeoutSec 15 | Out-Null
-    Write-Host "`n✅ ANDMED SAADETUD DASHBOARD SERVERSISSE." -ForegroundColor Green
+    # 2. SALVESTAMINE (Ülekirjutamine)
+    $JsonData | Set-Content -Path $FullFilePath -Encoding utf8 -Force
+    Write-Host "`n✅ Uus raport loodud: $FullFilePath" -ForegroundColor Cyan
+
+    # 3. SAATMINE SERVERISSE 
+    # NB! Kasutame $DashboardIP muutujat (või $ServerIP, olenevalt kumba sa alguses defineerisid)
+    # Kui sul on alguses $DashboardIP = "192.168.124.64", siis kasuta seda:
+    $TargetIP = if ($DashboardIP) { $DashboardIP } else { "192.168.124.64" }
+    
+    $FullApiUrl = "http://$($TargetIP):5000/api/upload"
+    
+    Invoke-RestMethod -Uri $FullApiUrl -Method Post -Body $JsonData -ContentType "application/json; charset=utf-8" -TimeoutSec 15 | Out-Null
+    Write-Host "✅ ANDMED SAADETUD DASHBOARD SERVERISSE ($TargetIP)." -ForegroundColor Green
+
+    # 4. EEMALDAMINE
+    if (Test-Path $FullFilePath) {
+        Remove-Item $FullFilePath -Force
+        Write-Host "Sweep: Lokaalne fail eemaldatud." -ForegroundColor Gray
+    }
+
 } catch {
-    Write-Host "`n❌ SERVERIGA ÜHENDUMINE EBAÕNNESTUS. Fail salvestati: $FullFilePath" -ForegroundColor Red
-    $Payload | Out-File $FullFilePath -Encoding utf8
+    Write-Host "`n❌ VIGA: Saatmine ebaõnnestus ($($_.Exception.Message))" -ForegroundColor Red
+    Write-Host "Fail säilitati siin: $FullFilePath" -ForegroundColor Yellow
 }
 
 ```
 
-### Mida see skript teisiti teeb?
-
-1. **Detailne tagasiside (Ootasin vs Leidsin):**
-* Selle asemel, et öelda "GPO puudub", ütleb skript nüüd näiteks: `Ootasin: GPO_Taustapildid | Leidsin: PUUDU`.
-* Kui domeen on vale, ütleb: `Ootasin: .local domeen | Leidsin: mandre.com (VALE)`.
-
-
-2. **LDAP Turvakontroll:**
-* See ei vaata ainult, kas kasutaja on olemas. See proovib reaalselt LDAP kaudu sisse logida parooliga `Toimetaja123!`. Kui parool on vale (õpilane unustas muuta), saab ta punkti ainult kasutaja olemasolu eest, mitte autentimise eest.
-
-
-3. **Värviline koondraport:**
-* Skript väljastab Powershelli aknas lõpus suure tabeli.
-* **Roheline:** Punktid täis.
-* **Kollane:** Osad punktid käes (nt sisselogimine õnnestus, aga IP on vale).
-* **Punane:** 0 punkti.
-
-
-4. **HTTPS reaalne testimine:**
-* Punkt 15 ei vaata ainult IIS-i sätteid, vaid proovib teha päringu. Kui binding on olemas, aga veebileht "viskab errorit", saab õpilane teada, et "veeb ei vasta".
