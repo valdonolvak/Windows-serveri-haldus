@@ -217,5 +217,4 @@ try {
     Write-Host "Fail salvestati manuaalseks üleslaadimiseks: $FullFilePath" -ForegroundColor Yellow
 }
 
-
 ```
