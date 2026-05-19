@@ -349,7 +349,6 @@ try {
     Write-Host "Fail säilitati manuaalseks kontrolliks: $FullFilePath" -ForegroundColor Yellow
 }
 
-
 ```
 
 
