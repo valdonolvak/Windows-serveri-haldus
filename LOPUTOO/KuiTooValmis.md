@@ -1,6 +1,10 @@
 #### Kui töö valmis, siis kopeeri see Powershelli skript ja läbi Powershell ISE salvesta see enda arvutisse  kausta **C:\Temp** nimega **Kontroll.ps1 **ja käivita ese Powershell ISE rakenduses ####
 
 ----
+**NB! Jälgi, et kindlasti avad ikka Powershell ISE, mitte tavalise Powershelli rakenduse.**
+<img width="602" height="423" alt="image" src="https://github.com/user-attachments/assets/b7b16f6b-4a7c-4357-b757-c9994404e7a0" />
+
+
 
 ### Täielik ja detailne kontrollskript: `Kontroll.ps1`
 
