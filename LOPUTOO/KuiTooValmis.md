@@ -6,7 +6,7 @@
 
 
 
-### Täielik ja detailne kontrollskript: `Kontroll.ps1`
+###Kopeeri see kontrollskript: `Kontroll.ps1`
 
 ```powershell
 
