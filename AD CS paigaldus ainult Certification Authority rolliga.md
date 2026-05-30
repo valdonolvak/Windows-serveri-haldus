@@ -180,7 +180,7 @@ IIS Manager → sinu sait → **Bindings…** → Add:
 <img width="434" height="346" alt="image" src="https://github.com/user-attachments/assets/356f210c-8d90-4b2c-8d49-91b60caa8802" />
 
 
-## PowerShell
+## PowerShell ##
 
 ```powershell
 Import-Module WebAdministration
@@ -189,10 +189,10 @@ New-WebBinding -Name "minuleht" -Protocol https -Port 443 -HostHeader "minuleht.
 ```
 
 **Miks see vajalik on:** IIS valib sissetuleva päringu järgi õige saidi ja sertifikaadi hostinime ning pordi alusel. SNI lubab sama IP ja pordi peal mitut HTTPS saiti, kui neid vaja peaks olema. ([Microsoft Learn][4])
+
 ---
 
-
-### NB! Järgnevaid samme ei ole vaja enam teha, kui sinu töökohaarvutid on lisatud samasse domeeni. 
+## NB! Järgnevaid samme ei ole vaja enam teha, kui sinu töökohaarvutid on lisatud samasse domeeni. ##
 ---
 
 # 6) Ekspordi CA juursertifikaat
