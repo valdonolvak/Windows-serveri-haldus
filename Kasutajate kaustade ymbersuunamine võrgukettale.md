@@ -108,7 +108,9 @@ Olulised valikud **Settings** saki all:
 
 ---
 
-### Oluline nõuanne: Selleks, et see poliitika hakkaks ka toimima tuleb kasutajad lisada sellesse AD gruppi või siis terved grupid lisada sinna gruppi, kelle puhul soovid, et kaustas asuksid võrgukettal
+### Oluline nõuanne: Selleks, et see poliitika hakkaks ka toimima tuleb kasutajad lisada sellesse AD gruppi või siis terved grupid lisada sinna gruppi, kelle puhul soovid, et kaustas asuksid võrgukettal ###
+
+## NB! Kui kasutaja on enne selle GPO rakendamist klientmasinasse sisse autentinud, siis tuleb selle GPO rakendumist, selle kasutaja profiil klientmasinast ära kustutada. Google otsingu abile leiab sellele vastuse, kuidas seda teha ##
 
 ---
 
