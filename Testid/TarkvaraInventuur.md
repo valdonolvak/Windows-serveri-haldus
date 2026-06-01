@@ -48,37 +48,45 @@ $ReportData | Sort-Object "Tarkvara nimi" | Out-Gridview -Title "Tarkvara invent
 # Impordime vajalikud moodulid
 Import-Module ActiveDirectory
 
-# Sihtkataloog ja fail F:\ kettal
+# 1. TUVASTAME AUTOMAATSELT DOMEENI JA OU TEEKONNA
+# See rida leiab ise üles domeeni (nt DC=test,DC=local)
+$DomainDN = (Get-ADDomain).DistinguishedName
+$TargetOU = "OU=Arvutid,$DomainDN"
+
+# Sihtfail F:\ kettal
 $TargetDir = "F:"
 $OutputFile = "$TargetDir\AD_arvutite_tarkvara.html"
 
-# Kontrollime, kas F:\ ketas on kättesaadav
+Write-Host "1. Tuvastatud domeen: $DomainDN" -ForegroundColor Green
+Write-Host "Otsitakse arvuteid asukohast: $TargetOU" -ForegroundColor Cyan
+
+# Kontrollime, kas F:\ ketas on olemas
 if (-not (Test-Path $TargetDir)) {
-    Write-Error "Ketas F:\ ei ole kättesaadav! Palun kontrolli kettatähist."
+    Write-Error "Ketas F:\ ei ole kättesaadav!"
     return
 }
 
-Write-Host "1. Loetakse arvutite nimekirja Active Directoryst..." -ForegroundColor Cyan
-
-# Küsime AD-st kõik arvutid, mis asuvad konkreetselt OU-s Arvutid
-# NB! Muuda vajadusel domeeni osa (DC=sinunimi,DC=local) vastavalt oma seadistusele
-$Computers = Get-ADComputer -Filter * -SearchBase "OU=Arvutid,DC=sinunimi,DC=local" | Select-Object -ExpandProperty Name
-
-if ($Computers.Count -eq 0) {
-    Write-Warning "OU-st Arvutid ei leitud ühtegi arvutit."
+# 2. LOETAKSE ARVUTID AD-ST
+try {
+    $Computers = Get-ADComputer -Filter * -SearchBase $TargetOU | Select-Object -ExpandProperty Name
+} catch {
+    Write-Error "Viga OU leidmisel! Kontrolli, kas OU nimena on kirjas 'Arvutid' (mitte 'Arvutid-OU' vms)."
     return
 }
 
-Write-Host "Leiti $($Computers.Count) arvutit. Alustatakse tarkvara inventuuri üle võrgu..." -ForegroundColor Cyan
+if ($null -eq $Computers -or $Computers.Count -eq 0) {
+    Write-Warning "OU-st Arvutid ei leitud ühtegi arvutit!"
+    return
+}
 
-# See plokk käivitatakse klientmasinate sees (WinRM kaudu)
+Write-Host "Leiti $($Computers.Count) arvutit. Alustatakse tarkvara inventuuri..." -ForegroundColor Cyan
+
+# 3. SKRIPTIPLOKK KLIENDIMASINATE JAOKS
 $ScriptBlock = {
     $RegPaths = @(
         "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*",
         "HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*"
     )
-    
-    # Loeme registrist andmed, filtreerime tühjad ja süsteemsed uuendused välja
     Get-ItemProperty -Path $RegPaths -ErrorAction SilentlyContinue | 
         Where-Object { $_.DisplayName -and $_.SystemComponent -ne 1 } | 
         Select-Object DisplayName, DisplayVersion, InstallDate
@@ -86,61 +94,32 @@ $ScriptBlock = {
 
 $FullReport = @()
 
-# Käime kõik arvutid ükshaaval läbi
+# 4. KÄIME ARVUTID LÄBI
 foreach ($Computer in $Computers) {
     Write-Host "Küsitakse andmeid arvutist: $Computer..." -ForegroundColor Yellow
     
-    # Kontrollime esmalt, kas arvuti on üldse võrgus (vastab pingile)
     if (Test-Connection -ComputerName $Computer -Count 1 -Quiet) {
         try {
-            # Käivitame koodi distantsilt klientmasinas
             $RemoteApps = Invoke-Command -ComputerName $Computer -ScriptBlock $ScriptBlock -ErrorAction Stop
-            
-            # Töötleme tulemused ja lisame juurde, millise arvutiga on tegu
             foreach ($App in $RemoteApps) {
-                $FormattedDate = $App.InstallDate
-                if ($App.InstallDate -match '^\d{8}$') {
-                    $FormattedDate = [datetime]::ParseExact($App.InstallDate, 'yyyyMMdd', $null).ToString('yyyy-MM-dd')
-                }
-
                 $FullReport += [PSCustomObject]@{
-                    "Arvuti nimi"        = $Computer
-                    "Tarkvara nimi"       = $App.DisplayName
-                    "Versioon"            = $App.DisplayVersion
-                    "Paigalduse kuupäev"  = if ($FormattedDate) { $FormattedDate } else { "Teadmata" }
+                    "Arvuti nimi"   = $Computer
+                    "Tarkvara nimi" = $App.DisplayName
+                    "Versioon"      = $App.DisplayVersion
+                    "Paigaldatud"   = $App.InstallDate
                 }
             }
         } catch {
-            Write-Warning "Viga arvutiga $Computer ühendumisel (WinRM õigused puuduvad)."
-            $FullReport += [PSCustomObject]@{ "Arvuti nimi" = $Computer; "Tarkvara nimi" = "VIGA: Ligipääs keelatud"; "Versioon" = "-"; "Paigalduse kuupäev" = "-" }
+            $FullReport += [PSCustomObject]@{ "Arvuti nimi" = $Computer; "Tarkvara nimi" = "VIGA: Ligipääs keelatud (WinRM)"; "Versioon" = "-"; "Paigaldatud" = "-" }
         }
     } else {
-        Write-Warning "Arvuti $Computer ei ole võrgus (Offline)."
-        $FullReport += [PSCustomObject]@{ "Arvuti nimi" = $Computer; "Tarkvara nimi" = "Masin on väljalülitatud (Offline)"; "Versioon" = "-"; "Paigalduse kuupäev" = "-" }
+        $FullReport += [PSCustomObject]@{ "Arvuti nimi" = $Computer; "Tarkvara nimi" = "OFFLINE"; "Versioon" = "-"; "Paigaldatud" = "-" }
     }
 }
 
-# Genereerime viisaka HTML kujunduse ja tabeli
-Write-Host "2. Koostatakse HTML raportit asukohta $OutputFile..." -ForegroundColor Cyan
+# 5. GENEREERIME HTML RAPORTI
+$Header = "<style>body{font-family:Arial;} table{border-collapse:collapse; width:100%;} th{background-color:#0078D4; color:white; padding:10px;} td{border:1px solid #ddd; padding:8px;} tr:nth-child(even){background-color:#f2f2f2;}</style>"
+$FullReport | Sort-Object "Arvuti nimi" | ConvertTo-Html -Head $Header -Title "Tarkvara Audit" | Out-File $OutputFile -Encoding UTF8
 
-$Header = @"
-<style>
-    body { font-family: Arial, sans-serif; margin: 20px; background-color: #f9f9f9; }
-    h2 { color: #333; }
-    table { border-collapse: collapse; width: 100%; background-color: #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-    th { background-color: #0078D4; color: white; padding: 10px; text-align: left; }
-    td { border: 1px solid #ddd; padding: 8px; font-size: 13px; }
-    tr:nth-child(even) { background-color: #f2f2f2; }
-    tr:hover { background-color: #ddd; }
-    .error { color: red; font-weight: bold; }
-</style>
-"@
-
-# Sorteerime tulemuse esmalt Arvuti nime ja siis Tarkvara nime järgi ning salvestame
-$FullReport | Sort-Object "Arvuti nimi", "Tarkvara nimi" | 
-    ConvertTo-Html -Head $Header -Title "AD Arvutite Tarkvara Audit" | 
-    Out-File $OutputFile -Encoding UTF8
-
-Write-Host "Valmis! Raport on edukalt loodud: $OutputFile" -ForegroundColor Green
-
+Write-Host "Valmis! Raport asub: $OutputFile" -ForegroundColor Green
 ```
