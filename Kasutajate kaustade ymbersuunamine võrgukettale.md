@@ -112,8 +112,6 @@ Olulised valikud **Settings** saki all:
 
 ---
 
-### NB! Kui kasutaja on enne selle GPO rakendamist klientmasinasse sisse autentinud, siis tuleb selle GPO rakendumist, selle kasutaja profiil klientmasinast ära kustutada. Google otsingu abile leiab sellele vastuse, kuidas seda teha ###
-
 > [!CAUTION]
 > **NB!** Kui kasutaja on enne selle GPO rakendamist klientmasinasse sisse autentinud, siis tuleb pärast selle GPO rakendumist selle kasutaja profiil klientmasinast ära kustutada. Google otsingu abil leiab sellele vastuse, kuidas seda teha.
 ---
