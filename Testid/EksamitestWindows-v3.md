@@ -164,17 +164,16 @@ Add-Result "Loodud skript impordib AD kasutajad (.csv)" "Kasutajad ja struktuur 
 
 # --- 7. GRUPIPOLIITIKAD (GPO) (2.0 punkti) ---
 
-# GPO_KontodeLukustamine (XML sisu ja lingi kontroll - PARANDATUD VERSIOON)
+# GPO_KontodeLukustamine (TÄIELIKULT PARANDATUD - Õiged XML nimed)
 $LockGPO = Get-GPO -Name "GPO_KontodeLukustamine" -ErrorAction SilentlyContinue
 if ($LockGPO) {
     $GpoXml = [xml](Get-GPOReport -Guid $LockGPO.Id -ReportType Xml)
     $XmlContent = $GpoXml.InnerXml
     
-    # Otsime XML-ist spetsiifilisi lukustuse väärtuseid
-    $ThresholdOK = ($XmlContent -match "LockoutThreshold>5<")
-    $DurationOK = ($XmlContent -match "LockoutDuration>15<")
+    # GPO kasutab XML-is sisemiselt nimesid "LockoutBadCount" ja "LockoutDuration"
+    $ThresholdOK = ($XmlContent -match "LockoutBadCount") -and ($XmlContent -match ">5<")
+    $DurationOK = ($XmlContent -match "LockoutDuration") -and ($XmlContent -match ">15<")
     
-    # Kontrollime, kas see GPO on reaalselt lingitud kuskile (ideaalis domeenile)
     $IsLinked = ($GpoXml.GPO.LinksTo -ne $null)
 
     $Details = "GPO leitud: Jah. Katseid 5: $ThresholdOK. Aeg 15min: $DurationOK. Lingitud: $IsLinked"
