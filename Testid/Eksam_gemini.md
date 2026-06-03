@@ -2,116 +2,171 @@ Siin Gemini test
 
 ```powershell
 
-<#
-.SYNOPSIS
-    Windows Serveri keskkonna kontrollskript vastavalt etteantud kriteeriumitele.
-    Väljastab tulemused HTML failina.
-#>
+# Sinu ülesande kohane täielik kontrollskript
+# Käivita administraatorina DC1/AD1 masinas
 
-$ReportPath = "$PSScriptRoot\Kontrolli_Raport.html"
-$DomainName = "sinunimi.local" # Muuda vajadusel "oige.ee" peale vastavalt juhisele
-$CSVPath = "$PSScriptRoot\kasutajad.csv"
+$ErrorActionPreference = "SilentlyContinue"
+Import-Module ActiveDirectory, GroupPolicy, DhcpServer, Storage
 
+# --- KASUTAJA SISEND ---
+$CustomDomain = Read-Host "Sisesta kontrollitav domeeninimi (nt sinunimi.local või oige.ee)"
+$CSVPath = "C:\Scripts\kasutajad.csv" # Muuda vajadusel faili asukohta
+$ReportPath = "C:\Audit\HindamisRaport.html"
+
+if (!(Test-Path "C:\Audit")) { New-Item -ItemType Directory -Path "C:\Audit" -Force | Out-Null }
+
+$totalPoints = 0
 $Results = @()
 
+# --- ABIFUNKTSIOON TULEMUSTE JA PUNKTIDE JAOKS ---
 function Add-Result {
-    param($Tegevus, $Ootus, $Tulemus, $Staatus)
-    $color = if($Staatus -eq "OK") { "green" } else { "red" }
-    $Global:Results += [PSCustomObject]@{
-        Tegevus = $Tegevus
-        Ootus   = $Ootus
-        Leitud  = $Tulemus
-        Staatus = "<b style='color:$color'>$Staatus</b>"
+    param([string]$Kontroll, [string]$Ootus, [string]$Leiti, [bool]$Staatus, [double]$Punktid)
+    $earned = if($Staatus){$Punktid} else {0}
+    $color = if($Staatus){"#c6efce"} else {"#ffc7ce"} # Roheline vs Punane
+    $script:totalPoints += $earned
+    $script:Results += [PSCustomObject]@{
+        Kontroll = $Kontroll; Ootus = $Ootus; Leiti = $Leiti; Staatus = if($Staatus){"OK"}else{"FAIL"}; Punktid = $earned; Color = $color
     }
 }
 
-# --- 1. Masina nimi ja IP ---
-$ComputerName = $env:COMPUTERNAME
-Add-Result "Serveri nimi" "DC1" $ComputerName (if($ComputerName -eq "DC1") {"OK"} else {"VIGA"})
+# --- 1. DOMEEN JA SERVERI NIMED (1.5p) ---
+$domain = Get-ADDomain
+$dcName = $env:COMPUTERNAME
+Add-Result "Serveri nimi" "DC1 või AD1" $dcName ($dcName -match "DC1|AD1") 0.5
+Add-Result "AD Domeeni nimi" $CustomDomain $domain.DNSRoot ($domain.DNSRoot -eq $CustomDomain) 1.0
 
-$IP = (Get-NetIPAddress -AddressFamily IPv4 -InterfaceAlias "Ethernet*").IPAddress | Select-Object -First 1
-Add-Result "DC1 IP Aadress" "Staatiline IP" $IP "INFO"
+# --- 2. VÕRK JA ROLLID (1.5p) ---
+$staticIP = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object {$_.PrefixOrigin -eq "Manual" -and $_.IPAddress -notlike "169.254*"}).IPAddress
+Add-Result "Staatiline IP" "Seadistatud" ($staticIP -join "; ") ($staticIP.Count -gt 0) 0.5
 
-# --- 2. AD Domeen ja DC2 olemasolu ---
-try {
-    $Domain = Get-ADDomain
-    Add-Result "AD Domeen" $DomainName $Domain.DomainName (if($Domain.DomainName -eq $DomainName) {"OK"} else {"VIGA"})
+$dnsRole = Get-WindowsFeature DNS
+Add-Result "DNS Teenus" "Installed" $dnsRole.InstallState ($dnsRole.Installed) 0.5
+
+$dcs = Get-ADDomainController -Filter *
+Add-Result "DC-de arv" "Vähemalt 2 (DC1 ja DC2)" $dcs.Count ($dcs.Count -ge 2) 0.5
+
+# --- 3. DHCP JA FAILOVER (4.0p) ---
+$scope = Get-DhcpServerv4Scope
+if($scope) {
+    Add-Result "DHCP Teenus" "Scope olemas" $scope.ScopeId ($scope -ne $null) 1.0
+    Add-Result "DHCP Lease aeg" "04:00:00" $scope.LeaseDuration.ToString() ($scope.LeaseDuration.TotalHours -eq 4) 1.0
     
-    $DC2 = Get-ADDomainController -Identity "DC2" -ErrorAction Stop
-    Add-Result "Teine DC (DC2)" "DC2 Core olemasolu" $DC2.Name "OK"
-} catch {
-    Add-Result "AD Kontroll" "Domeen/DC2" "Ei leitud" "VIGA"
-}
-
-# --- 3. DHCP ja Failover ---
-try {
-    $DHCPConfig = Get-DhcpServerv4Scope -ComputerName DC1
-    $Failover = Get-DhcpServerv4Failover -ComputerName DC1
-    $LeaseTime = (Get-DhcpServerv4Scope -ComputerName DC1).LeaseTime
+    $dnsOpt = Get-DhcpServerv4OptionValue -OptionId 6
+    Add-Result "DHCP DNS Serverid" "2 serverit" ($dnsOpt.Value -join ", ") ($dnsOpt.Value.Count -ge 2) 0.5
     
-    Add-Result "DHCP Failover" "Partner DC2" $Failover.PartnerServer "OK"
-    Add-Result "DHCP Lease aeg" "04:00:00" $LeaseTime (if($LeaseTime -eq "04:00:00") {"OK"} else {"VIGA"})
-    
-    $ScopeOptions = Get-DhcpServerv4OptionValue -ScopeId $DHCPConfig.ScopeId -OptionId 6
-    Add-Result "DHCP DNS DNS väljastus" "DC1 ja DC2 IP-d" ($ScopeOptions.Value -join ", ") "INFO"
-} catch {
-    Add-Result "DHCP Kontroll" "Seadistused" "Viga päringul" "VIGA"
-}
+    $reservations = Get-DhcpServerv4Reservation -ScopeId $scope.ScopeId
+    Add-Result "DHCP Staatilised rendid" "Olemas" $reservations.Count ($reservations.Count -gt 0) 0.5
 
-# --- 4. OU Struktuur ja Haldur ---
-$OU_Users = Get-ADOrganizationalUnit -Filter "Name -eq 'Kasutajad'"
-$OU_Comps = Get-ADOrganizationalUnit -Filter "Name -eq 'Arvutid'"
-Add-Result "OU Kasutajad" "Olemas" (if($OU_Users) {"Jah"} else {"Ei"}) (if($OU_Users) {"OK"} else {"VIGA"})
-Add-Result "OU Arvutid" "Olemas" (if($OU_Comps) {"Jah"} else {"Ei"}) (if($OU_Comps) {"OK"} else {"VIGA"})
-
-$Haldur = Get-ADUser -Filter "Name -eq 'Haldur'" -Properties MemberOf
-$IsAdmin = $Haldur.MemberOf -like "*Domain Admins*"
-Add-Result "Kasutaja Haldur" "Domain Admin" (if($IsAdmin) {"Jah"} else {"Ei"}) (if($IsAdmin) {"OK"} else {"VIGA"})
-
-# --- 5. GPO Kontrollid (Sisu kontroll) ---
-# Kontode lukustamine
-try {
-    $GPO_Lock = Get-GPO -Name "GPO_KontodeLukustamine"
-    $GPO_Report = [xml](Get-GPOReport -Name "GPO_KontodeLukustamine" -ReportType Xml)
-    $LockoutLimit = $GPO_Report.GPO.User.ExtensionData.Extension.Account.LockoutThreshold # Lihtsustatud näide
-    Add-Result "GPO Lukustamine" "Nimi olemas" "Leitud" "OK"
-} catch {
-    Add-Result "GPO Lukustamine" "Nimi GPO_KontodeLukustamine" "Puudu" "VIGA"
-}
-
-# Edge Siseportaal
-try {
-    $GPO_Edge = Get-GPO -Name "Edge_Siseportaal"
-    Add-Result "GPO Edge" "Nimi olemas" "Leitud" "OK"
-} catch {
-    Add-Result "GPO Edge" "Nimi Edge_Siseportaal" "Puudu" "VIGA"
-}
-
-# --- 6. CSV ja Kasutajate pisteline kontroll ---
-if (Test-Path $CSVPath) {
-    $CSVData = Import-Csv $CSVPath -Delimiter "`t" # Eeldab tab-eraldatud faili nagu kopeeritud tekstis
-    $Departments = $CSVData | Select-Object -ExpandProperty "Osakond" -Unique
-    
-    foreach ($Dept in $Departments) {
-        $TestUser = $CSVData | Where-Object { $_.Osakond -eq $Dept } | Select-Object -First 1
-        $ADUser = Get-ADUser -Filter "DisplayName -eq '$($TestUser.Nimi)'" -SearchBase "OU=$Dept,OU=Kasutajad,$( (Get-ADDomain).DistinguishedName )" -ErrorAction SilentlyContinue
-        
-        Add-Result "Kasutaja osakonnast $Dept" "Leitud OU-st $Dept" (if($ADUser) {$ADUser.SamAccountName} else {"PUUDU"}) (if($ADUser) {"OK"} else {"VIGA"})
-    }
+    $failover = Get-DhcpServerv4Failover
+    Add-Result "DHCP Failover" "DC2 partnerina" ($failover.PartnerServer) ($failover.PartnerServer -match "DC2|AD2") 1.0
 } else {
-    Add-Result "CSV Kontroll" "Fail kasutajad.csv" "Ei leitud skripti kaustast" "VIGA"
+    Add-Result "DHCP" "Seadistamata" "Scope puudu" $false 4.0
 }
 
-# --- 7. Ketas F: ---
-$DriveF = Get-Volume -DriveLetter F -ErrorAction SilentlyContinue
-Add-Result "Ketas F:" "Olemas/Vormindatud" (if($DriveF) {"Leitud"} else {"Puudu"}) (if($DriveF) {"OK"} else {"VIGA"})
+# --- 4. OU-D, KASUTAJAD JA GRUPID (2.0p) ---
+$ouUsers = Get-ADOrganizationalUnit -Filter "Name -eq 'Kasutajad'"
+$ouComps = Get-ADOrganizationalUnit -Filter "Name -eq 'Arvutid'"
+Add-Result "OU Kasutajad ja Arvutid" "Loodud" (if($ouUsers -and $ouComps){"Jah"}else{"Ei"}) ($ouUsers -and $ouComps) 0.5
 
-# --- HTML Generatsoon ---
-$HtmlHeader = "<html><head><style>table{border-collapse:collapse;width:100%;} th,td{border:1px solid #ddd;padding:8px;text-align:left;} th{background-color:#4CAF50;color:white;}</style></head><body><h2>Serveri Auditi Raport</h2>"
-$HtmlFooter = "</body></html>"
-$TableBody = $Results | ConvertTo-Html -Fragment
+$haldur = Get-ADUser -Filter "SamAccountName -eq 'haldur'" -Properties MemberOf
+$isAdmin = $haldur.MemberOf -like "*Domain Admins*"
+Add-Result "Kasutaja Haldur Admin" "Domain Admins liige" (if($isAdmin){"Jah"}else{"Ei"}) ($isAdmin) 0.5
 
-$HtmlHeader + $TableBody + $HtmlFooter | Out-File $ReportPath -Encoding utf8
-Write-Host "Raport on loodud: $ReportPath" -ForegroundColor Cyan
+if($ouComps) {
+    $comps = Get-ADComputer -SearchBase $ouComps.DistinguishedName -Filter *
+    Add-Result "Klientmasin domeenis" "OU-s Arvutid" $comps.Count ($comps.Count -gt 0) 0.5
+}
+
+$records = Get-DnsServerResourceRecord -ZoneName $CustomDomain -RRType A | Where-Object { $_.HostName -notmatch "@|gc|DomainDnsZones" }
+Add-Result "DNS A-kirjed (Linux)" "Loodud" $records.Count ($records.Count -gt 0) 0.5
+
+# --- 5. CSV IMPORT JA OSAKONNAD (1.0p) ---
+if (Test-Path $CSVPath) {
+    $osakonnad = @("Müük", "Personal", "Raamatupidamine", "Toimetajad", "IT", "Juhtkond", "Haldus")
+    $allFound = $true
+    foreach($os in $osakonnad) {
+        $checkOU = Get-ADOrganizationalUnit -Filter "Name -eq '$os'"
+        if(!$checkOU) { $allFound = $false }
+    }
+    Add-Result "CSV Import/OU struktuur" "Osakonnad loodud" (if($allFound){"Kõik olemas"}else{"Mõni puudu"}) ($allFound) 1.0
+} else {
+    Add-Result "CSV Fail" "C:\Scripts\kasutajad.csv" "Puudub" $false 1.0
+}
+
+# --- 6. KETAS F: (1.0p) ---
+$diskF = Get-Volume -DriveLetter F
+Add-Result "Ketas F:" "Vormindatud ja ühendatud" (if($diskF){"Leitud"}else{"Puudub"}) ($diskF -ne $null) 1.0
+
+# --- 7. GRUPIPÖHIMÕTTED (GPO) SISU KONTROLL (2.0p) ---
+
+# GPO 1: Kontode lukustamine
+$lockGPO = Get-GPO -Name "GPO_KontodeLukustamine"
+if($lockGPO) {
+    $defPwd = Get-ADDefaultDomainPasswordPolicy
+    $lockOK = ($defPwd.LockoutThreshold -eq 5 -and $defPwd.LockoutDuration.TotalMinutes -eq 15)
+    Add-Result "GPO KontodeLukustamine" "5 katset / 15 min" "Threshold: $($defPwd.LockoutThreshold)" $lockOK 1.0
+} else {
+    Add-Result "GPO KontodeLukustamine" "Puudub" "Ei leitud" $false 1.0
+}
+
+# GPO 2: Edge Siseportaal (Sisu kontroll XML-ist)
+$edgeGPO = Get-GPO -Name "Edge_Siseportaal"
+if($edgeGPO) {
+    $xml = [xml](Get-GPOReport -Guid $edgeGPO.Id -ReportType Xml)
+    $xmlText = $xml.InnerXml
+    $contentOK = ($xmlText -match "siseportaal.$CustomDomain") -and ($xmlText -match "NewTabPageLocation")
+    Add-Result "GPO Edge Siseportaal" "Sisu: URL ja lukustus" (if($contentOK){"Õige URL leitud"}else{"URL vale või puudu"}) $contentOK 1.0
+} else {
+    Add-Result "GPO Edge Siseportaal" "Puudub" "Ei leitud" $false 1.0
+}
+
+# --- HTML RAPORTI GENEREERIMINE ---
+$html = @"
+<html>
+<head>
+    <meta charset='UTF-8'>
+    <title>Serveri Audit - $CustomDomain</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; background-color: #f4f4f4; }
+        table { border-collapse: collapse; width: 100%; background: white; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        th { background-color: #333; color: white; }
+        h1, h2 { color: #333; }
+        .summary { font-size: 1.2em; font-weight: bold; margin-bottom: 20px; padding: 15px; background: #fff; border-left: 5px solid #333; }
+    </style>
+</head>
+<body>
+    <h1>Windows Serveri Auditi Raport</h1>
+    <div class='summary'>
+        Domeen: $CustomDomain <br>
+        Kontrolli teostas: $env:USERNAME <br>
+        KOONDPUNKTID: $totalPoints / 13.0
+    </div>
+    <table>
+        <tr>
+            <th>Kontrollitav tegevus</th>
+            <th>Oodatud tulemus</th>
+            <th>Leitud olukord</th>
+            <th>Staatus</th>
+            <th>Punktid</th>
+        </tr>
+"@
+
+foreach($row in $Results) {
+    $html += "<tr style='background-color:$($row.Color)'>
+        <td>$($row.Kontroll)</td>
+        <td>$($row.Ootus)</td>
+        <td>$($row.Leiti)</td>
+        <td>$($row.Staatus)</td>
+        <td>$($row.Punktid)</td>
+    </tr>"
+}
+
+$html += "</table></body></html>"
+$html | Out-File $ReportPath -Encoding UTF8
+
+Write-Host "Kontroll lõpetatud!" -ForegroundColor Green
+Write-Host "Raport asub: $ReportPath" -ForegroundColor Cyan
+Write-Host "Kokku punkte: $totalPoints" -ForegroundColor Yellow
 
 ```
