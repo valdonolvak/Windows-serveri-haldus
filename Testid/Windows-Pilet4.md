@@ -19,7 +19,29 @@ Import-Module DnsServer
 
 # --- SEADISTUSED JA SISEND ---
 $ExpectedDomain = Read-Host "Sisesta oodatud domeeninimi (nt oige.ee või sinunimi.local)"
-$ReportPath = "$PSScriptRoot\HindamisRaport.html"
+$OpilaseNimi = Read-Host "Sisesta õpilase ees- ja perekonnanimi (dashboardile saatmiseks ja failinimeks)"
+
+Write-Host "Vali pileti liik:" -ForegroundColor Cyan
+Write-Host "1 - Linux"
+Write-Host "2 - Windows"
+Write-Host "3 - Võrk"
+$PiletLiikValik = Read-Host "Sisesta number (1-3)"
+$PiletLiik = switch ($PiletLiikValik) {
+    '1' { 'Linux' }
+    '2' { 'Windows' }
+    '3' { 'Võrk' }
+    Default { 'Määramata' }
+}
+
+$PiletNumber = Read-Host "Sisesta pileti number (1-6)"
+$TaisPilet = "$PiletLiik $PiletNumber"
+
+# --- FAILINIMEDE GENEREERIMINE ---
+$SafeName = $OpilaseNimi -replace '\s+', '_'
+$SafePilet = $TaisPilet -replace '\s+', '_'
+
+$ReportPath = "$PSScriptRoot\HindamisRaport_${SafeName}_${SafePilet}.html"
+$JsonPath = "$PSScriptRoot\HindamisRaport_${SafeName}_${SafePilet}.json"
 
 $TotalPoints = 0
 $Results = @()
@@ -406,43 +428,29 @@ $Html += @"
 </html>
 "@
 
+# Salvestame ajutiselt unikaalse nimega HTML-i
 $Html | Out-File $ReportPath -Encoding UTF8
 Write-Host "Kontroll on lõpetatud!" -ForegroundColor Green
 Write-Host "Kogutud punktid: $TotalPoints / 20.0" -ForegroundColor Yellow
-Write-Host "Raport asub failis: $ReportPath" -ForegroundColor Cyan
-
-# --- UUS: KÜSIME PILETI INFOT ---
-$OpilaseNimi = Read-Host "Sisesta õpilase ees- ja perekonnanimi (dashboardile saatmiseks)"
-
-Write-Host "Vali pileti liik:" -ForegroundColor Cyan
-Write-Host "1 - Linux"
-Write-Host "2 - Windows"
-Write-Host "3 - Võrk"
-$PiletLiikValik = Read-Host "Sisesta number (1-3)"
-$PiletLiik = switch ($PiletLiikValik) {
-    '1' { 'Linux' }
-    '2' { 'Windows' }
-    '3' { 'Võrk' }
-    Default { 'Määramata' }
-}
-
-$PiletNumber = Read-Host "Sisesta pileti number (1-6)"
-$TaisPilet = "$PiletLiik $PiletNumber"
 
 # --- JSON GENEREERIMINE JA ÜLESLAADIMINE FLASKI SERVERISSE ---
 
 $JsonPayload = @{
-    Nimi = $OpilaseNimi
+    Nimi = "$OpilaseNimi - $TaisPilet"
     Pilet = $TaisPilet
     Aeg = (Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
     KokkuPunkte = $TotalPoints
     Masin = $ComputerName
     Domeen = $ExpectedDomain
     Tulemused = $Results
-    UserCheckDetails = $UserCheckDetails # See saadab CSV kontrolli nimekirja serverisse!
+    UserCheckDetails = $UserCheckDetails 
+    FailiNimi = "HindamisRaport_${SafeName}_${SafePilet}"
 }
 
 $JsonString = $JsonPayload | ConvertTo-Json -Depth 5 -Compress
+
+# Salvestame ajutiselt unikaalse nimega JSON faili
+$JsonString | Out-File $JsonPath -Encoding UTF8
 
 $ServeriURL = "http://192.168.124.64:5001/api/upload"
 
@@ -460,6 +468,18 @@ catch {
     Write-Host "Viga andmete üleslaadimisel: $($_.Exception.Message)" -ForegroundColor Red
 }
 
+# --- LOKAALSETE FAILIDE KUSTUTAMINE ---
+Write-Host "Puhastan kohaliku masina testifailidest..." -ForegroundColor Cyan
+
+if (Test-Path $ReportPath) {
+    Remove-Item -Path $ReportPath -Force
+}
+
+if (Test-Path $JsonPath) {
+    Remove-Item -Path $JsonPath -Force
+}
+
+Write-Host "Kohalikud .html ja .json failid on edukalt kustutatud!" -ForegroundColor Green
 
 
 ```
