@@ -2,7 +2,6 @@
 
 
 ```powershell
-
 <#
 .SYNOPSIS
     Täielik Windows Serveri auditi skript vastavalt 20-punktisele hindamiskriteeriumile.
@@ -412,22 +411,37 @@ Write-Host "Kontroll on lõpetatud!" -ForegroundColor Green
 Write-Host "Kogutud punktid: $TotalPoints / 20.0" -ForegroundColor Yellow
 Write-Host "Raport asub failis: $ReportPath" -ForegroundColor Cyan
 
-# --- JSON GENEREERIMINE JA ÜLESLAADIMINE FLASKI SERVERISSE ---
-
-# Küsime skripti alguses või lõpus õpilase nime
+# --- UUS: KÜSIME PILETI INFOT ---
 $OpilaseNimi = Read-Host "Sisesta õpilase ees- ja perekonnanimi (dashboardile saatmiseks)"
 
-# Loome ühtse objekti, mida on lihtne JSON-iks teha
+Write-Host "Vali pileti liik:" -ForegroundColor Cyan
+Write-Host "1 - Linux"
+Write-Host "2 - Windows"
+Write-Host "3 - Võrk"
+$PiletLiikValik = Read-Host "Sisesta number (1-3)"
+$PiletLiik = switch ($PiletLiikValik) {
+    '1' { 'Linux' }
+    '2' { 'Windows' }
+    '3' { 'Võrk' }
+    Default { 'Määramata' }
+}
+
+$PiletNumber = Read-Host "Sisesta pileti number (1-6)"
+$TaisPilet = "$PiletLiik $PiletNumber"
+
+# --- JSON GENEREERIMINE JA ÜLESLAADIMINE FLASKI SERVERISSE ---
+
 $JsonPayload = @{
     Nimi = $OpilaseNimi
+    Pilet = $TaisPilet
     Aeg = (Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
     KokkuPunkte = $TotalPoints
     Masin = $ComputerName
     Domeen = $ExpectedDomain
     Tulemused = $Results
+    UserCheckDetails = $UserCheckDetails # See saadab CSV kontrolli nimekirja serverisse!
 }
 
-# Teeme objektist JSON stringi. Depth on vajalik, et kõik alamobjektid kaasa tuleks.
 $JsonString = $JsonPayload | ConvertTo-Json -Depth 5 -Compress
 
 $ServeriURL = "http://192.168.124.64:5001/api/upload"
@@ -435,7 +449,6 @@ $ServeriURL = "http://192.168.124.64:5001/api/upload"
 Write-Host "Saadan andmed dashboardile ($ServeriURL)..." -ForegroundColor Cyan
 
 try {
-    # Saadame POST päringuga andmed Ubuntu serverisse
     $Response = Invoke-RestMethod -Uri $ServeriURL `
                                   -Method Post `
                                   -Body $JsonString `
@@ -446,6 +459,7 @@ try {
 catch {
     Write-Host "Viga andmete üleslaadimisel: $($_.Exception.Message)" -ForegroundColor Red
 }
+
 
 
 ```
