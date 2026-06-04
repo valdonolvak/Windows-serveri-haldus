@@ -412,4 +412,40 @@ Write-Host "Kontroll on lõpetatud!" -ForegroundColor Green
 Write-Host "Kogutud punktid: $TotalPoints / 20.0" -ForegroundColor Yellow
 Write-Host "Raport asub failis: $ReportPath" -ForegroundColor Cyan
 
+# --- JSON GENEREERIMINE JA ÜLESLAADIMINE FLASKI SERVERISSE ---
+
+# Küsime skripti alguses või lõpus õpilase nime
+$OpilaseNimi = Read-Host "Sisesta õpilase ees- ja perekonnanimi (dashboardile saatmiseks)"
+
+# Loome ühtse objekti, mida on lihtne JSON-iks teha
+$JsonPayload = @{
+    Nimi = $OpilaseNimi
+    Aeg = (Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
+    KokkuPunkte = $TotalPoints
+    Masin = $ComputerName
+    Domeen = $ExpectedDomain
+    Tulemused = $Results
+}
+
+# Teeme objektist JSON stringi. Depth on vajalik, et kõik alamobjektid kaasa tuleks.
+$JsonString = $JsonPayload | ConvertTo-Json -Depth 5 -Compress
+
+$ServeriURL = "http://192.168.124.64:5001/api/upload"
+
+Write-Host "Saadan andmed dashboardile ($ServeriURL)..." -ForegroundColor Cyan
+
+try {
+    # Saadame POST päringuga andmed Ubuntu serverisse
+    $Response = Invoke-RestMethod -Uri $ServeriURL `
+                                  -Method Post `
+                                  -Body $JsonString `
+                                  -ContentType "application/json; charset=utf-8"
+    
+    Write-Host "Andmed edukalt üles laetud! Server vastas: $($Response.message)" -ForegroundColor Green
+}
+catch {
+    Write-Host "Viga andmete üleslaadimisel: $($_.Exception.Message)" -ForegroundColor Red
+}
+
+
 ```
