@@ -2,11 +2,10 @@
 
 
 ```powershell
-
 <#
 .SYNOPSIS
     Täielik Windows Serveri auditi skript vastavalt 20-punktisele hindamiskriteeriumile (PILET 2 - DFS/FSRM).
-    Sisaldab täpsustatud pealkirju, DC2 IP lollikindlamat tuvastust, GPO kooloni viga parandust ja ülisügavat DFS otsingut.
+    Sisaldab täpsustatud pealkirju, DC2 IP lollikindlamat tuvastust, kirjavigade andestamist (fuzzy matching) ja FSRM gruppide korrektset lugemist.
     Käivitada DC1 serveris Domain Admin õigustes.
 #>
 
@@ -471,7 +470,7 @@ $KQDet += "</ul>"
 Add-Result "Määra kaustale FSRM abil mahupiirang 10 GB" "10GB kvoot rakendatud" $KQDet ($KQPts -eq 0.5) 0.5 $KQPts
 
 
-# 7.7 FSRM Failipiirang
+# 7.7 FSRM Failipiirang (PARANDATUD: Loeb gruppe otse IncludeGroup alt)
 $FileScreen = Get-FsrmFileScreen -ErrorAction SilentlyContinue | Where-Object { $_.Path -match "(?i)kogu|kogukond" } | Select-Object -First 1
 $FSPts = 0
 $FSDet = "<ul style='margin:0; padding-left:20px;'>"
@@ -480,12 +479,28 @@ if ($FileScreen) {
     $FSPts += 0.25
     $FSDet += "<li>Failipiirang: <b style='color:green'>Olemas (+0.25p)</b></li>"
     
-    $FSGroup = Get-FsrmFileGroup -Name $FileScreen.FileGroup -ErrorAction SilentlyContinue
-    if ($FSGroup -and ($FSGroup.IncludePattern -match "\.exe" -or $FSGroup.IncludePattern -match "\.msi" -or $FSGroup.IncludePattern -match "\.bat")) {
+    $FSPatternFound = $false
+    $FSGroupNames = $FileScreen.IncludeGroup
+    
+    if ($FSGroupNames) {
+        foreach ($gName in $FSGroupNames) {
+            $FSGroup = Get-FsrmFileGroup -Name $gName -ErrorAction SilentlyContinue
+            if ($FSGroup) {
+                # Ühendame kõik filtri mustrid üheks stringiks, et neid lihtsamini otsida
+                $joinedPatterns = $FSGroup.IncludePattern -join " "
+                if ($joinedPatterns -match "(?i)\.exe|\.msi|\.bat|\.ps1") {
+                    $FSPatternFound = $true
+                    break
+                }
+            }
+        }
+    }
+    
+    if ($FSPatternFound) {
         $FSPts += 0.25
         $FSDet += "<li>Keelab skriptid/programmid: <b style='color:green'>Jah (+0.25p)</b></li>"
     } else { 
-        $FSDet += "<li>Filtrid: <b style='color:red'>Ei tuvastanud exe/msi filtreid</b></li>" 
+        $FSDet += "<li>Filtrid: <b style='color:red'>Ei tuvastanud exe/msi filtreid rakendatud grupis</b></li>" 
     }
 } else { 
     $FSDet += "<li>Failipiirang: <b style='color:red'>Puudu</b></li>" 
