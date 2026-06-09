@@ -4,7 +4,7 @@
 ```powershell
 <#
 .SYNOPSIS
-    Täielik Windows Serveri auditi skript koos detailse asukohatuvastuse ja DHCP/IP analüüsiga.
+    Täielik Windows Serveri auditi skript koos detailse asukohatuvastuse, DHCP IP analüüsi ja nutika failoveri kontrolliga.
     Käivitada DC1 serveris Domain Admin õigustes.
 #>
 
@@ -212,9 +212,30 @@ $dhcpDetails += "</ul>"
 
 Add-Result "Seadista DHCP teenus, reservatsioonid, DNS" "Skoop, 4h, reserv, 2xDNS" $dhcpDetails ($dhcpTasksMet -eq 4) 1.0 ($dhcpTasksMet * 0.25)
 
+# NUTIKAS FAILOVER KONTROLL
 $Failover = Get-DhcpServerv4Failover -ErrorAction SilentlyContinue
-$foStatus = ($Failover -and (($Failover.PartnerServer -join " ") -match "DC2"))
-$foDetails = if ($foStatus) { "Failover korras. Partner: DC2" } else { "Failover puudub või partner pole DC2. Tuvastatud partner: $($Failover.PartnerServer)" }
+$foStatus = $false
+$foDetails = "Failover puudub täielikult."
+
+if ($Failover) {
+    $partner = $Failover.PartnerServer -join " "
+    $dc2Ips = if ($DC2DNS) { $DC2DNS.IPAddress -join "|" } else { "POLE_LEITUD" }
+    
+    # 1. Kontrollime, kas partneri nimes sisaldub sõna "DC2"
+    if ($partner -match "DC2") {
+        $foStatus = $true
+        $foDetails = "Failover korras. Partner tuvastatud nime järgi: <b>$partner</b>"
+    } 
+    # 2. Kontrollime, kas partneriks märgitud IP klapib DC2 DNS-ist leitud IP-ga
+    elseif ($dc2Ips -ne "POLE_LEITUD" -and $partner -match $dc2Ips) {
+        $foStatus = $true
+        $foDetails = "Failover korras. Partner tuvastatud DC2 IP-aadressi järgi: <b>$partner</b>"
+    } 
+    # 3. Kui ei klapi kumbagi pidi
+    else {
+        $foDetails = "Failover leitud, kuid partner pole DC2 (nimi/IP ei kattu). Tuvastatud partner: <b>$partner</b>"
+    }
+}
 Add-Result "Seadista DHCP teenusele failover" "Partneriks on DC2" $foDetails $foStatus 1.0
 
 # ====================================================================
@@ -458,7 +479,6 @@ try {
 if (Test-Path $ReportPath) { Remove-Item -Path $ReportPath -Force }
 if (Test-Path $JsonPath) { Remove-Item -Path $JsonPath -Force }
 Write-Host "Kohalikud failid puhastatud ja hindamine lõpetatud!" -ForegroundColor Green
-
 
 
 ```
