@@ -2,10 +2,12 @@
 
 
 ```powershell
+
 <#
 .SYNOPSIS
     Täielik Windows Serveri auditi skript vastavalt 20-punktisele hindamiskriteeriumile (PILET 2 - DFS/FSRM).
-    Sisaldab täpsustatud pealkirju, DC2 IP lollikindlamat tuvastust, kirjavigade andestamist (fuzzy matching) ja FSRM gruppide korrektset lugemist.
+    Sisaldab täpsustatud pealkirju, DC2 IP lollikindlamat tuvastust, kirjavigade andestamist (fuzzy matching), 
+    FSRM gruppide korrektset lugemist ja DFS-R replikatsiooni kaudset tuvastust (Folder Targets).
     Käivitada DC1 serveris Domain Admin õigustes.
 #>
 
@@ -369,7 +371,6 @@ Add-Result "Paigalda Windows Server 2025-le rollid DFS Namespaces, DFS Replicati
 
 
 # 7.2 DFS nimeruum Jagatud
-# Kogume kokku kõik võimalikud nimeruumid domeenis ja lokaalselt
 $AllRoots = @(Get-DfsnRoot -Domain $DomainFQDN -ErrorAction SilentlyContinue)
 $AllRoots += @(Get-DfsnRoot -ComputerName $ComputerName -ErrorAction SilentlyContinue)
 
@@ -380,11 +381,10 @@ $DfsnDet = if ($DfsN) { "Nimeruum leitud: <b style='color:green'>Jah (+1p)</b> [
 Add-Result "Loo DFS nimeruum Jagatud" "Nimeruum \\$DomainFQDN\Jagatud (või ligilähedane nimi)" $DfsnDet ($DfsN -ne $null) 1.0
 
 
-# ABIMUUTUJAD ALAMKAUSTADE JAOKS (ÜLISÜGAV OTSING)
+# ABIMUUTUJAD ALAMKAUSTADE JAOKS
 $KogukondFolder = $null
 $IsiklikFolder = $null
 
-# Otsime kõikidest leitud nimeruumidest alamkaustu (isegi kui õpilane tegi valesse nimeruumi)
 foreach ($root in $AllRoots) {
     $AllFolders = Get-DfsnFolder -Path "$($root.Path)\*" -ErrorAction SilentlyContinue
     if (-not $KogukondFolder) { 
@@ -401,13 +401,31 @@ $KFolderDet = if ($KogukondFolder) { "Kaust leitud nimeruumist: <b style='color:
 Add-Result "Loo nimeruumi Jagatud kaust Kogukond" "Kaust Kogukond nimeruumis olemas" $KFolderDet ($KogukondFolder -ne $null) 0.5
 
 
-# 7.4 Replikatsiooni grupp Kogukond (Otsib nii GroupName kui ka Name alt)
-$RepGroupKogukond = Get-DfsrReplicationGroup -ErrorAction SilentlyContinue | Where-Object { $_.GroupName -match "(?i)kogu|kogukond" -or $_.Name -match "(?i)kogu|kogukond" } | Select-Object -First 1
-$RepKogukondDet = if ($RepGroupKogukond) { "Grupp leitud: <b style='color:green'>Jah (+0.5p)</b> [Nimi: $($RepGroupKogukond.GroupName)]" } else { "Grupp leitud: <b style='color:red'>Ei</b>" }
-Add-Result "Loo kaustale replikatsiooni grupp, et kaustast oleks koopia ka teises (DC2) serveris" "Replikatsioonigrupp Kogukond leitud" $RepKogukondDet ($RepGroupKogukond -ne $null) 0.5
+# 7.4 Replikatsiooni grupp Kogukond (MITMETASANDILINE, KAUDNE KONTROLL)
+$RepGroupKogukond = Get-DfsrReplicationGroup -ErrorAction SilentlyContinue | Where-Object { "$($_.GroupName) $($_.Name)" -match "(?i)kogu" } | Select-Object -First 1
+$RepKogukondPts = 0
+
+if ($RepGroupKogukond) {
+    $RepKogukondPts = 0.5
+    $RepKogukondDet = "Grupp leitud: <b style='color:green'>Jah (+0.5p)</b> [Nimi: $($RepGroupKogukond.GroupName)]"
+} else {
+    # VARUPLAAN: Kui rühma ei leia, vaatame, kas nimeruumi kaustal on seadistatud 2 sihtkohta (Targets)
+    if ($KogukondFolder) {
+        $KTargets = @(Get-DfsnFolderTarget -Path $KogukondFolder.Path -ErrorAction SilentlyContinue)
+        if ($KTargets.Count -ge 2) {
+            $RepKogukondPts = 0.5
+            $RepKogukondDet = "Kaudselt tuvastatud: Kaustal on mitu sihtkohta (DC1, DC2): <b style='color:green'>Jah (+0.5p)</b>"
+        } else {
+            $RepKogukondDet = "Grupp leitud: <b style='color:red'>Ei (Ka sihtkohti on vaid $($KTargets.Count))</b>"
+        }
+    } else {
+        $RepKogukondDet = "Grupp leitud: <b style='color:red'>Ei (Kaust ise puudub)</b>"
+    }
+}
+Add-Result "Loo kaustale replikatsiooni grupp, et kaustast oleks koopia ka teises (DC2) serveris" "Replikatsioonigrupp Kogukond leitud" $RepKogukondDet ($RepKogukondPts -eq 0.5) 0.5 $RepKogukondPts
 
 
-# 7.5 GPO Kogukond (KIRJAVIGADELE ANDESTAV GPO NIMI JA ILMA KOOLONITA KETTATÄHT)
+# 7.5 GPO Kogukond
 $GpoK = Get-GPO -All -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -match "(?i)kogu|kogukond" } | Select-Object -First 1
 $GpoKPts = 0
 $GpoKDet = "<ul style='margin:0; padding-left:20px;'>"
@@ -425,7 +443,6 @@ if ($GpoK) {
     }
 
     $xmlString = $GpoKXml.InnerXml
-    # Otsib XML-ist "letter" atribuuti (nii kooloniga kui ilma, kuna XML-is koolonit pole!)
     if ($xmlString -match '(?i)letter="([A-Z]):?"' -or $xmlString -match '(?i)Drive Letter="([A-Z]):?"') {
         $foundLetter = $Matches[1].ToUpper()
         $GpoKPts += 0.5
@@ -470,7 +487,7 @@ $KQDet += "</ul>"
 Add-Result "Määra kaustale FSRM abil mahupiirang 10 GB" "10GB kvoot rakendatud" $KQDet ($KQPts -eq 0.5) 0.5 $KQPts
 
 
-# 7.7 FSRM Failipiirang (PARANDATUD: Loeb gruppe otse IncludeGroup alt)
+# 7.7 FSRM Failipiirang
 $FileScreen = Get-FsrmFileScreen -ErrorAction SilentlyContinue | Where-Object { $_.Path -match "(?i)kogu|kogukond" } | Select-Object -First 1
 $FSPts = 0
 $FSDet = "<ul style='margin:0; padding-left:20px;'>"
@@ -486,7 +503,6 @@ if ($FileScreen) {
         foreach ($gName in $FSGroupNames) {
             $FSGroup = Get-FsrmFileGroup -Name $gName -ErrorAction SilentlyContinue
             if ($FSGroup) {
-                # Ühendame kõik filtri mustrid üheks stringiks, et neid lihtsamini otsida
                 $joinedPatterns = $FSGroup.IncludePattern -join " "
                 if ($joinedPatterns -match "(?i)\.exe|\.msi|\.bat|\.ps1") {
                     $FSPatternFound = $true
@@ -514,10 +530,28 @@ $IFolderDet = if ($IsiklikFolder) { "Kaust leitud nimeruumis: <b style='color:gr
 Add-Result "Loo nimeruumi Jagatud kaust Isiklik" "Kaust nimeruumis olemas" $IFolderDet ($IsiklikFolder -ne $null) 0.5
 
 
-# 7.9 Replikatsiooni grupp Isiklik
-$RepGroupIsiklik = Get-DfsrReplicationGroup -ErrorAction SilentlyContinue | Where-Object { $_.GroupName -match "(?i)isik|isiklik" -or $_.Name -match "(?i)isik|isiklik" } | Select-Object -First 1
-$RepIsiklikDet = if ($RepGroupIsiklik) { "Grupp leitud: <b style='color:green'>Jah (+0.5p)</b> [Nimi: $($RepGroupIsiklik.GroupName)]" } else { "Grupp leitud: <b style='color:red'>Ei</b>" }
-Add-Result "Loo kaustale replikatsiooni grupp, et kaustast oleks koopia ka teises serveris (DC2)" "Replikatsioonigrupp leitud" $RepIsiklikDet ($RepGroupIsiklik -ne $null) 0.5
+# 7.9 Replikatsiooni grupp Isiklik (MITMETASANDILINE, KAUDNE KONTROLL)
+$RepGroupIsiklik = Get-DfsrReplicationGroup -ErrorAction SilentlyContinue | Where-Object { "$($_.GroupName) $($_.Name)" -match "(?i)isik" } | Select-Object -First 1
+$RepIsiklikPts = 0
+
+if ($RepGroupIsiklik) {
+    $RepIsiklikPts = 0.5
+    $RepIsiklikDet = "Grupp leitud: <b style='color:green'>Jah (+0.5p)</b> [Nimi: $($RepGroupIsiklik.GroupName)]"
+} else {
+    # VARUPLAAN: Kui rühma ei leia, vaatame, kas nimeruumi kaustal on seadistatud 2 sihtkohta (Targets)
+    if ($IsiklikFolder) {
+        $ITargets = @(Get-DfsnFolderTarget -Path $IsiklikFolder.Path -ErrorAction SilentlyContinue)
+        if ($ITargets.Count -ge 2) {
+            $RepIsiklikPts = 0.5
+            $RepIsiklikDet = "Kaudselt tuvastatud: Kaustal on mitu sihtkohta (DC1, DC2): <b style='color:green'>Jah (+0.5p)</b>"
+        } else {
+            $RepIsiklikDet = "Grupp leitud: <b style='color:red'>Ei (Ka sihtkohti on vaid $($ITargets.Count))</b>"
+        }
+    } else {
+        $RepIsiklikDet = "Grupp leitud: <b style='color:red'>Ei (Kaust ise puudub)</b>"
+    }
+}
+Add-Result "Loo kaustale replikatsiooni grupp, et kaustast oleks koopia ka teises serveris (DC2)" "Replikatsioonigrupp leitud" $RepIsiklikDet ($RepIsiklikPts -eq 0.5) 0.5 $RepIsiklikPts
 
 
 # 7.10 GPO Isiklik
@@ -677,5 +711,6 @@ if (Test-Path $ReportPath) { Remove-Item -Path $ReportPath -Force }
 if (Test-Path $JsonPath) { Remove-Item -Path $JsonPath -Force }
 
 Write-Host "Kohalikud failid puhastatud." -ForegroundColor Green
+
 
 ```
