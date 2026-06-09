@@ -6,7 +6,7 @@
 <#
 .SYNOPSIS
     Täielik Windows Serveri auditi skript vastavalt 20-punktisele hindamiskriteeriumile (PILET 2 - DFS/FSRM).
-    Sisaldab täpsustatud pealkirju, pommikindlat parameetrite edastust, fuzzy matching'ut ja FSRM gruppide lugemist.
+    Sisaldab täpsustatud pealkirju, üli-otsingut GPO-dele, DC2 IP lollikindlat tuvastust ja sügavaid varuplaane DFS-ile.
     Käivitada DC1 serveris Domain Admin õigustes.
 #>
 
@@ -106,9 +106,28 @@ function Convert-DNToReadable {
 function Check-GPOSettings {
     param($GpoName, $ExpectedOUs, $Regexes, $MaxP)
     
-    $Gpo = Get-GPO -Name $GpoName -ErrorAction SilentlyContinue
+    $Gpos = Get-GPO -All -ErrorAction SilentlyContinue
+    if (!$Gpos) { 
+        return @{ Pts = 0; Status = $false; Det = "GPO-de lugemine ebaõnnestus." } 
+    }
+    
+    # 1. Täpne otsing
+    $Gpo = $Gpos | Where-Object { $_.DisplayName -eq $GpoName } | Select-Object -First 1
+    
+    # 2. Hägune otsing (asendame alakriipsud ja tühikud)
+    if (!$Gpo) {
+        $cleanName = $GpoName -replace '_','.*'
+        $Gpo = $Gpos | Where-Object { $_.DisplayName -match "(?i)$cleanName" } | Select-Object -First 1
+    }
+    
+    # 3. Väga hägune otsing (eemaldame "GPO_" algusest täielikult, et leida nt "Kontode lukustamine")
+    if (!$Gpo) {
+        $shortName = $GpoName -replace "(?i)GPO_?", "" -replace '\s','' -replace '_',''
+        $Gpo = $Gpos | Where-Object { ($_.DisplayName -replace '\s','' -replace '_','') -match "(?i)$shortName" } | Select-Object -First 1
+    }
+
     if (!$Gpo) { 
-        return @{ Pts = 0; Status = $false; Det = "GPO '$GpoName' puudub." } 
+        return @{ Pts = 0; Status = $false; Det = "GPO '$GpoName' (või sarnase nimega) puudub." } 
     }
     
     $Xml = [xml](Get-GPOReport -Guid $Gpo.Id -ReportType Xml)
@@ -140,17 +159,17 @@ function Check-GPOSettings {
     
     if ($linksOk) {
         if ($setMet -eq $Regexes.Count) { 
-            return @{ Pts = $MaxP; Status = $true; Det = "Kõik seaded korras. Lingitud: $linksStr." } 
+            return @{ Pts = $MaxP; Status = $true; Det = "Kõik seaded korras (Leitud GPO: $($Gpo.DisplayName)). Lingitud: $linksStr." } 
         } elseif ($setMet -gt 0) { 
-            return @{ Pts = ($MaxP * 0.75); Status = $false; Det = "Link õige ($linksStr), osad seaded olemas." } 
+            return @{ Pts = ($MaxP * 0.75); Status = $false; Det = "Link õige ($linksStr), osad seaded olemas (GPO: $($Gpo.DisplayName))." } 
         } else { 
-            return @{ Pts = ($MaxP * 0.25); Status = $false; Det = "Link õige ($linksStr), seaded puudu." } 
+            return @{ Pts = ($MaxP * 0.25); Status = $false; Det = "Link õige ($linksStr), seaded puudu (GPO: $($Gpo.DisplayName))." } 
         }
     } else {
         if ($setMet -eq $Regexes.Count) { 
-            return @{ Pts = ($MaxP * 0.75); Status = $false; Det = "Seaded õiged, aga VALE ASUKOHT! Lingitud: $linksStr" } 
+            return @{ Pts = ($MaxP * 0.75); Status = $false; Det = "Seaded õiged, aga VALE ASUKOHT! Lingitud: $linksStr (GPO: $($Gpo.DisplayName))" } 
         } elseif ($setMet -gt 0) { 
-            return @{ Pts = ($MaxP * 0.5); Status = $false; Det = "Osaliselt õige, VALE ASUKOHT: $linksStr" } 
+            return @{ Pts = ($MaxP * 0.5); Status = $false; Det = "Osaliselt õige, VALE ASUKOHT: $linksStr (GPO: $($Gpo.DisplayName))" } 
         } else { 
             return @{ Pts = 0; Status = $false; Det = "Seaded puudu, vale asukoht." } 
         }
@@ -393,17 +412,26 @@ Add-Result "Grupipoliitika (GPO): Loo GPO nimega Edge_Siseportaal, mis määrab 
 # ====================================================================
 $DomainFQDN = (Get-ADDomain).DNSRoot
 
-# 17. DFS Rollide kontroll
+# 17. DFS Rollide kontroll (Varuplaaniga, kui Get-WindowsFeature jookseb kokku)
 $RolePts = 0
 $RoleDetails = "<ul style='margin:0; padding-left:20px;'>"
-$Roles = @("FS-DFS-Namespace", "FS-DFS-Replication", "FS-Resource-Manager")
+$Roles = @(
+    @{Name="FS-DFS-Namespace"; Svc="Dfs"},
+    @{Name="FS-DFS-Replication"; Svc="Dfsr"},
+    @{Name="FS-Resource-Manager"; Svc="srmsvc"}
+)
 
 foreach ($Role in $Roles) {
-    if ((Get-WindowsFeature $Role -ErrorAction SilentlyContinue).Installed) {
+    $rName = $Role.Name
+    $rSvc = $Role.Svc
+    $feat = Get-WindowsFeature $rName -ErrorAction SilentlyContinue
+    $svc = Get-Service -Name $rSvc -ErrorAction SilentlyContinue
+    
+    if (($feat -and $feat.Installed) -or $svc) {
         $RolePts += 0.5
-        $RoleDetails += "<li>${Role}: <b style='color:green'>OK (+0.5p)</b></li>"
+        $RoleDetails += "<li>${rName}: <b style='color:green'>OK (+0.5p)</b></li>"
     } else { 
-        $RoleDetails += "<li>${Role}: <b style='color:red'>Puudu</b></li>" 
+        $RoleDetails += "<li>${rName}: <b style='color:red'>Puudu</b></li>" 
     }
 }
 $RoleDetails += "</ul>"
@@ -418,6 +446,14 @@ $AllRoots += @(Get-DfsnRoot -ComputerName $ComputerName -ErrorAction SilentlyCon
 $DfsN = $AllRoots | Where-Object { $_.Path -match "(?i)jaga|jag|share" } | Select-Object -First 1
 if (!$DfsN -and $AllRoots.Count -gt 0) { $DfsN = $AllRoots[0] }
 
+# Ülisügav varuplaan: otsime C:\DFSRoots kaustast
+if (!$DfsN) {
+    $dfsDirs = Get-ChildItem "C:\DFSRoots" -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -match "(?i)jaga|jag|share" }
+    if ($dfsDirs) {
+        $DfsN = [PSCustomObject]@{ Path = "\\$ExpectedDomain\$($dfsDirs[0].Name)" }
+    }
+}
+
 $DfsnDet = if ($DfsN) { "Nimeruum leitud: <b style='color:green'>Jah (+1p)</b> [Asukoht: $($DfsN.Path)]" } else { "Nimeruum leitud: <b style='color:red'>Ei leitud</b>" }
 $dfsnStatus = [bool]($DfsN)
 Add-Result "Loo DFS nimeruum Jagatud" "Nimeruum \\$DomainFQDN\Jagatud (või ligilähedane nimi)" $DfsnDet $dfsnStatus 1.0
@@ -427,13 +463,17 @@ Add-Result "Loo DFS nimeruum Jagatud" "Nimeruum \\$DomainFQDN\Jagatud (või ligi
 $KogukondFolder = $null
 $IsiklikFolder = $null
 
-foreach ($root in $AllRoots) {
-    $AllFolders = Get-DfsnFolder -Path "$($root.Path)\*" -ErrorAction SilentlyContinue
-    if (-not $KogukondFolder) { 
-        $KogukondFolder = $AllFolders | Where-Object { $_.Path -match "(?i)kogu|kogukond" } | Select-Object -First 1 
+if ($DfsN) {
+    $AllFolders = Get-DfsnFolder -Path "$($DfsN.Path)\*" -ErrorAction SilentlyContinue
+    $KogukondFolder = $AllFolders | Where-Object { $_.Path -match "(?i)kogu|kogukond" } | Select-Object -First 1 
+    $IsiklikFolder = $AllFolders | Where-Object { $_.Path -match "(?i)isik|isiklik" } | Select-Object -First 1 
+    
+    # Sügav varuplaan: Kui Get-DfsnFolder ei tööta, testime UNC radu
+    if (!$KogukondFolder -and (Test-Path "$($DfsN.Path)\Kogukond" -ErrorAction SilentlyContinue)) { 
+        $KogukondFolder = [PSCustomObject]@{ Path = "$($DfsN.Path)\Kogukond" } 
     }
-    if (-not $IsiklikFolder) { 
-        $IsiklikFolder = $AllFolders | Where-Object { $_.Path -match "(?i)isik|isiklik" } | Select-Object -First 1 
+    if (!$IsiklikFolder -and (Test-Path "$($DfsN.Path)\Isiklik" -ErrorAction SilentlyContinue)) { 
+        $IsiklikFolder = [PSCustomObject]@{ Path = "$($DfsN.Path)\Isiklik" } 
     }
 }
 
@@ -458,7 +498,13 @@ if ($RepGroupKogukond) {
             $RepKogukondPts = 0.5
             $RepKogukondDet = "Kaudselt tuvastatud: Kaustal on mitu sihtkohta (DC1, DC2): <b style='color:green'>Jah (+0.5p)</b>"
         } else {
-            $RepKogukondDet = "Grupp leitud: <b style='color:red'>Ei (Ka sihtkohti on vaid $($KTargets.Count))</b>"
+            # Veel sügavam varuplaan: proovime otse serveri pealt kausta kätte saada (nagu õpilase pildil \\DC1 ja \\DC2)
+            if ((Test-Path "\\DC1\Kogukond" -ErrorAction SilentlyContinue) -and (Test-Path "\\DC2\Kogukond" -ErrorAction SilentlyContinue)) {
+                $RepKogukondPts = 0.5
+                $RepKogukondDet = "Kaudselt tuvastatud: Kaustad on jagatud ja kättesaadavad nii DC1 kui DC2 peal: <b style='color:green'>Jah (+0.5p)</b>"
+            } else {
+                $RepKogukondDet = "Grupp leitud: <b style='color:red'>Ei (Ka sihtkohti on vaid $($KTargets.Count))</b>"
+            }
         }
     } else {
         $RepKogukondDet = "Grupp leitud: <b style='color:red'>Ei (Kaust ise puudub)</b>"
@@ -591,7 +637,12 @@ if ($RepGroupIsiklik) {
             $RepIsiklikPts = 0.5
             $RepIsiklikDet = "Kaudselt tuvastatud: Kaustal on mitu sihtkohta (DC1, DC2): <b style='color:green'>Jah (+0.5p)</b>"
         } else {
-            $RepIsiklikDet = "Grupp leitud: <b style='color:red'>Ei (Ka sihtkohti on vaid $($ITargets.Count))</b>"
+            if ((Test-Path "\\DC1\Isiklik" -ErrorAction SilentlyContinue) -and (Test-Path "\\DC2\Isiklik" -ErrorAction SilentlyContinue)) {
+                $RepIsiklikPts = 0.5
+                $RepIsiklikDet = "Kaudselt tuvastatud: Kaustad on jagatud ja kättesaadavad nii DC1 kui DC2 peal: <b style='color:green'>Jah (+0.5p)</b>"
+            } else {
+                $RepIsiklikDet = "Grupp leitud: <b style='color:red'>Ei (Ka sihtkohti on vaid $($ITargets.Count))</b>"
+            }
         }
     } else {
         $RepIsiklikDet = "Grupp leitud: <b style='color:red'>Ei (Kaust ise puudub)</b>"
