@@ -278,13 +278,15 @@ $compDetails = "<ul style='margin:0; padding-left:20px;'>"
 
 if ($AllComps) {
     $compTasksMet = 1 
-    $realCompLoc = Convert-DNToReadable $AllComps[0].DistinguishedName
-    $compDetails += "<li>Klientmasin '$($AllComps[0].Name)': <b style='color:green'>Liidetud domeeni (+0.25p)</b></li>"
+    $inArvutid = $AllComps | Where-Object { $_.DistinguishedName -match "OU=Arvutid" }
     
-    if ($AllComps[0].DistinguishedName -match "OU=Arvutid") {
+    if ($inArvutid) {
         $compTasksMet = 2
+        $compDetails += "<li>Klientmasin '$($inArvutid[0].Name)': <b style='color:green'>Liidetud domeeni (+0.25p)</b></li>"
         $compDetails += "<li>Asukoht: <b style='color:green'>Õige (OU=Arvutid) (+0.25p)</b></li>"
     } else {
+        $realCompLoc = Convert-DNToReadable $AllComps[0].DistinguishedName
+        $compDetails += "<li>Klientmasin '$($AllComps[0].Name)': <b style='color:green'>Liidetud domeeni (+0.25p)</b></li>"
         $compDetails += "<li>Asukoht: <b style='color:red'>VALE OU! Masin unustati asukohta: $realCompLoc</b></li>"
     }
 } else { $compDetails += "<li>Klientmasin: <b style='color:red'>Ühtegi klientmasinat (peale DC-de) ei leitud domeenist!</b></li>" }
