@@ -6,8 +6,7 @@
 <#
 .SYNOPSIS
     Täielik Windows Serveri auditi skript vastavalt 20-punktisele hindamiskriteeriumile (PILET 2 - DFS/FSRM).
-    Sisaldab täpsustatud pealkirju, DC2 IP lollikindlamat tuvastust, kirjavigade andestamist (fuzzy matching), 
-    FSRM gruppide korrektset lugemist ja DFS-R replikatsiooni kaudset tuvastust (Folder Targets).
+    Sisaldab täpsustatud pealkirju, pommikindlat parameetrite edastust, fuzzy matching'ut ja FSRM gruppide lugemist.
     Käivitada DC1 serveris Domain Admin õigustes.
 #>
 
@@ -161,22 +160,34 @@ function Check-GPOSettings {
 # ====================================================================
 # PÕHIOSA (12 punkti kokku)
 # ====================================================================
+
+# 1. DC1 nimi
 $ComputerName = $env:COMPUTERNAME
-Add-Result "Muuta WinServer2025 masin nimi DC1" "Masina nimi on DC1" "Tuvastatud: $ComputerName" ($ComputerName -eq "DC1") 0.5
+$dc1NameStatus = ($ComputerName -eq "DC1")
+Add-Result "Muuta WinServer2025 masin nimi DC1" "Masina nimi on DC1" "Tuvastatud: $ComputerName" $dc1NameStatus 0.5
 
+# 2. DC1 IP
 $DC1IP = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.PrefixOrigin -eq "Manual" -and $_.InterfaceAlias -notmatch "Loopback" }).IPAddress
-Add-Result "Anna DC1 serverile staatiline IP-aadress" "Manuaalne IPv4 seadistus" ("IP: " + ($DC1IP -join ", ")) ($DC1IP.Count -gt 0) 0.5
+$dc1IpStatus = ($DC1IP.Count -gt 0)
+Add-Result "Anna DC1 serverile staatiline IP-aadress" "Manuaalne IPv4 seadistus" ("IP: " + ($DC1IP -join ", ")) $dc1IpStatus 0.5
 
+# 3. AD Roll
 $Domain = Get-ADDomain
-Add-Result "Seadista DC1 serverile Acitve Directory domeeni teenused domeeni $ExpectedDomain tarvis" "Domeen $ExpectedDomain" "Tuvastatud: $($Domain.DNSRoot)" ($Domain.DNSRoot -eq $ExpectedDomain) 1.0
+$adStatus = ($Domain.DNSRoot -eq $ExpectedDomain)
+Add-Result "Seadista DC1 serverile Acitve Directory domeeni teenused domeeni $ExpectedDomain tarvis" "Domeen $ExpectedDomain" "Tuvastatud: $($Domain.DNSRoot)" $adStatus 1.0
 
+# 4. DNS Roll
 $DNSRole = Get-WindowsFeature DNS
-Add-Result "Seadista DC1 serverile DNS teenus" "DNS roll paigaldatud" "Roll: $($DNSRole.InstallState)" ($DNSRole.Installed) 0.5
+$dnsStatus = [bool]($DNSRole.Installed)
+Add-Result "Seadista DC1 serverile DNS teenus" "DNS roll paigaldatud" "Roll: $($DNSRole.InstallState)" $dnsStatus 0.5
 
-# DC2 tuvastus otse AD-st
+# 5. DC2 nimi
 $DC2 = Get-ADComputer -Filter "Name -eq 'DC2'" -Properties IPv4Address -ErrorAction SilentlyContinue
-Add-Result "WinCore2025 masinal muuta nimi DC2-ks" "AD-s eksisteerib arvuti DC2" (if($DC2){"Leitud DC2 konto AD-st"}else{"Ei leitud arvutit DC2"}) ($DC2 -ne $null) 0.5
+$dc2Status = [bool]($DC2)
+$dc2LeitudText = if ($dc2Status) { "Leitud DC2 konto AD-st" } else { "Ei leitud arvutit DC2" }
+Add-Result "WinCore2025 masinal muuta nimi DC2-ks" "AD-s eksisteerib arvuti DC2" $dc2LeitudText $dc2Status 0.5
 
+# 6. DC2 IP
 $dc2IpDet = "Ei tuvastatud staatilist IP-d"
 $dc2IpStatus = $false
 $ip = $null
@@ -185,9 +196,7 @@ if ($DC2 -and $DC2.IPv4Address) {
     $ip = $DC2.IPv4Address
 } else {
     $DC2DNS = Resolve-DnsName -Name "DC2" -Type A -ErrorAction SilentlyContinue
-    if ($DC2DNS) { 
-        $ip = $DC2DNS.IPAddress[0] 
-    }
+    if ($DC2DNS) { $ip = $DC2DNS.IPAddress[0] }
 }
 
 if ($ip) {
@@ -202,13 +211,15 @@ if ($ip) {
 }
 Add-Result "WinCore2025 serverile anda staatiline IP-aadress" "Tuvastatud DC2 IP-aadress" $dc2IpDet $dc2IpStatus 0.5
 
+# 7. DC2 on domeenikontroller
 $DomainDN = $Domain.DistinguishedName
 $DCsInOU = Get-ADComputer -Filter * -SearchBase "OU=Domain Controllers,$DomainDN" -ErrorAction SilentlyContinue
 $HasTwoDCs = ($DCsInOU.Count -ge 2) -and ($DCsInOU.Name -contains "DC2")
-Add-Result "Lisada WinCore2025 server teiseks domeenikontrolleriks domeeni $ExpectedDomain jaoks" "Vähemalt 2 masinat (sh DC2) Domain Controllers OU-s" ("Masinad DC OU-s: " + ($DCsInOU.Name -join ", ")) $HasTwoDCs 1.0
+$hasTwoDCsStatus = [bool]($HasTwoDCs)
+Add-Result "Lisada WinCore2025 server teiseks domeenikontrolleriks domeeni $ExpectedDomain jaoks" "Vähemalt 2 masinat (sh DC2) Domain Controllers OU-s" ("Masinad DC OU-s: " + ($DCsInOU.Name -join ", ")) $hasTwoDCsStatus 1.0
 
 
-# DHCP KONTROLL
+# 8. DHCP
 $DHCPScope = Get-DhcpServerv4Scope -ErrorAction SilentlyContinue | Select-Object -First 1
 $dhcpTasksMet = 0
 $dhcpDetails = "<ul style='margin:0; padding-left:20px;'>"
@@ -243,8 +254,11 @@ if ($DHCPScope) {
     $dhcpDetails += "<li>Skoop: <b style='color:red'>Puudu</b></li>" 
 }
 $dhcpDetails += "</ul>"
-Add-Result "Seadista WinServer2025 peal DHCP teenus, kus klientidele antakse reservereritud IP-aadressid. DHCP server jagab DNS serveritena välja mõlemad AD serverid" "Skoop, 4h, reserv, 2xDNS" $dhcpDetails ($dhcpTasksMet -eq 4) 1.0 ($dhcpTasksMet * 0.25)
+$dhcpStatus = ($dhcpTasksMet -eq 4)
+Add-Result "Seadista WinServer2025 peal DHCP teenus, kus klientidele antakse reservereritud IP-aadressid. DHCP server jagab DNS serveritena välja mõlemad AD serverid" "Skoop, 4h, reserv, 2xDNS" $dhcpDetails $dhcpStatus 1.0 ($dhcpTasksMet * 0.25)
 
+
+# 9. DHCP Failover
 $Failover = Get-DhcpServerv4Failover -ErrorAction SilentlyContinue
 $foStatus = $false
 $foDetails = "Failover puudub"
@@ -261,11 +275,15 @@ if ($Failover) {
 Add-Result "Seadista DHCP teenusele failover, kus failover partneriks on DC2 server" "Partneriks on DC2" $foDetails $foStatus 1.0
 
 
-# AD STRUKTUUR JA HALDUR
+# 10. AD OU-d
 $OUUsers = Get-ADOrganizationalUnit -Filter "Name -eq 'Kasutajad'"
 $OUComps = Get-ADOrganizationalUnit -Filter "Name -eq 'Arvutid'"
-Add-Result "AD-sse on loodud 2 OU-d: Kasutajad ja Arvutid." "Mõlemad loodud" (if($OUUsers -and $OUComps){"Mõlemad leitud"}else{"Puudu/Osaline"}) ($OUUsers -and $OUComps) 0.5
+$ouStatus = ([bool]($OUUsers) -and [bool]($OUComps))
+$ouLeitudText = if ($ouStatus) { "Mõlemad leitud" } else { "Puudu/Osaline" }
+Add-Result "AD-sse on loodud 2 OU-d: Kasutajad ja Arvutid." "Mõlemad loodud" $ouLeitudText $ouStatus 0.5
 
+
+# 11. Haldur
 $Haldur = Get-ADUser -Filter "Name -eq 'Haldur' -or SamAccountName -eq 'haldur'" -Properties DistinguishedName -ErrorAction SilentlyContinue
 $haldurTasksMet = 0
 $haldurDetails = "<ul style='margin:0; padding-left:20px;'>"
@@ -289,9 +307,11 @@ if ($Haldur) {
     $haldurDetails += "<li>Kasutaja 'haldur': <b style='color:red'>Puudu AD-st</b></li>" 
 }
 $haldurDetails += "</ul>"
-Add-Result "Domeeni on lisatud kasutaja haldur, kes on lisatud Domain Admins gruppi" "OU=Kasutajad ja Domain Admins" $haldurDetails ($haldurTasksMet -eq 2) 0.5 ($haldurTasksMet * 0.25)
+$haldurStatus = ($haldurTasksMet -eq 2)
+Add-Result "Domeeni on lisatud kasutaja haldur, kes on lisatud Domain Admins gruppi" "OU=Kasutajad ja Domain Admins" $haldurDetails $haldurStatus 0.5 ($haldurTasksMet * 0.25)
 
-# KLIENTMASIN
+
+# 12. Klientmasin
 $AllComps = Get-ADComputer -Filter {Name -notlike "DC1" -and Name -notlike "DC2"} -Properties DistinguishedName -ErrorAction SilentlyContinue
 $compTasksMet = 0
 $compDetails = "<ul style='margin:0; padding-left:20px;'>"
@@ -311,13 +331,17 @@ if ($AllComps) {
     $compDetails += "<li>Klientmasin: <b style='color:red'>Puudub domeenist</b></li>" 
 }
 $compDetails += "</ul>"
-Add-Result "Windows 11 klientmasin on lisatud domeeni ja pandud OU-sse Arvutid" "Domeenis ja OU-s Arvutid" $compDetails ($compTasksMet -eq 2) 0.5 ($compTasksMet * 0.25)
+$compStatus = ($compTasksMet -eq 2)
+Add-Result "Windows 11 klientmasin on lisatud domeeni ja pandud OU-sse Arvutid" "Domeenis ja OU-s Arvutid" $compDetails $compStatus 0.5 ($compTasksMet * 0.25)
 
 
-# DNS KIRJED JA CSV IMPORT
+# 13. DNS Kirjed
 $DnsRecords = Get-DnsServerResourceRecord -ZoneName $ExpectedDomain -RRType A | Where-Object {$_.HostName -notmatch "@|gc|DomainDnsZones|ForestDnsZones|DC1|DC2"}
-Add-Result "DNS serveris on tehtud A-kirjed kõikide Linux serverite jaoks" "Vähemalt 1 manuaalne A-kirje" "$($DnsRecords.Count) tk leitud" ($DnsRecords.Count -gt 0) 1.0
+$dnsRecordsStatus = ($DnsRecords.Count -gt 0)
+Add-Result "DNS serveris on tehtud A-kirjed kõikide Linux serverite jaoks" "Vähemalt 1 manuaalne A-kirje" "$($DnsRecords.Count) tk leitud" $dnsRecordsStatus 1.0
 
+
+# 14. AD Import
 $TestUsers = @{"Müük"="Aivo Teder"; "Personal"="Andres Karl Kukk"; "Raamatupidamine"="Anette Kuusk"; "Toimetajad"="Anneli Koppel"; "IT"="Anneli Roos"; "Juhtkond"="Annika Rand"; "Haldus"="Erki Niit"}
 $UsersFoundCount = 0
 $UserCheckDetails = "<ul style='margin:0; padding-left:20px;'>"
@@ -337,13 +361,16 @@ foreach ($Dept in $TestUsers.Keys) {
     }
 }
 $UserCheckDetails += "</ul>"
-Add-Result "Loodud on Powershelli skript, mis impordib AD kasutajad koos OU struktuuriga failist kasutajad.csv" "Kasutajad ja struktuur leitud" "$UsersFoundCount / 7 testkasutajat OK" ($UsersFoundCount -gt 0) 1.0
+$importStatus = ($UsersFoundCount -gt 0)
+Add-Result "Loodud on Powershelli skript, mis impordib AD kasutajad koos OU struktuuriga failist kasutajad.csv" "Kasutajad ja struktuur leitud" "$UsersFoundCount / 7 testkasutajat OK" $importStatus 1.0
 
 
-# GPO ALGSED KONTROLLID
+# 15. GPO Lukustamine
 $resLock = Check-GPOSettings "GPO_KontodeLukustamine" @() @("LockoutBadCount", ">5<", "LockoutDuration", ">15<") 1.0
 Add-Result "Grupipoliitika (GPO): Loo GPO nimega GPO_KontodeLukustamine, mis lukustab kasutajakonto 15 minutiks, kui parooli on 5 korda järjest valesti sisestatud. Poliitika peab rakenduma kogu domeenile." "Domeenile rakendatud, 5 katset, 15 min" $resLock.Det $resLock.Status 1.0 $resLock.Pts
 
+
+# 16. GPO Edge
 $resEdge = Check-GPOSettings "Edge_Siseportaal" @("Personal") @("siseportaal", "NewTabPageLocation") 1.0
 Add-Result "Grupipoliitika (GPO): Loo GPO nimega Edge_Siseportaal, mis määrab OU-sse Personal kuuluvate kasutajate Microsoft Edge brauseri vaikimisi avaleheks (Homepage) ja uue vahekaardi leheks (New Tab Page) siseportaali aadressi [https://siseportaal.$ExpectedDomain](https://siseportaal.$ExpectedDomain). Kasutajatel peab olema avalehe muutmine veebilehitseja seadetest blokeeritud." "Avaleht siseportaal, uue tab'i URL, lukustatud" $resEdge.Det $resEdge.Status 1.0 $resEdge.Pts
 
@@ -353,7 +380,7 @@ Add-Result "Grupipoliitika (GPO): Loo GPO nimega Edge_Siseportaal, mis määrab 
 # ====================================================================
 $DomainFQDN = (Get-ADDomain).DNSRoot
 
-# 7.1 Rollide kontroll
+# 17. DFS Rollide kontroll
 $RolePts = 0
 $RoleDetails = "<ul style='margin:0; padding-left:20px;'>"
 $Roles = @("FS-DFS-Namespace", "FS-DFS-Replication", "FS-Resource-Manager")
@@ -367,10 +394,11 @@ foreach ($Role in $Roles) {
     }
 }
 $RoleDetails += "</ul>"
-Add-Result "Paigalda Windows Server 2025-le rollid DFS Namespaces, DFS Replication ja File Server Resource Manager" "Kõik 3 rolli paigaldatud" $RoleDetails ($RolePts -eq 1.5) 1.5 $RolePts
+$rolesStatus = ($RolePts -eq 1.5)
+Add-Result "Paigalda Windows Server 2025-le rollid DFS Namespaces, DFS Replication ja File Server Resource Manager" "Kõik 3 rolli paigaldatud" $RoleDetails $rolesStatus 1.5 $RolePts
 
 
-# 7.2 DFS nimeruum Jagatud
+# 18. DFS nimeruum Jagatud
 $AllRoots = @(Get-DfsnRoot -Domain $DomainFQDN -ErrorAction SilentlyContinue)
 $AllRoots += @(Get-DfsnRoot -ComputerName $ComputerName -ErrorAction SilentlyContinue)
 
@@ -378,7 +406,8 @@ $DfsN = $AllRoots | Where-Object { $_.Path -match "(?i)jaga|jag|share" } | Selec
 if (!$DfsN -and $AllRoots.Count -gt 0) { $DfsN = $AllRoots[0] }
 
 $DfsnDet = if ($DfsN) { "Nimeruum leitud: <b style='color:green'>Jah (+1p)</b> [Asukoht: $($DfsN.Path)]" } else { "Nimeruum leitud: <b style='color:red'>Ei leitud</b>" }
-Add-Result "Loo DFS nimeruum Jagatud" "Nimeruum \\$DomainFQDN\Jagatud (või ligilähedane nimi)" $DfsnDet ($DfsN -ne $null) 1.0
+$dfsnStatus = [bool]($DfsN)
+Add-Result "Loo DFS nimeruum Jagatud" "Nimeruum \\$DomainFQDN\Jagatud (või ligilähedane nimi)" $DfsnDet $dfsnStatus 1.0
 
 
 # ABIMUUTUJAD ALAMKAUSTADE JAOKS
@@ -396,12 +425,13 @@ foreach ($root in $AllRoots) {
 }
 
 
-# 7.3 Nimeruumi kaust Kogukond
+# 19. Nimeruumi kaust Kogukond
 $KFolderDet = if ($KogukondFolder) { "Kaust leitud nimeruumist: <b style='color:green'>Jah (+0.5p)</b> [Asukoht: $($KogukondFolder.Path)]" } else { "Kaust leitud: <b style='color:red'>Ei</b>" }
-Add-Result "Loo nimeruumi Jagatud kaust Kogukond" "Kaust Kogukond nimeruumis olemas" $KFolderDet ($KogukondFolder -ne $null) 0.5
+$kfolderStatus = [bool]($KogukondFolder)
+Add-Result "Loo nimeruumi Jagatud kaust Kogukond" "Kaust Kogukond nimeruumis olemas" $KFolderDet $kfolderStatus 0.5
 
 
-# 7.4 Replikatsiooni grupp Kogukond (MITMETASANDILINE, KAUDNE KONTROLL)
+# 20. Replikatsiooni grupp Kogukond
 $RepGroupKogukond = Get-DfsrReplicationGroup -ErrorAction SilentlyContinue | Where-Object { "$($_.GroupName) $($_.Name)" -match "(?i)kogu" } | Select-Object -First 1
 $RepKogukondPts = 0
 
@@ -409,7 +439,6 @@ if ($RepGroupKogukond) {
     $RepKogukondPts = 0.5
     $RepKogukondDet = "Grupp leitud: <b style='color:green'>Jah (+0.5p)</b> [Nimi: $($RepGroupKogukond.GroupName)]"
 } else {
-    # VARUPLAAN: Kui rühma ei leia, vaatame, kas nimeruumi kaustal on seadistatud 2 sihtkohta (Targets)
     if ($KogukondFolder) {
         $KTargets = @(Get-DfsnFolderTarget -Path $KogukondFolder.Path -ErrorAction SilentlyContinue)
         if ($KTargets.Count -ge 2) {
@@ -422,10 +451,11 @@ if ($RepGroupKogukond) {
         $RepKogukondDet = "Grupp leitud: <b style='color:red'>Ei (Kaust ise puudub)</b>"
     }
 }
-Add-Result "Loo kaustale replikatsiooni grupp, et kaustast oleks koopia ka teises (DC2) serveris" "Replikatsioonigrupp Kogukond leitud" $RepKogukondDet ($RepKogukondPts -eq 0.5) 0.5 $RepKogukondPts
+$repKogukondStatus = ($RepKogukondPts -eq 0.5)
+Add-Result "Loo kaustale replikatsiooni grupp, et kaustast oleks koopia ka teises (DC2) serveris" "Replikatsioonigrupp Kogukond leitud" $RepKogukondDet $repKogukondStatus 0.5 $RepKogukondPts
 
 
-# 7.5 GPO Kogukond
+# 21. GPO Kogukond
 $GpoK = Get-GPO -All -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -match "(?i)kogu|kogukond" } | Select-Object -First 1
 $GpoKPts = 0
 $GpoKDet = "<ul style='margin:0; padding-left:20px;'>"
@@ -462,10 +492,11 @@ if ($GpoK) {
     $GpoKDet += "<li>GPO 'Kogukond': <b style='color:red'>Puudu</b></li>" 
 }
 $GpoKDet += "</ul>"
-Add-Result "Loo GPO nimega Kogukond, millega kaust jagataks välja kõigile domeeni kasutajatele ligipääsetava võrgukettana Y: kõikidele sinu domeeni kasutajatele" "Ketas jagatud GPO abil" $GpoKDet ($GpoKPts -eq 1.0) 1.0 $GpoKPts
+$gpoKStatus = ($GpoKPts -eq 1.0)
+Add-Result "Loo GPO nimega Kogukond, millega kaust jagataks välja kõigile domeeni kasutajatele ligipääsetava võrgukettana Y: kõikidele sinu domeeni kasutajatele" "Ketas jagatud GPO abil" $GpoKDet $gpoKStatus 1.0 $GpoKPts
 
 
-# 7.6 FSRM Kogukond 10GB
+# 22. FSRM Kogukond 10GB
 $KogukondQuota = Get-FsrmQuota -ErrorAction SilentlyContinue | Where-Object { $_.Path -match "(?i)kogu|kogukond" } | Select-Object -First 1
 $KQPts = 0
 $KQDet = "<ul style='margin:0; padding-left:20px;'>"
@@ -484,10 +515,11 @@ if ($KogukondQuota) {
     $KQDet += "<li>Kvoot: <b style='color:red'>Puudu</b></li>" 
 }
 $KQDet += "</ul>"
-Add-Result "Määra kaustale FSRM abil mahupiirang 10 GB" "10GB kvoot rakendatud" $KQDet ($KQPts -eq 0.5) 0.5 $KQPts
+$kqStatus = ($KQPts -eq 0.5)
+Add-Result "Määra kaustale FSRM abil mahupiirang 10 GB" "10GB kvoot rakendatud" $KQDet $kqStatus 0.5 $KQPts
 
 
-# 7.7 FSRM Failipiirang
+# 23. FSRM Failipiirang
 $FileScreen = Get-FsrmFileScreen -ErrorAction SilentlyContinue | Where-Object { $_.Path -match "(?i)kogu|kogukond" } | Select-Object -First 1
 $FSPts = 0
 $FSDet = "<ul style='margin:0; padding-left:20px;'>"
@@ -522,15 +554,17 @@ if ($FileScreen) {
     $FSDet += "<li>Failipiirang: <b style='color:red'>Puudu</b></li>" 
 }
 $FSDet += "</ul>"
-Add-Result "Sellele ressursile luua piirang, mis takistab programmifailide kopeerimist sinna (.msi, .exe, .bat, .ps1)" "Failipiirang aktiivne" $FSDet ($FSPts -eq 0.5) 0.5 $FSPts
+$fsStatus = ($FSPts -eq 0.5)
+Add-Result "Sellele ressursile luua piirang, mis takistab programmifailide kopeerimist sinna (.msi, .exe, .bat, .ps1)" "Failipiirang aktiivne" $FSDet $fsStatus 0.5 $FSPts
 
 
-# 7.8 Nimeruumi kaust Isiklik
+# 24. Nimeruumi kaust Isiklik
 $IFolderDet = if ($IsiklikFolder) { "Kaust leitud nimeruumis: <b style='color:green'>Jah (+0.5p)</b> [Asukoht: $($IsiklikFolder.Path)]" } else { "Kaust leitud: <b style='color:red'>Ei</b>" }
-Add-Result "Loo nimeruumi Jagatud kaust Isiklik" "Kaust nimeruumis olemas" $IFolderDet ($IsiklikFolder -ne $null) 0.5
+$ifolderStatus = [bool]($IsiklikFolder)
+Add-Result "Loo nimeruumi Jagatud kaust Isiklik" "Kaust nimeruumis olemas" $IFolderDet $ifolderStatus 0.5
 
 
-# 7.9 Replikatsiooni grupp Isiklik (MITMETASANDILINE, KAUDNE KONTROLL)
+# 25. Replikatsiooni grupp Isiklik
 $RepGroupIsiklik = Get-DfsrReplicationGroup -ErrorAction SilentlyContinue | Where-Object { "$($_.GroupName) $($_.Name)" -match "(?i)isik" } | Select-Object -First 1
 $RepIsiklikPts = 0
 
@@ -538,7 +572,6 @@ if ($RepGroupIsiklik) {
     $RepIsiklikPts = 0.5
     $RepIsiklikDet = "Grupp leitud: <b style='color:green'>Jah (+0.5p)</b> [Nimi: $($RepGroupIsiklik.GroupName)]"
 } else {
-    # VARUPLAAN: Kui rühma ei leia, vaatame, kas nimeruumi kaustal on seadistatud 2 sihtkohta (Targets)
     if ($IsiklikFolder) {
         $ITargets = @(Get-DfsnFolderTarget -Path $IsiklikFolder.Path -ErrorAction SilentlyContinue)
         if ($ITargets.Count -ge 2) {
@@ -551,10 +584,11 @@ if ($RepGroupIsiklik) {
         $RepIsiklikDet = "Grupp leitud: <b style='color:red'>Ei (Kaust ise puudub)</b>"
     }
 }
-Add-Result "Loo kaustale replikatsiooni grupp, et kaustast oleks koopia ka teises serveris (DC2)" "Replikatsioonigrupp leitud" $RepIsiklikDet ($RepIsiklikPts -eq 0.5) 0.5 $RepIsiklikPts
+$repIsiklikStatus = ($RepIsiklikPts -eq 0.5)
+Add-Result "Loo kaustale replikatsiooni grupp, et kaustast oleks koopia ka teises serveris (DC2)" "Replikatsioonigrupp leitud" $RepIsiklikDet $repIsiklikStatus 0.5 $RepIsiklikPts
 
 
-# 7.10 GPO Isiklik
+# 26. GPO Isiklik
 $GpoI = Get-GPO -All -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -match "(?i)isik|isiklik" } | Select-Object -First 1
 $GpoIPts = 0
 $GpoIDet = "<ul style='margin:0; padding-left:20px;'>"
@@ -591,10 +625,11 @@ if ($GpoI) {
     $GpoIDet += "<li>GPO 'Isiklik': <b style='color:red'>Puudu</b></li>" 
 }
 $GpoIDet += "</ul>"
-Add-Result "Loo GPO nimega Isiklik, millega tehakse kausta sisse domeeni kasutaja nimega kaust ja jagatakse ainult see kaust kasutajale välja võrgukettana Z:" "Ketas seadistatud GPO abil" $GpoIDet ($GpoIPts -eq 1.0) 1.0 $GpoIPts
+$gpoIStatus = ($GpoIPts -eq 1.0)
+Add-Result "Loo GPO nimega Isiklik, millega tehakse kausta sisse domeeni kasutaja nimega kaust ja jagatakse ainult see kaust kasutajale välja võrgukettana Z:" "Ketas seadistatud GPO abil" $GpoIDet $gpoIStatus 1.0 $GpoIPts
 
 
-# 7.11 FSRM Isiklik 1GB Auto Quota
+# 27. FSRM Isiklik Auto Quota
 $AutoQuota = Get-FsrmAutoQuota -ErrorAction SilentlyContinue | Where-Object { $_.Path -match "(?i)isik|isiklik" } | Select-Object -First 1
 $AQPts = 0
 $AQDet = "<ul style='margin:0; padding-left:20px;'>"
@@ -614,7 +649,8 @@ if ($AutoQuota) {
     $AQDet += "<li>Auto-quota: <b style='color:red'>Puudu</b></li>" 
 }
 $AQDet += "</ul>"
-Add-Result "Määra kaustadele FSRM abil mahupiirang 1GB kasutaja kohta" "Auto-quota rakendatud" $AQDet ($AQPts -eq 0.5) 0.5 $AQPts
+$aqStatus = ($AQPts -eq 0.5)
+Add-Result "Määra kaustadele FSRM abil mahupiirang 1GB kasutaja kohta" "Auto-quota rakendatud" $AQDet $aqStatus 0.5 $AQPts
 
 
 # --- HTML RAPORTI GENEREERIMINE ---
