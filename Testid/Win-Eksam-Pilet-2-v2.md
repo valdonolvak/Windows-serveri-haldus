@@ -6,7 +6,7 @@
 <#
 .SYNOPSIS
     Täielik Windows Serveri auditi skript vastavalt 20-punktisele hindamiskriteeriumile (PILET 2 - DFS/FSRM).
-    Sisaldab täpsustatud pealkirju, lollikindlamat DC2 IP tuvastust ja kirjavigade andestamist (fuzzy matching) DFS/FSRM/GPO nimedes.
+    Sisaldab täpsustatud pealkirju, DC2 IP lollikindlamat tuvastust, GPO kooloni viga parandust ja ülisügavat DFS otsingut.
     Käivitada DC1 serveris Domain Admin õigustes.
 #>
 
@@ -369,43 +369,46 @@ $RoleDetails += "</ul>"
 Add-Result "Paigalda Windows Server 2025-le rollid DFS Namespaces, DFS Replication ja File Server Resource Manager" "Kõik 3 rolli paigaldatud" $RoleDetails ($RolePts -eq 1.5) 1.5 $RolePts
 
 
-# 7.2 DFS nimeruum Jagatud (LOODUD KIRJAVIGADELE ANDESTAVAKS)
-$AllRoots = Get-DfsnRoot -Domain $DomainFQDN -ErrorAction SilentlyContinue
-if (-not $AllRoots) { $AllRoots = Get-DfsnRoot -ComputerName $ComputerName -ErrorAction SilentlyContinue }
+# 7.2 DFS nimeruum Jagatud
+# Kogume kokku kõik võimalikud nimeruumid domeenis ja lokaalselt
+$AllRoots = @(Get-DfsnRoot -Domain $DomainFQDN -ErrorAction SilentlyContinue)
+$AllRoots += @(Get-DfsnRoot -ComputerName $ComputerName -ErrorAction SilentlyContinue)
 
-# Otsime "Jagatud" või sarnast nime (jagat, jaga, jag jne)
 $DfsN = $AllRoots | Where-Object { $_.Path -match "(?i)jaga|jag|share" } | Select-Object -First 1
-
-# Kui ikka ei leidnud, aga nimeruume on loodud, võtame esimese mis eksisteerib
 if (!$DfsN -and $AllRoots.Count -gt 0) { $DfsN = $AllRoots[0] }
 
 $DfsnDet = if ($DfsN) { "Nimeruum leitud: <b style='color:green'>Jah (+1p)</b> [Asukoht: $($DfsN.Path)]" } else { "Nimeruum leitud: <b style='color:red'>Ei leitud</b>" }
 Add-Result "Loo DFS nimeruum Jagatud" "Nimeruum \\$DomainFQDN\Jagatud (või ligilähedane nimi)" $DfsnDet ($DfsN -ne $null) 1.0
 
 
-# ABIMUUTUJAD ALAMKAUSTADE JAOKS
+# ABIMUUTUJAD ALAMKAUSTADE JAOKS (ÜLISÜGAV OTSING)
 $KogukondFolder = $null
 $IsiklikFolder = $null
-if ($DfsN) {
-    # Hangime kõik loodud kaustad leitud nimeruumist (katab ka vale nimeruumi all olevaid kaustu)
-    $AllFolders = Get-DfsnFolder -Path "$($DfsN.Path)\*" -ErrorAction SilentlyContinue
-    $KogukondFolder = $AllFolders | Where-Object { $_.Path -match "(?i)kogu|kogukond" } | Select-Object -First 1
-    $IsiklikFolder = $AllFolders | Where-Object { $_.Path -match "(?i)isik|isiklik" } | Select-Object -First 1
+
+# Otsime kõikidest leitud nimeruumidest alamkaustu (isegi kui õpilane tegi valesse nimeruumi)
+foreach ($root in $AllRoots) {
+    $AllFolders = Get-DfsnFolder -Path "$($root.Path)\*" -ErrorAction SilentlyContinue
+    if (-not $KogukondFolder) { 
+        $KogukondFolder = $AllFolders | Where-Object { $_.Path -match "(?i)kogu|kogukond" } | Select-Object -First 1 
+    }
+    if (-not $IsiklikFolder) { 
+        $IsiklikFolder = $AllFolders | Where-Object { $_.Path -match "(?i)isik|isiklik" } | Select-Object -First 1 
+    }
 }
 
 
-# 7.3 Nimeruumi kaust Kogukond (Kirjavigadele andestav)
+# 7.3 Nimeruumi kaust Kogukond
 $KFolderDet = if ($KogukondFolder) { "Kaust leitud nimeruumist: <b style='color:green'>Jah (+0.5p)</b> [Asukoht: $($KogukondFolder.Path)]" } else { "Kaust leitud: <b style='color:red'>Ei</b>" }
 Add-Result "Loo nimeruumi Jagatud kaust Kogukond" "Kaust Kogukond nimeruumis olemas" $KFolderDet ($KogukondFolder -ne $null) 0.5
 
 
-# 7.4 Replikatsiooni grupp Kogukond (Kirjavigadele andestav)
-$RepGroupKogukond = Get-DfsrReplicationGroup -ErrorAction SilentlyContinue | Where-Object { $_.Name -match "(?i)kogu|kogukond" } | Select-Object -First 1
-$RepKogukondDet = if ($RepGroupKogukond) { "Grupp leitud: <b style='color:green'>Jah (+0.5p)</b> [Nimi: $($RepGroupKogukond.Name)]" } else { "Grupp leitud: <b style='color:red'>Ei</b>" }
+# 7.4 Replikatsiooni grupp Kogukond (Otsib nii GroupName kui ka Name alt)
+$RepGroupKogukond = Get-DfsrReplicationGroup -ErrorAction SilentlyContinue | Where-Object { $_.GroupName -match "(?i)kogu|kogukond" -or $_.Name -match "(?i)kogu|kogukond" } | Select-Object -First 1
+$RepKogukondDet = if ($RepGroupKogukond) { "Grupp leitud: <b style='color:green'>Jah (+0.5p)</b> [Nimi: $($RepGroupKogukond.GroupName)]" } else { "Grupp leitud: <b style='color:red'>Ei</b>" }
 Add-Result "Loo kaustale replikatsiooni grupp, et kaustast oleks koopia ka teises (DC2) serveris" "Replikatsioonigrupp Kogukond leitud" $RepKogukondDet ($RepGroupKogukond -ne $null) 0.5
 
 
-# 7.5 GPO Kogukond (KIRJAVIGADELE ANDESTAV GPO NIMI JA KETTATÄHT)
+# 7.5 GPO Kogukond (KIRJAVIGADELE ANDESTAV GPO NIMI JA ILMA KOOLONITA KETTATÄHT)
 $GpoK = Get-GPO -All -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -match "(?i)kogu|kogukond" } | Select-Object -First 1
 $GpoKPts = 0
 $GpoKDet = "<ul style='margin:0; padding-left:20px;'>"
@@ -423,7 +426,8 @@ if ($GpoK) {
     }
 
     $xmlString = $GpoKXml.InnerXml
-    if ($xmlString -match 'letter="([A-Za-z]):"' -or $xmlString -match 'Drive Letter="([A-Za-z]):"') {
+    # Otsib XML-ist "letter" atribuuti (nii kooloniga kui ilma, kuna XML-is koolonit pole!)
+    if ($xmlString -match '(?i)letter="([A-Z]):?"' -or $xmlString -match '(?i)Drive Letter="([A-Z]):?"') {
         $foundLetter = $Matches[1].ToUpper()
         $GpoKPts += 0.5
         if ($foundLetter -eq 'Y') {
@@ -435,7 +439,7 @@ if ($GpoK) {
         $GpoKDet += "<li>Ketas ühendatud: <b style='color:red'>GPO-s pole Drive Map seadistust tehtud!</b></li>"
     }
 
-    if ($xmlString -match 'path="([^"]+)"' -or $xmlString -match 'Path="([^"]+)"') {
+    if ($xmlString -match '(?i)path="([^"]+)"') {
         $GpoKDet += "<li><i>Jagatud sihtkoht: <b>$($Matches[1])</b></i></li>"
     }
 } else { 
@@ -445,7 +449,7 @@ $GpoKDet += "</ul>"
 Add-Result "Loo GPO nimega Kogukond, millega kaust jagataks välja kõigile domeeni kasutajatele ligipääsetava võrgukettana Y: kõikidele sinu domeeni kasutajatele" "Ketas jagatud GPO abil" $GpoKDet ($GpoKPts -eq 1.0) 1.0 $GpoKPts
 
 
-# 7.6 FSRM Kogukond 10GB (Kirjavigadele andestav)
+# 7.6 FSRM Kogukond 10GB
 $KogukondQuota = Get-FsrmQuota -ErrorAction SilentlyContinue | Where-Object { $_.Path -match "(?i)kogu|kogukond" } | Select-Object -First 1
 $KQPts = 0
 $KQDet = "<ul style='margin:0; padding-left:20px;'>"
@@ -467,7 +471,7 @@ $KQDet += "</ul>"
 Add-Result "Määra kaustale FSRM abil mahupiirang 10 GB" "10GB kvoot rakendatud" $KQDet ($KQPts -eq 0.5) 0.5 $KQPts
 
 
-# 7.7 FSRM Failipiirang (Kirjavigadele andestav)
+# 7.7 FSRM Failipiirang
 $FileScreen = Get-FsrmFileScreen -ErrorAction SilentlyContinue | Where-Object { $_.Path -match "(?i)kogu|kogukond" } | Select-Object -First 1
 $FSPts = 0
 $FSDet = "<ul style='margin:0; padding-left:20px;'>"
@@ -490,18 +494,18 @@ $FSDet += "</ul>"
 Add-Result "Sellele ressursile luua piirang, mis takistab programmifailide kopeerimist sinna (.msi, .exe, .bat, .ps1)" "Failipiirang aktiivne" $FSDet ($FSPts -eq 0.5) 0.5 $FSPts
 
 
-# 7.8 Nimeruumi kaust Isiklik (Kirjavigadele andestav)
+# 7.8 Nimeruumi kaust Isiklik
 $IFolderDet = if ($IsiklikFolder) { "Kaust leitud nimeruumis: <b style='color:green'>Jah (+0.5p)</b> [Asukoht: $($IsiklikFolder.Path)]" } else { "Kaust leitud: <b style='color:red'>Ei</b>" }
 Add-Result "Loo nimeruumi Jagatud kaust Isiklik" "Kaust nimeruumis olemas" $IFolderDet ($IsiklikFolder -ne $null) 0.5
 
 
-# 7.9 Replikatsiooni grupp Isiklik (Kirjavigadele andestav)
-$RepGroupIsiklik = Get-DfsrReplicationGroup -ErrorAction SilentlyContinue | Where-Object { $_.Name -match "(?i)isik|isiklik" } | Select-Object -First 1
-$RepIsiklikDet = if ($RepGroupIsiklik) { "Grupp leitud: <b style='color:green'>Jah (+0.5p)</b> [Nimi: $($RepGroupIsiklik.Name)]" } else { "Grupp leitud: <b style='color:red'>Ei</b>" }
+# 7.9 Replikatsiooni grupp Isiklik
+$RepGroupIsiklik = Get-DfsrReplicationGroup -ErrorAction SilentlyContinue | Where-Object { $_.GroupName -match "(?i)isik|isiklik" -or $_.Name -match "(?i)isik|isiklik" } | Select-Object -First 1
+$RepIsiklikDet = if ($RepGroupIsiklik) { "Grupp leitud: <b style='color:green'>Jah (+0.5p)</b> [Nimi: $($RepGroupIsiklik.GroupName)]" } else { "Grupp leitud: <b style='color:red'>Ei</b>" }
 Add-Result "Loo kaustale replikatsiooni grupp, et kaustast oleks koopia ka teises serveris (DC2)" "Replikatsioonigrupp leitud" $RepIsiklikDet ($RepGroupIsiklik -ne $null) 0.5
 
 
-# 7.10 GPO Isiklik (KIRJAVIGADELE ANDESTAV GPO NIMI JA KETTATÄHT)
+# 7.10 GPO Isiklik
 $GpoI = Get-GPO -All -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -match "(?i)isik|isiklik" } | Select-Object -First 1
 $GpoIPts = 0
 $GpoIDet = "<ul style='margin:0; padding-left:20px;'>"
@@ -519,7 +523,7 @@ if ($GpoI) {
     }
 
     $xmlString = $GpoIXml.InnerXml
-    if ($xmlString -match 'letter="([A-Za-z]):"' -or $xmlString -match 'Drive Letter="([A-Za-z]):"') {
+    if ($xmlString -match '(?i)letter="([A-Z]):?"' -or $xmlString -match '(?i)Drive Letter="([A-Z]):?"') {
         $foundLetter = $Matches[1].ToUpper()
         $GpoIPts += 0.5
         if ($foundLetter -eq 'Z') {
@@ -531,7 +535,7 @@ if ($GpoI) {
         $GpoIDet += "<li>Ketas ühendatud: <b style='color:red'>GPO-s pole Drive Map seadistust!</b></li>"
     }
     
-    if ($xmlString -match 'path="([^"]+)"' -or $xmlString -match 'Path="([^"]+)"') {
+    if ($xmlString -match '(?i)path="([^"]+)"') {
         $GpoIDet += "<li><i>Jagatud sihtkoht: <b>$($Matches[1])</b></i></li>"
     }
 } else { 
@@ -541,7 +545,7 @@ $GpoIDet += "</ul>"
 Add-Result "Loo GPO nimega Isiklik, millega tehakse kausta sisse domeeni kasutaja nimega kaust ja jagatakse ainult see kaust kasutajale välja võrgukettana Z:" "Ketas seadistatud GPO abil" $GpoIDet ($GpoIPts -eq 1.0) 1.0 $GpoIPts
 
 
-# 7.11 FSRM Isiklik 1GB Auto Quota (Kirjavigadele andestav)
+# 7.11 FSRM Isiklik 1GB Auto Quota
 $AutoQuota = Get-FsrmAutoQuota -ErrorAction SilentlyContinue | Where-Object { $_.Path -match "(?i)isik|isiklik" } | Select-Object -First 1
 $AQPts = 0
 $AQDet = "<ul style='margin:0; padding-left:20px;'>"
