@@ -177,7 +177,7 @@ $Domain = Get-ADDomain
 $adStatus = ($Domain.DNSRoot -eq $ExpectedDomain)
 Add-Result "Seadista DC1 serverile Acitve Directory domeeni teenused domeeni $ExpectedDomain tarvis" "Domeen $ExpectedDomain" "Tuvastatud: $($Domain.DNSRoot)" $adStatus 1.0
 
-# 4. DNS Roll (PARANDATUD - Loeb nii rolli kui ka teenust)
+# 4. DNS Roll
 $DNSRole = Get-WindowsFeature -Name DNS -ErrorAction SilentlyContinue
 $DNSService = Get-Service -Name DNS -ErrorAction SilentlyContinue
 $dnsStatus = ($DNSRole.Installed -eq $true -or $DNSService -ne $null)
@@ -249,10 +249,20 @@ if ($DHCPScope) {
     $DNSOptions = Get-DhcpServerv4OptionValue -ScopeId $DHCPScope.ScopeId -OptionId 6 -ErrorAction SilentlyContinue
     if ($DNSOptions -and $DNSOptions.Value.Count -ge 2) { 
         $dhcpTasksMet++
-        $dhcpDetails += "<li>DNS serverid (min 2): <b style='color:green'>OK (+0.25p)</b></li>" 
+        $dhcpDetails += "<li>DNS serverid (min 2 tk): <b style='color:green'>OK (+0.25p)</b> [Leitud: $($DNSOptions.Value -join ', ')]</li>" 
     } else { 
-        $dhcpDetails += "<li>DNS serverid: <b style='color:red'>Puudu / < 2</b></li>" 
+        $dnsFound = if ($DNSOptions -and $DNSOptions.Value) { $DNSOptions.Value -join ", " } else { "Puudub" }
+        $dhcpDetails += "<li>DNS serverid (min 2 tk): <b style='color:red'>Viga! (Leiti: $dnsFound)</b></li>" 
     }
+    
+    # Visuaalne abistav info Ruuteri kohta
+    $RouterOption = Get-DhcpServerv4OptionValue -ScopeId $DHCPScope.ScopeId -OptionId 3 -ErrorAction SilentlyContinue
+    if ($RouterOption -and $RouterOption.Value) {
+        $dhcpDetails += "<li><i>Ruuter (Gateway): $($RouterOption.Value -join ", ")</i></li>"
+    } else {
+        $dhcpDetails += "<li><i>Ruuter (Gateway): Puudub</i></li>"
+    }
+    
 } else { 
     $dhcpDetails += "<li>Skoop: <b style='color:red'>Puudu</b></li>" 
 }
