@@ -4,7 +4,7 @@
 <#
 .SYNOPSIS
     Täielik Windows Serveri auditi skript vastavalt 20-punktisele hindamiskriteeriumile (PILET 4 - GPO SPETSIIFILISED PIIRANGUD).
-    Sisaldab täpsustatud pealkirju, üli-otsingut GPO-dele, DC2 IP lollikindlat tuvastust ja programmide käivitamise keeldude otsingut.
+    Sisaldab täpsustatud pealkirju, üli-otsingut GPO-dele (sh taustapildi trükivigadele), DC2 IP lollikindlat tuvastust ja laiendatud rakenduste piirangute otsingut.
     Käivitada DC1 serveris Domain Admin õigustes.
 #>
 
@@ -121,15 +121,27 @@ function Check-GPOSettings {
         $Gpo = $Gpos | Where-Object { ($_.DisplayName -replace '\s','' -replace '_','') -match "(?i)$shortName" } | Select-Object -First 1
     }
 
+    # 4. ÜLI-HÄGUNE OTSING SPETSIAALSELT TAUSTAPILDILE (kui õpilane paneb nimeks nt "TöölauaTasutaPilt")
+    if (!$Gpo -and $GpoName -match "(?i)Taustapilt") {
+        $Gpo = $Gpos | Where-Object { $_.DisplayName -match "(?i)töölau|tausta|tasuta|wallpaper" } | Select-Object -First 1
+        if ($Gpo) {
+            # Veendume kindluse mõttes, et leitud GPO-s on tõesti taustapildi (Wallpaper) seaded sees
+            $testXml = [xml](Get-GPOReport -Guid $Gpo.Id -ReportType Xml -ErrorAction SilentlyContinue)
+            if ($testXml.InnerXml -notmatch "(?i)Wallpaper|Taustapilt") {
+                $Gpo = $null # See oli mingi muu GPO, tühistame leiu
+            }
+        }
+    }
+
     if (!$Gpo) { 
         return @{ Pts = 0; Status = $false; Det = "GPO '$GpoName' (või sarnase nimega) puudub." } 
     }
     
-    $Xml = [xml](Get-GPOReport -Guid $Gpo.Id -ReportType Xml)
-    $txt = $Xml.InnerXml
+    $Xml = [xml](Get-GPOReport -Guid $Gpo.Id -ReportType Xml -ErrorAction SilentlyContinue)
+    $txt = if ($Xml) { $Xml.InnerXml } else { "" }
     $actualLinks = @()
     
-    if ($Xml.GPO.LinksTo) {
+    if ($Xml -and $Xml.GPO.LinksTo) {
         $links = $Xml.GPO.LinksTo
         if ($links -is [array]) { 
             foreach ($l in $links) { $actualLinks += $l.SOMName } 
@@ -141,9 +153,11 @@ function Check-GPOSettings {
     $linksStr = if ($actualLinks.Count -gt 0) { $actualLinks -join ", " } else { "Lingid puuduvad" }
     
     $linksOk = $true
-    foreach ($ou in $ExpectedOUs) {
-        if ($ou -and $actualLinks -notcontains $ou -and ($Xml.GPO.LinksTo.SOMPath -join " ") -notmatch $ou) { 
-            $linksOk = $false 
+    if ($ExpectedOUs.Count -gt 0) {
+        foreach ($ou in $ExpectedOUs) {
+            if ($ou -and $actualLinks -notcontains $ou -and ($Xml.GPO.LinksTo.SOMPath -join " ") -notmatch $ou) { 
+                $linksOk = $false 
+            }
         }
     }
     
@@ -154,19 +168,19 @@ function Check-GPOSettings {
     
     if ($linksOk) {
         if ($setMet -eq $Regexes.Count) { 
-            return @{ Pts = $MaxP; Status = $true; Det = "Kõik seaded korras (Leitud GPO: $($Gpo.DisplayName)). Lingitud: $linksStr." } 
+            return @{ Pts = $MaxP; Status = $true; Det = "Kõik seaded korras (Leiti GPO: <b>$($Gpo.DisplayName)</b>). Lingitud: $linksStr." } 
         } elseif ($setMet -gt 0) { 
-            return @{ Pts = ($MaxP * 0.75); Status = $false; Det = "Link õige ($linksStr), osad seaded olemas (GPO: $($Gpo.DisplayName))." } 
+            return @{ Pts = ($MaxP * 0.75); Status = $false; Det = "Link õige ($linksStr), osad seaded olemas (Leiti GPO: <b>$($Gpo.DisplayName)</b>)." } 
         } else { 
-            return @{ Pts = ($MaxP * 0.25); Status = $false; Det = "Link õige ($linksStr), seaded puudu (GPO: $($Gpo.DisplayName))." } 
+            return @{ Pts = ($MaxP * 0.25); Status = $false; Det = "Link õige ($linksStr), seaded puudu (Leiti GPO: <b>$($Gpo.DisplayName)</b>)." } 
         }
     } else {
         if ($setMet -eq $Regexes.Count) { 
-            return @{ Pts = ($MaxP * 0.75); Status = $false; Det = "Seaded õiged, aga VALE ASUKOHT! Lingitud: $linksStr (GPO: $($Gpo.DisplayName))" } 
+            return @{ Pts = ($MaxP * 0.75); Status = $false; Det = "Seaded õiged, aga VALE ASUKOHT! Lingitud: $linksStr (Leiti GPO: <b>$($Gpo.DisplayName)</b>)" } 
         } elseif ($setMet -gt 0) { 
-            return @{ Pts = ($MaxP * 0.5); Status = $false; Det = "Osaliselt õige, VALE ASUKOHT: $linksStr (GPO: $($Gpo.DisplayName))" } 
+            return @{ Pts = ($MaxP * 0.5); Status = $false; Det = "Osaliselt õige, VALE ASUKOHT: $linksStr (Leiti GPO: <b>$($Gpo.DisplayName)</b>)" } 
         } else { 
-            return @{ Pts = 0; Status = $false; Det = "Seaded puudu, vale asukoht." } 
+            return @{ Pts = 0; Status = $false; Det = "Seaded puudu, vale asukoht (Leiti GPO: <b>$($Gpo.DisplayName)</b>)." } 
         }
     }
 }
@@ -275,13 +289,11 @@ if ($DHCPScope) {
     } else {
         $dhcpDetails += "<li><i>Ruuter (Gateway): Puudub</i></li>"
     }
-    
 } else { 
     $dhcpDetails += "<li>Skoop: <b style='color:red'>Puudu</b></li>" 
 }
 $dhcpDetails += "</ul>"
 $dhcpStatus = ($dhcpTasksMet -eq 4)
-# Pealkiri muudetud "mõlemad DC serverid" vastavalt pildile
 Add-Result "Seadista WinServer2025 peal DHCP teenus, kus klientidele antakse reservereritud IP-aadressid. DHCP server jagab DNS serveritena välja mõlemad DC serverid" "Skoop, 4h, reserv, 2xDNS" $dhcpDetails $dhcpStatus 1.0 ($dhcpTasksMet * 0.25)
 
 
@@ -302,7 +314,7 @@ if ($Failover) {
 Add-Result "Seadista DHCP teenusele failover, kus failover partneriks on DC2 server" "Partneriks on DC2" $foDetails $foStatus 1.0
 
 
-# 10. AD OU-d (Sõnastus muudetud "DC-sse")
+# 10. AD OU-d
 $OUUsers = Get-ADOrganizationalUnit -Filter "Name -eq 'Kasutajad'"
 $OUComps = Get-ADOrganizationalUnit -Filter "Name -eq 'Arvutid'"
 $ouStatus = ([bool]($OUUsers) -and [bool]($OUComps))
@@ -310,7 +322,7 @@ $ouLeitudText = if ($ouStatus) { "Mõlemad leitud" } else { "Puudu/Osaline" }
 Add-Result "DC-sse on loodud 2 OU-d: Kasutajad ja Arvutid." "Mõlemad loodud" $ouLeitudText $ouStatus 0.5
 
 
-# 11. Haldur (Sõnastus muudetud "Domain DC admins")
+# 11. Haldur
 $Haldur = Get-ADUser -Filter "Name -eq 'Haldur' -or SamAccountName -eq 'haldur'" -Properties DistinguishedName -ErrorAction SilentlyContinue
 $haldurTasksMet = 0
 $haldurDetails = "<ul style='margin:0; padding-left:20px;'>"
@@ -403,7 +415,7 @@ Add-Result "Grupipoliitika (GPO): Loo GPO nimega Edge_Siseportaal, mis määrab 
 
 
 # ====================================================================
-# PILET 4 SPETSIIFILINE OSA (8 PUNKTI)
+# PILET 4 SPETSIIFILINE OSA (8 PUNKTI) - KÕIKIDELE GPO-dele HÄGUNE OTSING JA LAIENDATUD PIIRANGUD
 # ====================================================================
 
 # 17. Turvaline Sisselogimine
@@ -430,7 +442,7 @@ if ($resPwd.Status -eq $false -and $resPwd.Pts -eq 0) {
 Add-Result "Loo uus domeenitaseme grupipoliitika nimega GPO_ParooliKehtivus (või seadista Default Domain Policy), mis määrab kasutajate paroolide maksimaalseks elueaks (Maximum password age) 30 päeva." "MaxPasswordAge = 30" $resPwd.Det $resPwd.Status 1.0 $resPwd.Pts
 
 
-# 22. KÄIVITAMISE KEELUD (Kogu domeenist GPO-de skännimine)
+# 22. KÄIVITAMISE KEELUD (Kogu domeenist GPO-de skännimine - Laiendatud regex filtrid vastavalt GPO konsooli kuvadele)
 $AllGPOsXml = ""
 $AllGposList = Get-GPO -All -ErrorAction SilentlyContinue
 if ($AllGposList) {
@@ -445,33 +457,33 @@ if ($AllGposList) {
 $headerRestr = "Keela kõigil kasutajatel, kes on OU-s Personal, Myyk, Juhtkond, Haldus või Toimetajad:"
 
 # cmd
-$chkCmd = ($AllGPOsXml -match "(?i)DisableCMD")
+$chkCmd = ($AllGPOsXml -match "(?i)DisableCMD|Prevent access to the command prompt")
 $cmdStatus = [bool]($chkCmd)
-$cmdDet = if ($cmdStatus) { "Leitud GPO-st: <b style='color:green'>Jah (+0.5p)</b>" } else { "Seadistus: <b style='color:red'>Puudu</b>" }
+$cmdDet = if ($cmdStatus) { "Leitud GPO-st: <b style='color:green'>Jah (+0.5p)</b>" } else { "Seadistus: <b style='color:red'>Puudu (Ei leitud DisableCMD/Prevent access...)</b>" }
 Add-Result "$headerRestr - cmd käivitamine" "DisableCMD leitud" $cmdDet $cmdStatus 0.5
 
 # powershell
-$chkPs = ($AllGPOsXml -match "(?i)powershell\.exe|RestrictRun|SoftwareRestriction")
+$chkPs = ($AllGPOsXml -match "(?i)powershell\.exe|powershell_ise\.exe|RestrictRun|DisallowRun|Don't run specified Windows applications|Run only specified Windows applications")
 $psStatus = [bool]($chkPs)
-$psDet = if ($psStatus) { "Leitud GPO-st: <b style='color:green'>Jah (+0.5p)</b>" } else { "Seadistus: <b style='color:red'>Puudu</b>" }
-Add-Result "$headerRestr - PowerShelli käivitamine" "RestrictRun / AppLocker / SRP powershell" $psDet $psStatus 0.5
+$psDet = if ($psStatus) { "Leitud GPO-st: <b style='color:green'>Jah (+0.5p)</b>" } else { "Seadistus: <b style='color:red'>Puudu (Ei leitud DisallowRun/RestrictRun...)</b>" }
+Add-Result "$headerRestr - PowerShelli käivitamine" "RestrictRun / DisallowRun powershell" $psDet $psStatus 0.5
 
 # juhtpaneel
-$chkCp = ($AllGPOsXml -match "(?i)NoControlPanel")
+$chkCp = ($AllGPOsXml -match "(?i)NoControlPanel|RestrictCpl|Show only specified Control Panel items|Prohibit access to Control Panel|Prohibit access to the Control Panel")
 $cpStatus = [bool]($chkCp)
-$cpDet = if ($cpStatus) { "Leitud GPO-st: <b style='color:green'>Jah (+0.5p)</b>" } else { "Seadistus: <b style='color:red'>Puudu</b>" }
-Add-Result "$headerRestr - juhtpaneeli avamine" "NoControlPanel leitud" $cpDet $cpStatus 0.5
+$cpDet = if ($cpStatus) { "Leitud GPO-st: <b style='color:green'>Jah (+0.5p)</b>" } else { "Seadistus: <b style='color:red'>Puudu (Ei leitud RestrictCpl/NoControlPanel...)</b>" }
+Add-Result "$headerRestr - juhtpaneeli avamine" "NoControlPanel / RestrictCpl leitud" $cpDet $cpStatus 0.5
 
 # tegumihaldur
-$chkTm = ($AllGPOsXml -match "(?i)DisableTaskMgr")
+$chkTm = ($AllGPOsXml -match "(?i)DisableTaskMgr|Remove Task Manager")
 $tmStatus = [bool]($chkTm)
-$tmDet = if ($tmStatus) { "Leitud GPO-st: <b style='color:green'>Jah (+0.5p)</b>" } else { "Seadistus: <b style='color:red'>Puudu</b>" }
+$tmDet = if ($tmStatus) { "Leitud GPO-st: <b style='color:green'>Jah (+0.5p)</b>" } else { "Seadistus: <b style='color:red'>Puudu (Ei leitud DisableTaskMgr/Remove Task Manager...)</b>" }
 Add-Result "$headerRestr - tegumihalduri käivitamine" "DisableTaskMgr leitud" $tmDet $tmStatus 0.5
 
 # regedit
-$chkReg = ($AllGPOsXml -match "(?i)DisableRegistryTools")
+$chkReg = ($AllGPOsXml -match "(?i)DisableRegistryTools|Prevent access to registry editing tools")
 $regStatus = [bool]($chkReg)
-$regDet = if ($regStatus) { "Leitud GPO-st: <b style='color:green'>Jah (+0.5p)</b>" } else { "Seadistus: <b style='color:red'>Puudu</b>" }
+$regDet = if ($regStatus) { "Leitud GPO-st: <b style='color:green'>Jah (+0.5p)</b>" } else { "Seadistus: <b style='color:red'>Puudu (Ei leitud DisableRegistryTools/Prevent access...)</b>" }
 Add-Result "$headerRestr - regedit.exe käivitamine" "DisableRegistryTools leitud" $regDet $regStatus 0.5
 
 
