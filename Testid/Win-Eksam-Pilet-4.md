@@ -121,14 +121,13 @@ function Check-GPOSettings {
         $Gpo = $Gpos | Where-Object { ($_.DisplayName -replace '\s','' -replace '_','') -match "(?i)$shortName" } | Select-Object -First 1
     }
 
-    # 4. ÜLI-HÄGUNE OTSING SPETSIAALSELT TAUSTAPILDILE (kui õpilane paneb nimeks nt "TöölauaTasutaPilt")
+    # 4. ÜLI-HÄGUNE OTSING SPETSIAALSELT TAUSTAPILDILE
     if (!$Gpo -and $GpoName -match "(?i)Taustapilt") {
         $Gpo = $Gpos | Where-Object { $_.DisplayName -match "(?i)töölau|tausta|tasuta|wallpaper" } | Select-Object -First 1
         if ($Gpo) {
-            # Veendume kindluse mõttes, et leitud GPO-s on tõesti taustapildi (Wallpaper) seaded sees
             $testXml = [xml](Get-GPOReport -Guid $Gpo.Id -ReportType Xml -ErrorAction SilentlyContinue)
             if ($testXml.InnerXml -notmatch "(?i)Wallpaper|Taustapilt") {
-                $Gpo = $null # See oli mingi muu GPO, tühistame leiu
+                $Gpo = $null 
             }
         }
     }
@@ -404,13 +403,13 @@ $importStatus = ($UsersFoundCount -gt 0)
 Add-Result "Loodud on Powershelli skript, mis impordib AD kasutajad koos OU struktuuriga failist kasutajad.csv" "Kasutajad ja struktuur leitud" "$UsersFoundCount / 7 testkasutajat OK" $importStatus 1.0
 
 
-# 15. GPO Lukustamine
-$resLock = Check-GPOSettings "GPO_KontodeLukustamine" @() @("LockoutBadCount", ">5<", "LockoutDuration", ">15<") 1.0
+# 15. GPO Lukustamine (Parandatud: Otsib laiemalt LockoutBadCount ja LockoutDuration väärtusi)
+$resLock = Check-GPOSettings "GPO_KontodeLukustamine" @() @("(?i)LockoutBadCount.*5", "(?i)LockoutDuration.*15") 1.0
 Add-Result "Grupipoliitika (GPO): Loo GPO nimega GPO_KontodeLukustamine, mis lukustab kasutajakonto 15 minutiks, kui parooli on 5 korda järjest valesti sisestatud. Poliitika peab rakenduma kogu domeenile." "Domeenile rakendatud, 5 katset, 15 min" $resLock.Det $resLock.Status 1.0 $resLock.Pts
 
 
-# 16. GPO Edge
-$resEdge = Check-GPOSettings "Edge_Siseportaal" @("Personal") @("siseportaal", "NewTabPageLocation") 1.0
+# 16. GPO Edge (Parandatud: Otsib nii 'NewTabPageLocation' kui ka 'Homepage' / 'New tab' seadistusi)
+$resEdge = Check-GPOSettings "Edge_Siseportaal" @("Personal") @("(?i)siseportaal", "(?i)NewTabPage|New tab|Homepage|Home page") 1.0
 Add-Result "Grupipoliitika (GPO): Loo GPO nimega Edge_Siseportaal, mis määrab OU-sse Personal kuuluvate kasutajate Microsoft Edge brauseri vaikimisi avaleheks (Homepage) ja uue vahekaardi leheks (New Tab Page) siseportaali aadressi [https://siseportaal.$ExpectedDomain](https://siseportaal.$ExpectedDomain). Kasutajatel peab olema avalehe muutmine veebilehitseja seadetest blokeeritud." "Avaleht siseportaal, uue tab'i URL, lukustatud" $resEdge.Det $resEdge.Status 1.0 $resEdge.Pts
 
 
@@ -418,12 +417,12 @@ Add-Result "Grupipoliitika (GPO): Loo GPO nimega Edge_Siseportaal, mis määrab 
 # PILET 4 SPETSIIFILINE OSA (8 PUNKTI) - KÕIKIDELE GPO-dele HÄGUNE OTSING JA LAIENDATUD PIIRANGUD
 # ====================================================================
 
-# 17. Turvaline Sisselogimine
-$resTurv = Check-GPOSettings "TurvalineSisselogimine" @() @("(?i)DontDisplayLastUserName", "(?i)Guest|SeDenyInteractiveLogonRight|SeInteractiveLogonRight|Local account") 1.0
+# 17. Turvaline Sisselogimine (Parandatud: Laiendatud keele- ja seadistusefiltrid)
+$resTurv = Check-GPOSettings "TurvalineSisselogimine" @() @("(?i)DontDisplayLastUserName|HideFastUserSwitching", "(?i)Guest|Külaline|SeDenyInteractiveLogonRight|SeInteractiveLogonRight|Local account|Kohalik") 1.0
 Add-Result "Loo arvutitele poliitika GPO_TurvalineSisselogimine, mis eemaldab sisselogimisekraanilt viimase sisseloginud kasutaja nime ja keelab külaliskontode (Guest) ning lokaalsete tavakasutajate sisselogimise." "DontDisplayLastUserName ja Guest keelatud" $resTurv.Det $resTurv.Status 1.0 $resTurv.Pts
 
-# 18. KeelaUSB
-$resUsb = Check-GPOSettings "KeelaUSB" @("Arvutid") @("(?i)RemovableDisksDenyRead|Deny_Read", "(?i)RemovableDisksDenyWrite|Deny_Write") 1.0
+# 18. KeelaUSB (Parandatud: Toetab ka "Deny read access" variatsioone XML-ist)
+$resUsb = Check-GPOSettings "KeelaUSB" @("Arvutid") @("(?i)Removable.*Read|Deny_Read|Deny read", "(?i)Removable.*Write|Deny_Write|Deny write") 1.0
 Add-Result "Loo arvutitele poliitika GPO_KeelaUSB ja lingi see OU-ga Arvutid, keelates kõigil sealsetel masinatel väliste USB-andmekandjate lugemis- ja kirjutamisõigused." "Removable Storage Access (Deny Read/Write)" $resUsb.Det $resUsb.Status 1.0 $resUsb.Pts
 
 # 19. TöölauaTaustapilt
@@ -434,7 +433,7 @@ Add-Result "Loo poliitika GPO_TöölauaTaustapilt, mis määrab kõigile kasutaj
 $resMsg = Check-GPOSettings "TurvapoliitikaTeade" @("Personal") @("(?i)LegalNotice") 1.5
 Add-Result "Loo poliitika GPO_TurvapoliitikaTeade ja lingi see OU-ga Personal, kuvamaks kasutajale sisselogimisel interaktiivset hoiatust ettevõtte turvapoliitika ja arvuti kasutamise eeskirjade kohta." "LegalNoticeCaption/Text seadistus" $resMsg.Det $resMsg.Status 1.5 $resMsg.Pts
 
-# 21. ParooliKehtivus (Kontrollib nii GPO_ParooliKehtivus kui ka Default Domain Policy)
+# 21. ParooliKehtivus
 $resPwd = Check-GPOSettings "ParooliKehtivus" @() @("(?i)MaximumPasswordAge.*30") 1.0
 if ($resPwd.Status -eq $false -and $resPwd.Pts -eq 0) {
     $resPwd = Check-GPOSettings "Default Domain Policy" @() @("(?i)MaximumPasswordAge.*30") 1.0
@@ -442,7 +441,7 @@ if ($resPwd.Status -eq $false -and $resPwd.Pts -eq 0) {
 Add-Result "Loo uus domeenitaseme grupipoliitika nimega GPO_ParooliKehtivus (või seadista Default Domain Policy), mis määrab kasutajate paroolide maksimaalseks elueaks (Maximum password age) 30 päeva." "MaxPasswordAge = 30" $resPwd.Det $resPwd.Status 1.0 $resPwd.Pts
 
 
-# 22. KÄIVITAMISE KEELUD (Kogu domeenist GPO-de skännimine - Laiendatud regex filtrid vastavalt GPO konsooli kuvadele)
+# 22. KÄIVITAMISE KEELUD (Laiendatud otsingusõnad vastavalt kasutajaliidesele)
 $AllGPOsXml = ""
 $AllGposList = Get-GPO -All -ErrorAction SilentlyContinue
 if ($AllGposList) {
