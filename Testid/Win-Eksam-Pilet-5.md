@@ -418,36 +418,38 @@ Add-Result "Grupipoliitika (GPO): Loo GPO nimega Edge_Siseportaal, mis määrab 
 # ====================================================================
 
 # ====================================================================
-# PILET 5 - WDS (Windows Deployment Services) KONTROLL
+# PILET 5 - WDS (Windows Deployment Services) HINDAMINE
 # ====================================================================
 
-# 1. WDS rolli paigaldus
+# 1. WDS rolli paigaldus (1p)
 $WdsRole = Get-WindowsFeature -Name WDS
-$wdsStatus = ($WdsRole.Installed -eq $true)
-Add-Result "WDS rolli paigaldus" "WDS roll paigaldatud" "Staatus: $($WdsRole.InstallState)" $wdsStatus 1.0
+Add-Result "WDS rolli paigaldus" "WDS roll paigaldatud" "Staatus: $($WdsRole.InstallState)" $WdsRole.Installed 1.0
 
-# 2. Boot.wim ja Install.wim kontroll (eeldab WDS andmekataloogi asukohta)
-$WdsPath = "C:\RemoteInstall" # Vaikimisi WDS rada, võib vajada kohandamist
-$bootWim = Test-Path "$WdsPath\Boot\x64\Images\boot.wim"
-$installWim = Test-Path "$WdsPath\Images\Install.wim"
-$wimStatus = ($bootWim -and $installWim)
-Add-Result "WDS boot.wim ja install.wim lisamine" "Mõlemad failid olemas" "Boot: $bootWim, Install: $installWim" $wimStatus 2.0
+# 2. Boot.wim kontroll (1p)
+$bootWimPath = "$WdsPath\Boot\x64\Images\boot.wim"
+$bootExists = Test-Path $bootWimPath
+Add-Result "WDS boot.wim tõmmisfail" "boot.wim fail olemas" "Leitud: $bootExists" $bootExists 1.0
 
-# 3. DHCP seadistused WDS jaoks (PXE kliendid)
-# Kontrollime, kas DHCP-s on seadistatud PXE Client class või vastavad options (66, 67)
+# 3. Install.wim kontroll (1p)
+$installWimPath = "$WdsPath\Images\Install.wim"
+$installExists = Test-Path $installWimPath
+Add-Result "WDS install.wim tõmmisfail" "install.wim fail olemas" "Leitud: $installExists" $installExists 1.0
+
+# 4. DHCP seadistused WDS jaoks (1p)
 $DhcpOptions = Get-DhcpServerv4OptionValue -ScopeId (Get-DhcpServerv4Scope).ScopeId -ErrorAction SilentlyContinue
 $pxeStatus = ($DhcpOptions | Where-Object { $_.OptionId -eq 66 -or $_.OptionId -eq 67 })
-Add-Result "DHCP seadistused WDS jaoks" "Option 66/67 seadistatud" "Leitud: $(if($pxeStatus){'Jah'}else{'Ei'})" [bool]$pxeStatus 1.0
+Add-Result "DHCP seadistused WDS jaoks" "Option 66 ja 67 seadistatud" "Leitud: $(if($pxeStatus){'Jah'}else{'Ei'})" [bool]$pxeStatus 1.0
 
-# 4. Automaatinstall (Unattend.xml olemasolu WDS-is)
-$unattendExists = Test-Path "$WdsPath\WDSClientUnattend\*"
-Add-Result "Automaatinstall (Unattend)" "Unattend fail WDS kataloogis" "Leitud: $unattendExists" $unattendExists 2.0
+# 5. Paigaldus üle võrgu (2p)
+# Kontrollime viimase aja tegevust WDS logidest
+$WdsLogs = Get-WinEvent -LogName "Microsoft-Windows-Deployment-Services-Diagnostics/Operational" -MaxEvents 100 -ErrorAction SilentlyContinue
+$wdsInstallSuccess = ($WdsLogs.Message -match "Image applied successfully")
+Add-Result "OS paigaldus üle võrgu (WDS)" "Windows 11 paigaldatud" "Logi kontroll: $(if($wdsInstallSuccess){'OK'}else{'Ei tuvastatud'})" $wdsInstallSuccess 2.0
 
-# 5. Klientmasina võrgu alglaadimine ja paigaldus (Hinnanguline)
-# Kuna me ei saa reaalajas jälgida klientmasina bootimist, kontrollime WDS logisid või viimase 1h paigaldusi
-$WdsLogs = Get-WinEvent -LogName "Microsoft-Windows-Deployment-Services-Diagnostics/Operational" -MaxEvents 50 -ErrorAction SilentlyContinue
-$wdsInstallSuccess = ($WdsLogs.Message -match "Image applied successfully|Client completed")
-Add-Result "Windows 11 paigaldus üle võrgu (WDS)" "OS paigaldatud üle PXE" "Logi kontroll: $(if($wdsInstallSuccess){'Edukas'}else{'Kontrollida manuaalselt'})" $wdsInstallSuccess 2.0
+# 6. Automaatinstall / Unattend (2p)
+$unattendExists = (Get-ChildItem -Path "$WdsPath\WDSClientUnattend" -Filter "*.xml" | Measure-Object).Count -gt 0
+Add-Result "Automaatinstall (Unattend)" "Unattend.xml fail WDS-is" "Fail leitud: $unattendExists" $unattendExists 2.0
+
 
 # ====================================================================
 
