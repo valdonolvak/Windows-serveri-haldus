@@ -1,10 +1,10 @@
-## Windows Pilet 4 ##
+## Windows Pilet 5 ##
 
 ```powershell
 <#
 .SYNOPSIS
-    Täielik Windows Serveri auditi skript vastavalt 20-punktisele hindamiskriteeriumile (PILET 4 - GPO SPETSIIFILISED PIIRANGUD).
-    Sisaldab täpsustatud pealkirju, üli-otsingut GPO-dele (sh taustapildi trükivigadele), DC2 IP lollikindlat tuvastust ja laiendatud rakenduste piirangute otsingut.
+    Täielik Windows Serveri auditi skript vastavalt 20-punktisele hindamiskriteeriumile (PILET 5 - WDS).
+    Sisaldab täpsustatud pealkirju, üli-otsingut GPO-dele, lollikindlat DC2 IP tuvastust ja dünaamilist WDS kontrolli.
     Käivitada DC1 serveris Domain Admin õigustes.
 #>
 
@@ -121,17 +121,6 @@ function Check-GPOSettings {
         $Gpo = $Gpos | Where-Object { ($_.DisplayName -replace '\s','' -replace '_','') -match "(?i)$shortName" } | Select-Object -First 1
     }
 
-    # 4. ÜLI-HÄGUNE OTSING SPETSIAALSELT TAUSTAPILDILE
-    if (!$Gpo -and $GpoName -match "(?i)Taustapilt") {
-        $Gpo = $Gpos | Where-Object { $_.DisplayName -match "(?i)töölau|tausta|tasuta|wallpaper" } | Select-Object -First 1
-        if ($Gpo) {
-            $testXml = [xml](Get-GPOReport -Guid $Gpo.Id -ReportType Xml -ErrorAction SilentlyContinue)
-            if ($testXml.InnerXml -notmatch "(?i)Wallpaper|Taustapilt") {
-                $Gpo = $null 
-            }
-        }
-    }
-
     if (!$Gpo) { 
         return @{ Pts = 0; Status = $false; Det = "GPO '$GpoName' (või sarnase nimega) puudub." } 
     }
@@ -186,13 +175,13 @@ function Check-GPOSettings {
 
 
 # ====================================================================
-# PÕHIOSA (12 punkti kokku)
+# PÕHIOSA (12 punkti kokku) - PILET 5 ("2022" nimekujud)
 # ====================================================================
 
 # 1. DC1 nimi
 $ComputerName = $env:COMPUTERNAME
 $dc1NameStatus = ($ComputerName -eq "DC1")
-Add-Result "Muuta WinServer2025 masin nimi DC1" "Masina nimi on DC1" "Tuvastatud: $ComputerName" $dc1NameStatus 0.5
+Add-Result "Muuta WinServer2022 masin nimi DC1" "Masina nimi on DC1" "Tuvastatud: $ComputerName" $dc1NameStatus 0.5
 
 # 2. DC1 IP
 $DC1IP = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.PrefixOrigin -eq "Manual" -and $_.InterfaceAlias -notmatch "Loopback" }).IPAddress
@@ -215,7 +204,7 @@ Add-Result "Seadista DC1 serverile DNS teenus" "DNS roll paigaldatud" "Roll: $dn
 $DC2 = Get-ADComputer -Filter "Name -eq 'DC2'" -Properties IPv4Address -ErrorAction SilentlyContinue
 $dc2Status = [bool]($DC2)
 $dc2LeitudText = if ($dc2Status) { "Leitud DC2 konto AD-st" } else { "Ei leitud arvutit DC2" }
-Add-Result "WinCore2025 masinal muuta nimi DC2-ks" "AD-s eksisteerib arvuti DC2" $dc2LeitudText $dc2Status 0.5
+Add-Result "WinCore2022 masinal muuta nimi DC2-ks" "AD-s eksisteerib arvuti DC2" $dc2LeitudText $dc2Status 0.5
 
 # 6. DC2 IP
 $dc2IpDet = "Ei tuvastatud staatilist IP-d"
@@ -239,14 +228,14 @@ if ($ip) {
         $dc2IpStatus = $true 
     }
 }
-Add-Result "WinCore2025 serverile anda staatiline IP-aadress" "Tuvastatud DC2 IP-aadress" $dc2IpDet $dc2IpStatus 0.5
+Add-Result "WinCore2022 serverile anda staatiline IP-aadress" "Tuvastatud DC2 IP-aadress" $dc2IpDet $dc2IpStatus 0.5
 
 # 7. DC2 on domeenikontroller
 $DomainDN = $Domain.DistinguishedName
 $DCsInOU = Get-ADComputer -Filter * -SearchBase "OU=Domain Controllers,$DomainDN" -ErrorAction SilentlyContinue
 $HasTwoDCs = ($DCsInOU.Count -ge 2) -and ($DCsInOU.Name -contains "DC2")
 $hasTwoDCsStatus = [bool]($HasTwoDCs)
-Add-Result "Lisada WinCore2025 server teiseks domeenikontrolleriks domeeni $ExpectedDomain jaoks" "Vähemalt 2 masinat (sh DC2) Domain Controllers OU-s" ("Masinad DC OU-s: " + ($DCsInOU.Name -join ", ")) $hasTwoDCsStatus 1.0
+Add-Result "Lisada WinCore2022 server teiseks domeenikontrolleriks domeeni $ExpectedDomain jaoks" "Vähemalt 2 masinat (sh DC2) Domain Controllers OU-s" ("Masinad DC OU-s: " + ($DCsInOU.Name -join ", ")) $hasTwoDCsStatus 1.0
 
 
 # 8. DHCP
@@ -293,7 +282,8 @@ if ($DHCPScope) {
 }
 $dhcpDetails += "</ul>"
 $dhcpStatus = ($dhcpTasksMet -eq 4)
-Add-Result "Seadista WinServer2025 peal DHCP teenus, kus klientidele antakse reservereritud IP-aadressid. DHCP server jagab DNS serveritena välja mõlemad DC serverid" "Skoop, 4h, reserv, 2xDNS" $dhcpDetails $dhcpStatus 1.0 ($dhcpTasksMet * 0.25)
+# Pealkiri muudetud "mõlemad AD serverid" vastavalt Pilet 5 pildile
+Add-Result "Seadista WinServer2022 peal DHCP teenus, kus klientidele antakse reservereritud IP-aadressid. DHCP server jagab DNS serveritena välja mõlemad AD serverid" "Skoop, 4h, reserv, 2xDNS" $dhcpDetails $dhcpStatus 1.0 ($dhcpTasksMet * 0.25)
 
 
 # 9. DHCP Failover
@@ -318,7 +308,7 @@ $OUUsers = Get-ADOrganizationalUnit -Filter "Name -eq 'Kasutajad'"
 $OUComps = Get-ADOrganizationalUnit -Filter "Name -eq 'Arvutid'"
 $ouStatus = ([bool]($OUUsers) -and [bool]($OUComps))
 $ouLeitudText = if ($ouStatus) { "Mõlemad leitud" } else { "Puudu/Osaline" }
-Add-Result "DC-sse on loodud 2 OU-d: Kasutajad ja Arvutid." "Mõlemad loodud" $ouLeitudText $ouStatus 0.5
+Add-Result "AD-sse on loodud 2 OU-d: Kasutajad ja Arvutid." "Mõlemad loodud" $ouLeitudText $ouStatus 0.5
 
 
 # 11. Haldur
@@ -346,7 +336,8 @@ if ($Haldur) {
 }
 $haldurDetails += "</ul>"
 $haldurStatus = ($haldurTasksMet -eq 2)
-Add-Result "Domeeni on lisatud kasutaja haldur, kes on lisatud Domain DC admins gruppi" "OU=Kasutajad ja Domain Admins" $haldurDetails $haldurStatus 0.5 ($haldurTasksMet * 0.25)
+# Pealkiri kohandatud Domain Admins gruppi
+Add-Result "Domeeni on lisatud kasutaja haldur, kes on lisatud Domain Admins gruppi" "OU=Kasutajad ja Domain Admins" $haldurDetails $haldurStatus 0.5 ($haldurTasksMet * 0.25)
 
 
 # 12. Klientmasin
@@ -414,44 +405,52 @@ Add-Result "Grupipoliitika (GPO): Loo GPO nimega Edge_Siseportaal, mis määrab 
 
 
 # ====================================================================
-# PILET 5 SPETSIIFILINE OSA (8 PUNKTI) - KÕIKIDELE GPO-dele HÄGUNE OTSING JA LAIENDATUD PIIRANGUD
+# PILET 5 SPETSIIFILINE OSA - WDS (8 PUNKTI)
 # ====================================================================
 
-# ====================================================================
-# PILET 5 - WDS (Windows Deployment Services) HINDAMINE
-# ====================================================================
+# Dünaamiline WDS kausta otsing (kui see pole C: kettal)
+$WdsPaths = @("C:\RemoteInstall", "D:\RemoteInstall", "E:\RemoteInstall", "F:\RemoteInstall")
+$ActualWdsPath = $null
+foreach ($p in $WdsPaths) { 
+    if (Test-Path $p) { $ActualWdsPath = $p; break } 
+}
+if (!$ActualWdsPath) { $ActualWdsPath = "C:\RemoteInstall" }
 
-# 1. WDS rolli paigaldus (1p)
-$WdsRole = Get-WindowsFeature -Name WDS
-Add-Result "WDS rolli paigaldus" "WDS roll paigaldatud" "Staatus: $($WdsRole.InstallState)" $WdsRole.Installed 1.0
+# 17. WDS rolli paigaldus (1p)
+$WdsRole = Get-WindowsFeature -Name WDS -ErrorAction SilentlyContinue
+$wdsStatus = [bool]($WdsRole.Installed)
+Add-Result "Paigalda Windows Serverisse WDS (Windows Deployment Services) roll" "WDS roll paigaldatud" "Staatus: $(if($WdsRole){$WdsRole.InstallState}else{'Puudu'})" $wdsStatus 1.0
 
-# 2. Boot.wim kontroll (1p)
-$bootWimPath = "$WdsPath\Boot\x64\Images\boot.wim"
-$bootExists = Test-Path $bootWimPath
-Add-Result "WDS boot.wim tõmmisfail" "boot.wim fail olemas" "Leitud: $bootExists" $bootExists 1.0
+# 18. Boot.wim tõmmisfail (1p)
+$bootWimFiles = Get-ChildItem -Path "$ActualWdsPath\Boot" -Filter "boot.wim" -Recurse -ErrorAction SilentlyContinue
+$bootExists = ($bootWimFiles.Count -gt 0)
+Add-Result "Lisa WDSi õige boot.wim tõmmisfail" "boot.wim fail olemas" "Leitud: $(if($bootExists){'Jah'}else{'Ei'})" $bootExists 1.0
 
-# 3. Install.wim kontroll (1p)
-$installWimPath = "$WdsPath\Images\Install.wim"
-$installExists = Test-Path $installWimPath
-Add-Result "WDS install.wim tõmmisfail" "install.wim fail olemas" "Leitud: $installExists" $installExists 1.0
+# 19. Install.wim tõmmisfail (1p)
+$installWimFiles = Get-ChildItem -Path "$ActualWdsPath\Images" -Filter "*.wim" -Recurse -ErrorAction SilentlyContinue
+$installExists = ($installWimFiles.Count -gt 0)
+Add-Result "Lisa WDSi õige install.wim tõmmisfail" "install.wim fail olemas" "Leitud: $(if($installExists){'Jah'}else{'Ei'})" $installExists 1.0
 
-# 4. DHCP seadistused WDS jaoks (1p)
-$DhcpOptions = Get-DhcpServerv4OptionValue -ScopeId (Get-DhcpServerv4Scope).ScopeId -ErrorAction SilentlyContinue
-$pxeStatus = ($DhcpOptions | Where-Object { $_.OptionId -eq 66 -or $_.OptionId -eq 67 })
-Add-Result "DHCP seadistused WDS jaoks" "Option 66 ja 67 seadistatud" "Leitud: $(if($pxeStatus){'Jah'}else{'Ei'})" [bool]$pxeStatus 1.0
+# 20. DHCP seadistused WDS jaoks (1p)
+# Otsib PXE kliendi või boot faili seadistusi (Option 60, 66 või 67)
+$WdsDhcpOptions = Get-DhcpServerv4OptionValue -ScopeId (Get-DhcpServerv4Scope | Select-Object -First 1).ScopeId -ErrorAction SilentlyContinue
+$pxeStatus = ($WdsDhcpOptions | Where-Object { $_.OptionId -eq 66 -or $_.OptionId -eq 67 -or $_.OptionId -eq 60 })
+$optStatus = [bool]$pxeStatus
+Add-Result "Tee AS oige DHCP serveris WDS jaoks vajalikud seadistused" "WDS optionid (60/66/67) seadistatud" "Seadistatud: $(if($optStatus){'Jah'}else{'Ei'})" $optStatus 1.0
 
-# 5. Paigaldus üle võrgu (2p)
-# Kontrollime viimase aja tegevust WDS logidest
-$WdsLogs = Get-WinEvent -LogName "Microsoft-Windows-Deployment-Services-Diagnostics/Operational" -MaxEvents 100 -ErrorAction SilentlyContinue
-$wdsInstallSuccess = ($WdsLogs.Message -match "Image applied successfully")
-Add-Result "OS paigaldus üle võrgu (WDS)" "Windows 11 paigaldatud" "Logi kontroll: $(if($wdsInstallSuccess){'OK'}else{'Ei tuvastatud'})" $wdsInstallSuccess 2.0
+# 21. OS paigaldus üle võrgu (2p)
+$WdsLogs = Get-WinEvent -LogName "Microsoft-Windows-Deployment-Services-Diagnostics/Operational" -MaxEvents 500 -ErrorAction SilentlyContinue
+$wdsInstallSuccess = $false
+if ($WdsLogs) {
+    if ($WdsLogs.Message -match "(?i)Image applied successfully|Downloaded|completed") { $wdsInstallSuccess = $true }
+}
+$wdsInstallDet = if($wdsInstallSuccess){"Tuvastatud logidest: Jah"}else{"Logist ei leitud (vajalik visuaalne kontroll)"}
+Add-Result "Seadista testmasin üle võrgu alglaadima ja paigalda sinna läbi WDS-i Windows 11" "OS paigaldatud üle võrgu" $wdsInstallDet $wdsInstallSuccess 2.0
 
-# 6. Automaatinstall / Unattend (2p)
-$unattendExists = (Get-ChildItem -Path "$WdsPath\WDSClientUnattend" -Filter "*.xml" | Measure-Object).Count -gt 0
-Add-Result "Automaatinstall (Unattend)" "Unattend.xml fail WDS-is" "Fail leitud: $unattendExists" $unattendExists 2.0
-
-
-# ====================================================================
+# 22. Automaatinstall (Unattend) (2p)
+$unattendFiles = Get-ChildItem -Path "$ActualWdsPath\WdsClientUnattend" -Filter "*.xml" -Recurse -ErrorAction SilentlyContinue
+$unattendExists = ($unattendFiles.Count -gt 0)
+Add-Result "Seadista automaatinstall, nii et klientmasin saaks OS-i paigaldatud ilma kasutaja poolse sekkumiseta" "Unattend fail WDS-is" "Leitud XML fail: $(if($unattendExists){'Jah'}else{'Ei'})" $unattendExists 2.0
 
 
 # --- HTML RAPORTI GENEREERIMINE ---
