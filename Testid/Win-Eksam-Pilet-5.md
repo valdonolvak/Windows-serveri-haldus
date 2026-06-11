@@ -4,7 +4,7 @@
 <#
 .SYNOPSIS
     Täielik Windows Serveri auditi skript vastavalt 20-punktisele hindamiskriteeriumile (PILET 5 - WDS).
-    Sisaldab täpsustatud pealkirju, üli-otsingut GPO-dele, lollikindlat DC2 IP tuvastust ja dünaamilist WDS kontrolli (Unattend 2 faasi + AD/DHCP kliendid).
+    Sisaldab täpsustatud pealkirju, üli-otsingut GPO-dele, lollikindlat DC2 IP tuvastust ja süvapoolega XML Unattend seadete kontrolli.
     Käivitada DC1 serveris Domain Admin õigustes.
 #>
 
@@ -445,47 +445,67 @@ $wdsInstallDet = "<ul style='margin:0; padding-left:20px;'>"
 
 if ($AdKliendid.Count -ge 2) {
     $wdsInstallPts = 2.0
-    $wdsInstallDet += "<li>AD kliendid ($($AdKliendid.Count) tk): <b style='color:green'>Jah (+2p)</b> [$($AdKliendid.Name -join ', ')]</li>"
+    $wdsInstallDet += "<li>AD võrgukliendid ($($AdKliendid.Count) tk): <b style='color:green'>Jah (+2p)</b> [$($AdKliendid.Name -join ', ')]</li>"
 } elseif ($AdKliendid.Count -eq 1) {
     $wdsInstallPts = 1.0
-    $wdsInstallDet += "<li>AD kliendid (ainult 1 tk): <b style='color:orange'>Osaline (+1p)</b> [$($AdKliendid[0].Name)]</li>"
+    $wdsInstallDet += "<li>AD võrgukliendid (ainult 1 masin leitud): <b style='color:orange'>Osaline (+1p)</b> [$($AdKliendid[0].Name)]</li>"
 } else {
-    $wdsInstallDet += "<li>AD kliendid: <b style='color:red'>0 tk leitud</b></li>"
+    $wdsInstallDet += "<li>AD võrgukliendid: <b style='color:red'>Uut klientmasinat ei leitud domeenist</b></li>"
 }
 
 if ($wdsDhcpLeases.Count -gt 0) {
     $leaseNames = $wdsDhcpLeases | ForEach-Object { if($_.HostName){$_.HostName}else{$_.IPAddress} }
-    $wdsInstallDet += "<li>DHCP rendid: <b style='color:blue'>$($leaseNames -join ', ')</b></li>"
-} else {
-    $wdsInstallDet += "<li>DHCP rendid: Puuduvad</li>"
+    $wdsInstallDet += "<li>DHCP aktiivsed rendid: <b style='color:blue'>$($leaseNames -join ', ')</b></li>"
 }
 $wdsInstallDet += "</ul>"
 $wdsInstallStatus = ($wdsInstallPts -eq 2.0)
 Add-Result "Seadista testmasin üle võrgu alglaadima ja paigalda sinna läbi WDS-i Windows 11" "AD-s ja DHCP-s uus masin tuvastatud" $wdsInstallDet $wdsInstallStatus 2.0 $wdsInstallPts
 
-# 22. Automaatinstall (Unattend 2 faasi) (2p)
+# 22. Automaatinstall (Unattend - SÜVAKONTROLL XML SISULE)
 $unattendClientXML = Get-ChildItem -Path "$ActualWdsPath\WdsClientUnattend" -Filter "*.xml" -Recurse -ErrorAction SilentlyContinue
 $unattendImageXML = Get-ChildItem -Path "$ActualWdsPath\Images" -Filter "*.xml" -Recurse -ErrorAction SilentlyContinue
 
 $unattPts = 0
 $unattDet = "<ul style='margin:0; padding-left:20px;'>"
 
+# 1. FAAS: Kontrollime WDS võrguviisardi ja ketta partitsioonide automaatsätteid (windowsPE faas)
 if ($unattendClientXML.Count -gt 0) {
-    $unattPts += 1.0
-    $unattDet += "<li>WDS Boot (Client) Unattend: <b style='color:green'>Leitud (+1p)</b> [$($unattendClientXML[0].FullName)]</li>"
+    $clientContent = Get-Content -Path $unattendClientXML[0].FullName -Raw -ErrorAction SilentlyContinue
+    $hasDiskAutomated = ($clientContent -match "(?i)<WillShowUI>(OnError|Never)</WillShowUI>")
+    $hasLangAutomated = ($clientContent -match "(?i)<UILanguage>" -and $clientContent -match "(?i)<InputLocale>")
+    
+    if ($hasDiskAutomated -and $hasLangAutomated) {
+        $unattPts += 1.0
+        $unattDet += "<li>Boot-faas (WdsClientUnattend): <b style='color:green'>Täielik (+1p)</b> [Ketas ja keel automatiseeritud]</li>"
+    } else {
+        $unattPts += 0.5
+        $unattDet += "<li>Boot-faas (WdsClientUnattend): <b style='color:orange'>Poolik (+0.5p)</b> [Fail leitud, kuid ketta/keele valikud ekraanilt eemaldamata]</li>"
+    }
+    $unattDet += "<li><i>Boot XML asukoht: $($unattendClientXML[0].FullName)</i></li>"
 } else {
-    $unattDet += "<li>WDS Boot (Client) Unattend: <b style='color:red'>Puudu WdsClientUnattend kaustast</b></li>"
+    $unattDet += "<li>Boot-faas (WdsClientUnattend): <b style='color:red'>Puudu (Võrguviisard pole automatiseeritud)</b></li>"
 }
 
+# 2. FAAS: Kontrollime operatsioonisüsteemi tõmmise lokaalsete kasutajate ja OOBE automatiseerimist
 if ($unattendImageXML.Count -gt 0) {
-    $unattPts += 1.0
-    $unattDet += "<li>WDS Install Image Unattend: <b style='color:green'>Leitud (+1p)</b> [$($unattendImageXML[0].FullName)]</li>"
+    $imageContent = Get-Content -Path $unattendImageXML[0].FullName -Raw -ErrorAction SilentlyContinue
+    $hasUserCreated = ($imageContent -match "(?i)<LocalAccounts>" -and $imageContent -match "(?i)<Password>")
+    
+    if ($hasUserCreated) {
+        $unattPts += 1.0
+        $unattDet += "<li>Install-faas (Image Unattend): <b style='color:green'>Täielik (+1p)</b> [Automaatne kasutaja loomine tuvastatud]</li>"
+    } else {
+        $unattPts += 0.5
+        $unattDet += "<li>Install-faas (Image Unattend): <b style='color:orange'>Poolik (+0.5p)</b> [Fail leitud tõmmise küljest, kuid kasutaja loomise plokk puudu]</li>"
+    }
+    $unattDet += "<li><i>Install XML asukoht: $($unattendImageXML[0].FullName)</i></li>"
 } else {
-    $unattDet += "<li>WDS Install Image Unattend: <b style='color:red'>Puudu Images alamkaustadest</b></li>"
+    $unattDet += "<li>Install-faas (Image Unattend): <b style='color:red'>Puudu (Tõmmise külge pole Unattend faili poogitud)</b></li>"
 }
+
 $unattDet += "</ul>"
 $unattStatus = ($unattPts -eq 2.0)
-Add-Result "Seadista automaatinstall, nii et klientmasin saaks OS-i paigaldatud ilma kasutaja poolse sekkumiseta" "Unattend failid nii Boot kui Install küljes" $unattDet $unattStatus 2.0 $unattPts
+Add-Result "Seadista automaatinstall, nii et klientmasin saaks OS-i paigaldatud ilma kasutaja poolse sekkumiseta" "Unattend failid seadistavad ketta, keele ja kasutajad" $unattDet $unattStatus 2.0 $unattPts
 
 
 # --- HTML RAPORTI GENEREERIMINE ---
