@@ -1,0 +1,618 @@
+## Windows 5 Pilet ##
+
+```powershell
+
+<#
+.SYNOPSIS
+    Täielik Windows Serveri auditi skript vastavalt 20-punktisele hindamiskriteeriumile (PILET 5 - WDS).
+    Sisaldab AD kasutajate punktiga nimede toetust, WDS failide ja registri süvakontrolli ning Unattend XML analüüsi.
+    Käivitada DC1 serveris Domain Admin õigustes.
+#>
+
+$ErrorActionPreference = "SilentlyContinue"
+
+# Moodulite laadimine
+Import-Module ActiveDirectory
+Import-Module GroupPolicy
+Import-Module DhcpServer
+Import-Module DnsServer
+Import-Module ServerManager
+Import-Module Wds -ErrorAction SilentlyContinue
+
+# --- SEADISTUSED JA SISEND ---
+$ExpectedDomain = Read-Host "Sisesta oodatud domeeninimi (nt oige.ee või sinunimi.local)"
+$OpilaseNimi = Read-Host "Sisesta õpilase ees- ja perekonnanimi"
+
+Write-Host "Vali pileti liik (1 - Linux, 2 - Windows, 3 - Võrk):" -ForegroundColor Cyan
+$PiletLiikValik = Read-Host "Sisesta number"
+$PiletLiik = switch ($PiletLiikValik) { 
+    '1' {'Linux'} 
+    '2' {'Windows'} 
+    '3' {'Võrk'} 
+    Default {'Määramata'} 
+}
+
+$PiletNumber = Read-Host "Sisesta pileti number (1-6)"
+$TaisPilet = "$PiletLiik $PiletNumber"
+
+$SafeName = $OpilaseNimi -replace '\s+', '_'
+$SafePilet = $TaisPilet -replace '\s+', '_'
+
+$ReportPath = "$PSScriptRoot\HindamisRaport_${SafeName}_${SafePilet}.html"
+$JsonPath = "$PSScriptRoot\HindamisRaport_${SafeName}_${SafePilet}.json"
+
+$TotalPoints = 0
+$Results = @()
+
+# --- ABIFUNKTSIOONID ---
+function Add-Result {
+    param(
+        [string]$Ylesanne, 
+        [string]$Oodatud, 
+        [string]$Leitud, 
+        [bool]$Staatus, 
+        [double]$MaxPunktid, 
+        [double]$OsalisedPunktid = -1
+    )
+    
+    $teenitud = if ($OsalisedPunktid -ge 0) { $OsalisedPunktid } elseif ($Staatus) { $MaxPunktid } else { 0 }
+    $Global:TotalPoints += $teenitud
+    
+    if ($teenitud -eq $MaxPunktid -and $MaxPunktid -gt 0) { 
+        $color = "#c6efce"
+        $staatusTekst = "OK" 
+    } elseif ($teenitud -gt 0) { 
+        $color = "#fff2cc"
+        $staatusTekst = "OSALINE" 
+    } else { 
+        $color = "#ffc7ce"
+        $staatusTekst = "PUUDU/VIGA" 
+    }
+    
+    $Global:Results += [PSCustomObject]@{ 
+        Ylesanne = $Ylesanne
+        Oodatud = $Oodatud
+        Leitud = $Leitud
+        Staatus = $staatusTekst
+        Punktid = $teenitud
+        Color = $color 
+    }
+}
+
+function Convert-DNToReadable {
+    param([string]$dn)
+    
+    if (!$dn) { return "Puudub" }
+    
+    $parts = $dn -split ','
+    $ouPath = @()
+    $domainParts = @()
+    
+    foreach ($p in $parts) {
+        if ($p -match "^OU=(.+)$") { $ouPath += $Matches[1] }
+        if ($p -match "^CN=(.+)$" -and $ouPath.Count -eq 0) { $ouPath += $Matches[1] }
+        if ($p -match "^DC=(.+)$") { $domainParts += $Matches[1] }
+    }
+    
+    [array]::Reverse($ouPath)
+    $domainStr = $domainParts -join '.'
+    
+    return "$domainStr/" + ($ouPath -join '/')
+}
+
+function Check-GPOSettings {
+    param($GpoName, $ExpectedOUs, $Regexes, $MaxP)
+    
+    $Gpos = Get-GPO -All -ErrorAction SilentlyContinue
+    if (!$Gpos) { 
+        return @{ Pts = 0; Status = $false; Det = "GPO-de lugemine ebaõnnestus." } 
+    }
+    
+    # 1. Täpne otsing
+    $Gpo = $Gpos | Where-Object { $_.DisplayName -eq $GpoName } | Select-Object -First 1
+    
+    # 2. Hägune otsing
+    if (!$Gpo) {
+        $cleanName = $GpoName -replace '_','.*'
+        $Gpo = $Gpos | Where-Object { $_.DisplayName -match "(?i)$cleanName" } | Select-Object -First 1
+    }
+    
+    # 3. Väga hägune otsing
+    if (!$Gpo) {
+        $shortName = $GpoName -replace "(?i)GPO_?", "" -replace '\s','' -replace '_',''
+        $Gpo = $Gpos | Where-Object { ($_.DisplayName -replace '\s','' -replace '_','') -match "(?i)$shortName" } | Select-Object -First 1
+    }
+
+    if (!$Gpo) { 
+        return @{ Pts = 0; Status = $false; Det = "GPO '$GpoName' (või sarnase nimega) puudub." } 
+    }
+    
+    $Xml = [xml](Get-GPOReport -Guid $Gpo.Id -ReportType Xml -ErrorAction SilentlyContinue)
+    $txt = if ($Xml) { $Xml.InnerXml } else { "" }
+    $actualLinks = @()
+    
+    if ($Xml -and $Xml.GPO.LinksTo) {
+        $links = $Xml.GPO.LinksTo
+        if ($links -is [array]) { 
+            foreach ($l in $links) { $actualLinks += $l.SOMName } 
+        } else { 
+            $actualLinks += $links.SOMName 
+        }
+    }
+    
+    $linksStr = if ($actualLinks.Count -gt 0) { $actualLinks -join ", " } else { "Lingid puuduvad" }
+    
+    $linksOk = $true
+    if ($ExpectedOUs.Count -gt 0) {
+        foreach ($ou in $ExpectedOUs) {
+            if ($ou -and $actualLinks -notcontains $ou -and ($Xml.GPO.LinksTo.SOMPath -join " ") -notmatch $ou) { 
+                $linksOk = $false 
+            }
+        }
+    }
+    
+    $setMet = 0
+    foreach ($r in $Regexes) { 
+        if ($txt -match $r) { $setMet++ } 
+    }
+    
+    if ($linksOk) {
+        if ($setMet -eq $Regexes.Count) { 
+            return @{ Pts = $MaxP; Status = $true; Det = "Kõik seaded korras (Leiti GPO: <b>$($Gpo.DisplayName)</b>). Lingitud: $linksStr." } 
+        } elseif ($setMet -gt 0) { 
+            return @{ Pts = ($MaxP * 0.75); Status = $false; Det = "Link õige ($linksStr), osad seaded olemas (Leiti GPO: <b>$($Gpo.DisplayName)</b>)." } 
+        } else { 
+            return @{ Pts = ($MaxP * 0.25); Status = $false; Det = "Link õige ($linksStr), seaded puudu (Leiti GPO: <b>$($Gpo.DisplayName)</b>)." } 
+        }
+    } else {
+        if ($setMet -eq $Regexes.Count) { 
+            return @{ Pts = ($MaxP * 0.75); Status = $false; Det = "Seaded õiged, aga VALE ASUKOHT! Lingitud: $linksStr (Leiti GPO: <b>$($Gpo.DisplayName)</b>)" } 
+        } elseif ($setMet -gt 0) { 
+            return @{ Pts = ($MaxP * 0.5); Status = $false; Det = "Osaliselt õige, VALE ASUKOHT: $linksStr (Leiti GPO: <b>$($Gpo.DisplayName)</b>)" } 
+        } else { 
+            return @{ Pts = 0; Status = $false; Det = "Seaded puudu, vale asukoht (Leiti GPO: <b>$($Gpo.DisplayName)</b>)." } 
+        }
+    }
+}
+
+
+# ====================================================================
+# PÕHIOSA (12 punkti kokku)
+# ====================================================================
+
+# 1. DC1 nimi
+$ComputerName = $env:COMPUTERNAME
+$dc1NameStatus = ($ComputerName -eq "DC1")
+Add-Result "Muuta WinServer2022 masin nimi DC1" "Masina nimi on DC1" "Tuvastatud: $ComputerName" $dc1NameStatus 0.5
+
+# 2. DC1 IP
+$DC1IP = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.PrefixOrigin -eq "Manual" -and $_.InterfaceAlias -notmatch "Loopback" }).IPAddress
+$dc1IpStatus = ($DC1IP.Count -gt 0)
+Add-Result "Anna DC1 serverile staatiline IP-aadress" "Manuaalne IPv4 seadistus" ("IP: " + ($DC1IP -join ", ")) $dc1IpStatus 0.5
+
+# 3. AD Roll
+$Domain = Get-ADDomain
+$adStatus = ($Domain.DNSRoot -eq $ExpectedDomain)
+Add-Result "Seadista DC1 serverile Acitve Directory domeeni teenused domeeni $ExpectedDomain tarvis" "Domeen $ExpectedDomain" "Tuvastatud: $($Domain.DNSRoot)" $adStatus 1.0
+
+# 4. DNS Roll
+$DNSRole = Get-WindowsFeature -Name DNS -ErrorAction SilentlyContinue
+$DNSService = Get-Service -Name DNS -ErrorAction SilentlyContinue
+$dnsStatus = ($DNSRole.Installed -eq $true -or $DNSService -ne $null)
+$dnsLeitudText = if ($DNSRole) { $($DNSRole.InstallState) } elseif ($DNSService) { "Teenus töötab ($($DNSService.Status))" } else { "Puudu" }
+Add-Result "Seadista DC1 serverile DNS teenus" "DNS roll paigaldatud" "Roll: $dnsLeitudText" $dnsStatus 0.5
+
+# 5. DC2 nimi
+$DC2 = Get-ADComputer -Filter "Name -eq 'DC2'" -Properties IPv4Address -ErrorAction SilentlyContinue
+$dc2Status = [bool]($DC2)
+$dc2LeitudText = if ($dc2Status) { "Leitud DC2 konto AD-st" } else { "Ei leitud arvutit DC2" }
+Add-Result "WinCore2022 masinal muuta nimi DC2-ks" "AD-s eksisteerib arvuti DC2" $dc2LeitudText $dc2Status 0.5
+
+# 6. DC2 IP
+$dc2IpDet = "Ei tuvastatud staatilist IP-d"
+$dc2IpStatus = $false
+$ip = $null
+
+if ($DC2 -and $DC2.IPv4Address) {
+    $ip = $DC2.IPv4Address
+} else {
+    $DC2DNS = Resolve-DnsName -Name "DC2" -Type A -ErrorAction SilentlyContinue
+    if ($DC2DNS) { $ip = $DC2DNS.IPAddress[0] }
+}
+
+if ($ip) {
+    $lastOctet = [int]($ip -split '\.')[-1]
+    if ($lastOctet -lt 100) {
+        $dc2IpDet = "Leitud IP: <b>$ip</b> <span style='color:green'>(Tundub staatiline, < .100)</span>"
+        $dc2IpStatus = $true
+    } else {
+        $dc2IpDet = "Leitud IP: <b>$ip</b> <span style='color:orange'>(HOIATUS: Dünaamiline? > .100)</span>"
+        $dc2IpStatus = $true 
+    }
+}
+Add-Result "WinCore2022 serverile anda staatiline IP-aadress" "Tuvastatud DC2 IP-aadress" $dc2IpDet $dc2IpStatus 0.5
+
+# 7. DC2 on domeenikontroller
+$DomainDN = $Domain.DistinguishedName
+$DCsInOU = Get-ADComputer -Filter * -SearchBase "OU=Domain Controllers,$DomainDN" -ErrorAction SilentlyContinue
+$HasTwoDCs = ($DCsInOU.Count -ge 2) -and ($DCsInOU.Name -contains "DC2")
+$hasTwoDCsStatus = [bool]($HasTwoDCs)
+Add-Result "Lisada WinCore2022 server teiseks domeenikontrolleriks domeeni $ExpectedDomain jaoks" "Vähemalt 2 masinat (sh DC2) Domain Controllers OU-s" ("Masinad DC OU-s: " + ($DCsInOU.Name -join ", ")) $hasTwoDCsStatus 1.0
+
+
+# 8. DHCP
+$DHCPScope = Get-DhcpServerv4Scope -ErrorAction SilentlyContinue | Select-Object -First 1
+$dhcpTasksMet = 0
+$dhcpDetails = "<ul style='margin:0; padding-left:20px;'>"
+
+if ($DHCPScope) {
+    $dhcpTasksMet++
+    $dhcpDetails += "<li>Skoop: <b style='color:green'>Jah (+0.25p) [$($DHCPScope.Name)]</b></li>"
+    
+    if ($DHCPScope.LeaseDuration.TotalHours -eq 4) { 
+        $dhcpTasksMet++
+        $dhcpDetails += "<li>Rendiaeg 4h: <b style='color:green'>OK (+0.25p)</b></li>" 
+    } else { 
+        $dhcpDetails += "<li>Rendiaeg: <b style='color:red'>Vale ($($DHCPScope.LeaseDuration))</b></li>" 
+    }
+    
+    $Reservations = @(Get-DhcpServerv4Reservation -ScopeId $DHCPScope.ScopeId -ErrorAction SilentlyContinue)
+    if ($Reservations.Count -gt 0) {
+        $dhcpTasksMet++
+        $dhcpDetails += "<li>Reservatsioonid: <b style='color:green'>OK (+0.25p) [$($Reservations.Count) tk]</b></li>"
+    } else { 
+        $dhcpDetails += "<li>Reservatsioonid: <b style='color:red'>Puudu</b></li>" 
+    }
+    
+    $DNSOptions = Get-DhcpServerv4OptionValue -ScopeId $DHCPScope.ScopeId -OptionId 6 -ErrorAction SilentlyContinue
+    if ($DNSOptions -and $DNSOptions.Value.Count -ge 2) { 
+        $dhcpTasksMet++
+        $dhcpDetails += "<li>DNS serverid (min 2 tk): <b style='color:green'>OK (+0.25p)</b> [Leitud: $($DNSOptions.Value -join ', ')]</li>" 
+    } else { 
+        $dnsFound = if ($DNSOptions -and $DNSOptions.Value) { $DNSOptions.Value -join ", " } else { "Puudub" }
+        $dhcpDetails += "<li>DNS serverid (min 2 tk): <b style='color:red'>Viga! (Leiti: $dnsFound)</b></li>" 
+    }
+    
+} else { 
+    $dhcpDetails += "<li>Skoop: <b style='color:red'>Puudu</b></li>" 
+}
+$dhcpDetails += "</ul>"
+$dhcpStatus = ($dhcpTasksMet -eq 4)
+Add-Result "Seadista WinServer2022 peal DHCP teenus, kus klientidele antakse reservereritud IP-aadressid. DHCP server jagab DNS serveritena välja mõlemad AD serverid" "Skoop, 4h, reserv, 2xDNS" $dhcpDetails $dhcpStatus 1.0 ($dhcpTasksMet * 0.25)
+
+
+# 9. DHCP Failover
+$Failover = Get-DhcpServerv4Failover -ErrorAction SilentlyContinue
+$foStatus = $false
+$foDetails = "Failover puudub"
+
+if ($Failover) {
+    $partner = $Failover.PartnerServer -join " "
+    if ($partner -match "DC2" -or ($ip -ne $null -and $partner -match [regex]::Escape($ip))) {
+        $foStatus = $true
+        $foDetails = "Failover korras. Partner: <b>$partner</b>"
+    } else { 
+        $foDetails = "Tuvastatud vale partner: $partner" 
+    }
+}
+Add-Result "Seadista DHCP teenusele failover, kus failover partneriks on DC2 server" "Partneriks on DC2" $foDetails $foStatus 1.0
+
+
+# 10. AD OU-d
+$OUUsers = Get-ADOrganizationalUnit -Filter "Name -eq 'Kasutajad'"
+$OUComps = Get-ADOrganizationalUnit -Filter "Name -eq 'Arvutid'"
+$ouStatus = ([bool]($OUUsers) -and [bool]($OUComps))
+$ouLeitudText = if ($ouStatus) { "Mõlemad leitud" } else { "Puudu/Osaline" }
+Add-Result "AD-sse on loodud 2 OU-d: Kasutajad ja Arvutid." "Mõlemad loodud" $ouLeitudText $ouStatus 0.5
+
+
+# 11. Haldur
+$Haldur = Get-ADUser -Filter "Name -eq 'Haldur' -or SamAccountName -eq 'haldur'" -Properties DistinguishedName -ErrorAction SilentlyContinue
+$haldurTasksMet = 0
+$haldurDetails = "<ul style='margin:0; padding-left:20px;'>"
+
+if ($Haldur) {
+    if ($Haldur.DistinguishedName -match "OU=Kasutajad") { 
+        $haldurTasksMet++
+        $haldurDetails += "<li>Asukoht Kasutajad: <b style='color:green'>OK (+0.25p)</b></li>" 
+    } else { 
+        $haldurDetails += "<li>Asukoht: <b style='color:red'>VALE! ($(Convert-DNToReadable $Haldur.DistinguishedName))</b></li>" 
+    }
+    
+    $HaldurGroups = Get-ADPrincipalGroupMembership -Identity $Haldur -ErrorAction SilentlyContinue
+    if ($HaldurGroups.Name -match "Domain Admins|Domeeni administraatorid") { 
+        $haldurTasksMet++
+        $haldurDetails += "<li>Domain Admins: <b style='color:green'>OK (+0.25p)</b></li>" 
+    } else { 
+        $haldurDetails += "<li>Domain Admins: <b style='color:red'>Puudu</b></li>" 
+    }
+} else { 
+    $haldurDetails += "<li>Kasutaja 'haldur': <b style='color:red'>Puudu AD-st</b></li>" 
+}
+$haldurDetails += "</ul>"
+$haldurStatus = ($haldurTasksMet -eq 2)
+Add-Result "Domeeni on lisatud kasutaja haldur, kes on lisatud Domain Admins gruppi" "OU=Kasutajad ja Domain Admins" $haldurDetails $haldurStatus 0.5 ($haldurTasksMet * 0.25)
+
+
+# 12. Klientmasin
+$AllComps = Get-ADComputer -Filter {Name -notlike "DC1" -and Name -notlike "DC2"} -Properties DistinguishedName -ErrorAction SilentlyContinue
+$compTasksMet = 0
+$compDetails = "<ul style='margin:0; padding-left:20px;'>"
+
+if ($AllComps) {
+    $compTasksMet = 1 
+    $inArvutid = $AllComps | Where-Object { $_.DistinguishedName -match "OU=Arvutid" }
+    if ($inArvutid) {
+        $compTasksMet = 2
+        $compDetails += "<li>Klientmasin '$($inArvutid[0].Name)': <b style='color:green'>Leitud domeenist (+0.25p)</b></li>"
+        $compDetails += "<li>Asukoht OU=Arvutid: <b style='color:green'>OK (+0.25p)</b></li>"
+    } else {
+        $compDetails += "<li>Klientmasin '$($AllComps[0].Name)': <b style='color:green'>Leitud domeenist (+0.25p)</b></li>"
+        $compDetails += "<li>Asukoht: <b style='color:red'>VALE OU! ($(Convert-DNToReadable $AllComps[0].DistinguishedName))</b></li>"
+    }
+} else { 
+    $compDetails += "<li>Klientmasin: <b style='color:red'>Puudub domeenist</b></li>" 
+}
+$compDetails += "</ul>"
+$compStatus = ($compTasksMet -eq 2)
+Add-Result "Windows 11 klientmasin on lisatud domeeni ja pandud OU-sse Arvutid" "Domeenis ja OU-s Arvutid" $compDetails $compStatus 0.5 ($compTasksMet * 0.25)
+
+
+# 13. DNS Kirjed
+$DnsRecords = Get-DnsServerResourceRecord -ZoneName $ExpectedDomain -RRType A | Where-Object {$_.HostName -notmatch "@|gc|DomainDnsZones|ForestDnsZones|DC1|DC2"}
+$dnsRecordsStatus = ($DnsRecords.Count -gt 0)
+Add-Result "DNS serveris on tehtud A-kirjed kõikide Linux serverite jaoks" "Vähemalt 1 manuaalne A-kirje" "$($DnsRecords.Count) tk leitud" $dnsRecordsStatus 1.0
+
+
+# 14. AD Import (Parandatud: Otsib ka punktiga ja sisselogimisnimesid)
+$TestUsers = @{"Müük"="Aivo Teder"; "Personal"="Andres Karl Kukk"; "Raamatupidamine"="Anette Kuusk"; "Toimetajad"="Anneli Koppel"; "IT"="Anneli Roos"; "Juhtkond"="Annika Rand"; "Haldus"="Erki Niit"}
+$UsersFoundCount = 0
+$UserCheckDetails = "<ul style='margin:0; padding-left:20px;'>"
+
+foreach ($Dept in $TestUsers.Keys) {
+    $ExpectedUser = $TestUsers[$Dept]
+    $ExpectedUserDot = $ExpectedUser -replace ' ', '.'
+    
+    # Otsib mitme nimekujuga, et andestada import-skripti eripärad (nt 'Annika.Rand')
+    $FoundUser = Get-ADUser -Filter "Name -eq '$ExpectedUser' -or Name -eq '$ExpectedUserDot' -or SamAccountName -eq '$ExpectedUserDot'" -Properties DistinguishedName -ErrorAction SilentlyContinue | Select-Object -First 1
+    
+    if ($FoundUser) {
+        if ($FoundUser.DistinguishedName -match "OU=$Dept") { 
+            $UsersFoundCount++
+            $UserCheckDetails += "<li><b>$ExpectedUser</b> (Tuvastatud: $($FoundUser.Name) OU=$Dept) - <span style='color:green'>OK</span></li>" 
+        } else { 
+            $UserCheckDetails += "<li><b>$ExpectedUser</b> - <span style='color:orange'>VALE OU! ($(Convert-DNToReadable $FoundUser.DistinguishedName))</span></li>" 
+        }
+    } else { 
+        $UserCheckDetails += "<li><b>$ExpectedUser</b> - <span style='color:red'>PUUDUB AD-st</span></li>" 
+    }
+}
+$UserCheckDetails += "</ul>"
+$importStatus = ($UsersFoundCount -gt 0)
+Add-Result "Loodud on Powershelli skript, mis impordib AD kasutajad koos OU struktuuriga failist kasutajad.csv" "Kasutajad ja struktuur leitud" "$UsersFoundCount / 7 testkasutajat OK" $importStatus 1.0
+
+
+# 15. GPO Lukustamine
+$resLock = Check-GPOSettings "GPO_KontodeLukustamine" @() @("(?i)LockoutBadCount.*5", "(?i)LockoutDuration.*15") 1.0
+Add-Result "Grupipoliitika (GPO): Loo GPO nimega GPO_KontodeLukustamine, mis lukustab kasutajakonto 15 minutiks, kui parooli on 5 korda järjest valesti sisestatud. Poliitika peab rakenduma kogu domeenile." "Domeenile rakendatud, 5 katset, 15 min" $resLock.Det $resLock.Status 1.0 $resLock.Pts
+
+
+# 16. GPO Edge
+$resEdge = Check-GPOSettings "Edge_Siseportaal" @("Personal") @("(?i)siseportaal", "(?i)NewTabPage|New tab|Homepage|Home page") 1.0
+Add-Result "Grupipoliitika (GPO): Loo GPO nimega Edge_Siseportaal, mis määrab OU-sse Personal kuuluvate kasutajate Microsoft Edge brauseri vaikimisi avaleheks (Homepage) ja uue vahekaardi leheks (New Tab Page) siseportaali aadressi [https://siseportaal.$ExpectedDomain](https://siseportaal.$ExpectedDomain). Kasutajatel peab olema avalehe muutmine veebilehitseja seadetest blokeeritud." "Avaleht siseportaal, uue tab'i URL, lukustatud" $resEdge.Det $resEdge.Status 1.0 $resEdge.Pts
+
+
+# ====================================================================
+# PILET 5 SPETSIIFILINE OSA - WDS (8 PUNKTI)
+# ====================================================================
+
+# Dünaamiline ja lollikindel WDS kausta otsing registrist
+$ActualWdsPath = (Get-ItemPropertyValue -Path "HKLM:\SYSTEM\CurrentControlSet\Services\WDSServer\Providers\WDSPXE" -Name "InstPath" -ErrorAction SilentlyContinue)
+
+# Varuplaan, kui registrist ei leia
+if (!$ActualWdsPath) {
+    $WdsPaths = @("C:\RemoteInstall", "D:\RemoteInstall", "E:\RemoteInstall", "F:\RemoteInstall")
+    foreach ($p in $WdsPaths) { 
+        if (Test-Path $p) { $ActualWdsPath = $p; break } 
+    }
+}
+if (!$ActualWdsPath) { $ActualWdsPath = "C:\RemoteInstall" }
+
+# 17. WDS rolli paigaldus (1p)
+$WdsRole = Get-WindowsFeature -Name WDS -ErrorAction SilentlyContinue
+$wdsStatus = [bool]($WdsRole.Installed)
+Add-Result "Paigalda Windows Serverisse WDS (Windows Deployment Services) roll" "WDS roll paigaldatud" "Staatus: $(if($WdsRole){$WdsRole.InstallState}else{'Puudu'})" $wdsStatus 1.0
+
+# 18. Boot.wim tõmmisfail (1p) - (Otsib nüüd lihtsalt *.wim faile ja toetub ka WDS moodulile)
+$bootWimFiles = @()
+if (Test-Path "$ActualWdsPath\Boot") {
+    $bootWimFiles = Get-ChildItem -Path "$ActualWdsPath\Boot" -Filter "*.wim" -Recurse -ErrorAction SilentlyContinue
+}
+$wdsBootCmd = Get-WdsBootImage -ErrorAction SilentlyContinue
+$bootExists = ($bootWimFiles.Count -gt 0 -or $wdsBootCmd)
+Add-Result "Lisa WDSi õige boot.wim tõmmisfail" "WDS-i on laetud boot tõmmis" "Leitud: $(if($bootExists){'Jah'}else{'Ei'})" $bootExists 1.0
+
+# 19. Install.wim tõmmisfail (1p)
+$installWimFiles = @()
+if (Test-Path "$ActualWdsPath\Images") {
+    $installWimFiles = Get-ChildItem -Path "$ActualWdsPath\Images" -Filter "*.wim" -Recurse -ErrorAction SilentlyContinue
+}
+$wdsInstCmd = Get-WdsInstallImage -ErrorAction SilentlyContinue
+$installExists = ($installWimFiles.Count -gt 0 -or $wdsInstCmd)
+Add-Result "Lisa WDSi õige install.wim tõmmisfail" "WDS-i on laetud OS tõmmis" "Leitud: $(if($installExists){'Jah'}else{'Ei'})" $installExists 1.0
+
+# 20. DHCP seadistused WDS jaoks (1p)
+$WdsDhcpOptions = Get-DhcpServerv4OptionValue -ScopeId (Get-DhcpServerv4Scope | Select-Object -First 1).ScopeId -ErrorAction SilentlyContinue
+$pxeStatus = ($WdsDhcpOptions | Where-Object { $_.OptionId -eq 66 -or $_.OptionId -eq 67 -or $_.OptionId -eq 60 })
+$optStatus = [bool]$pxeStatus
+Add-Result "Tee AS oige DHCP serveris WDS jaoks vajalikud seadistused" "WDS optionid (60/66/67) seadistatud" "Seadistatud: $(if($optStatus){'Jah'}else{'Ei'})" $optStatus 1.0
+
+# 21. OS paigaldus üle võrgu (2p) - Arvutite AD ja DHCP kontroll
+$AdKliendid = Get-ADComputer -Filter {Name -notlike "*DC1*" -and Name -notlike "*DC2*"} -ErrorAction SilentlyContinue
+$wdsDhcpScope = Get-DhcpServerv4Scope -ErrorAction SilentlyContinue | Select-Object -First 1
+$wdsDhcpLeases = if ($wdsDhcpScope) { Get-DhcpServerv4Lease -ScopeId $wdsDhcpScope.ScopeId -ErrorAction SilentlyContinue } else { @() }
+
+$wdsInstallPts = 0
+$wdsInstallDet = "<ul style='margin:0; padding-left:20px;'>"
+
+if ($AdKliendid.Count -ge 2) {
+    $wdsInstallPts = 2.0
+    $wdsInstallDet += "<li>AD võrgukliendid ($($AdKliendid.Count) tk): <b style='color:green'>Jah (+2p)</b> [$($AdKliendid.Name -join ', ')]</li>"
+} elseif ($AdKliendid.Count -eq 1) {
+    $wdsInstallPts = 1.0
+    $wdsInstallDet += "<li>AD võrgukliendid (ainult 1 masin leitud): <b style='color:orange'>Osaline (+1p)</b> [$($AdKliendid[0].Name)]</li>"
+} else {
+    $wdsInstallDet += "<li>AD võrgukliendid: <b style='color:red'>Uut klientmasinat ei leitud domeenist</b></li>"
+}
+
+if ($wdsDhcpLeases.Count -gt 0) {
+    $leaseNames = $wdsDhcpLeases | ForEach-Object { if($_.HostName){$_.HostName}else{$_.IPAddress} }
+    $wdsInstallDet += "<li>DHCP aktiivsed rendid: <b style='color:blue'>$($leaseNames -join ', ')</b></li>"
+}
+$wdsInstallDet += "</ul>"
+$wdsInstallStatus = ($wdsInstallPts -eq 2.0)
+Add-Result "Seadista testmasin üle võrgu alglaadima ja paigalda sinna läbi WDS-i Windows 11" "AD-s ja DHCP-s uus masin tuvastatud" $wdsInstallDet $wdsInstallStatus 2.0 $wdsInstallPts
+
+# 22. Automaatinstall (Unattend - SÜVAKONTROLL XML SISULE)
+$unattendClientXML = Get-ChildItem -Path "$ActualWdsPath\WdsClientUnattend" -Filter "*.xml" -Recurse -ErrorAction SilentlyContinue
+$unattendImageXML = Get-ChildItem -Path "$ActualWdsPath\Images" -Filter "*.xml" -Recurse -ErrorAction SilentlyContinue
+
+$unattPts = 0
+$unattDet = "<ul style='margin:0; padding-left:20px;'>"
+
+# 1. FAAS: Kontrollime WDS võrguviisardi ja ketta partitsioonide automaatsätteid (windowsPE faas)
+if ($unattendClientXML.Count -gt 0) {
+    $clientContent = Get-Content -Path $unattendClientXML[0].FullName -Raw -ErrorAction SilentlyContinue
+    $hasDiskAutomated = ($clientContent -match "(?i)<WillShowUI>(OnError|Never)</WillShowUI>")
+    $hasLangAutomated = ($clientContent -match "(?i)<UILanguage>" -and $clientContent -match "(?i)<InputLocale>")
+    
+    if ($hasDiskAutomated -and $hasLangAutomated) {
+        $unattPts += 1.0
+        $unattDet += "<li>Boot-faas (WdsClientUnattend): <b style='color:green'>Täielik (+1p)</b> [Ketas ja keel automatiseeritud]</li>"
+    } else {
+        $unattPts += 0.5
+        $unattDet += "<li>Boot-faas (WdsClientUnattend): <b style='color:orange'>Poolik (+0.5p)</b> [Fail leitud, kuid ketta/keele valikud ekraanilt eemaldamata]</li>"
+    }
+    $unattDet += "<li><i>Boot XML asukoht: $($unattendClientXML[0].FullName)</i></li>"
+} else {
+    $unattDet += "<li>Boot-faas (WdsClientUnattend): <b style='color:red'>Puudu (Võrguviisard pole automatiseeritud)</b></li>"
+}
+
+# 2. FAAS: Kontrollime operatsioonisüsteemi tõmmise lokaalsete kasutajate ja OOBE automatiseerimist
+if ($unattendImageXML.Count -gt 0) {
+    $imageContent = Get-Content -Path $unattendImageXML[0].FullName -Raw -ErrorAction SilentlyContinue
+    $hasUserCreated = ($imageContent -match "(?i)<LocalAccounts>" -and $imageContent -match "(?i)<Password>")
+    
+    if ($hasUserCreated) {
+        $unattPts += 1.0
+        $unattDet += "<li>Install-faas (Image Unattend): <b style='color:green'>Täielik (+1p)</b> [Automaatne kasutaja loomine tuvastatud]</li>"
+    } else {
+        $unattPts += 0.5
+        $unattDet += "<li>Install-faas (Image Unattend): <b style='color:orange'>Poolik (+0.5p)</b> [Fail leitud tõmmise küljest, kuid kasutaja loomise plokk puudu]</li>"
+    }
+    $unattDet += "<li><i>Install XML asukoht: $($unattendImageXML[0].FullName)</i></li>"
+} else {
+    $unattDet += "<li>Install-faas (Image Unattend): <b style='color:red'>Puudu (Tõmmise külge pole Unattend faili poogitud)</b></li>"
+}
+
+$unattDet += "</ul>"
+$unattStatus = ($unattPts -eq 2.0)
+Add-Result "Seadista automaatinstall, nii et klientmasin saaks OS-i paigaldatud ilma kasutaja poolse sekkumiseta" "Unattend failid seadistavad ketta, keele ja kasutajad" $unattDet $unattStatus 2.0 $unattPts
+
+
+# --- HTML RAPORTI GENEREERIMINE ---
+$Html = @"
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8'>
+    <title>Windows Server Auditi Raport</title>
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; margin: 20px; background-color: #f9f9f9; color: #333; }
+        h1 { border-bottom: 2px solid #005a9e; padding-bottom: 10px; }
+        .summary { background-color: #fff; border-left: 5px solid #005a9e; padding: 15px; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .total-points { font-size: 24px; font-weight: bold; color: #d83b01; }
+        table { border-collapse: collapse; width: 100%; background: white; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        th, td { border: 1px solid #ccc; padding: 10px; text-align: left; vertical-align: top; }
+        th { background-color: #005a9e; color: white; }
+        .details-box { background: #fff; padding: 15px; margin-top: 20px; border: 1px solid #ccc; }
+    </style>
+</head>
+<body>
+    <h1>Windows Server Auditi Raport</h1>
+    <div class='summary'>
+        <strong>Kontrollitud domeen:</strong> $ExpectedDomain<br>
+        <strong>Käivitatud masinast:</strong> $ComputerName<br>
+        <strong>Õpilane:</strong> $OpilaseNimi - $TaisPilet<br>
+        <strong>Aeg:</strong> $(Get-Date -Format 'dd.MM.yyyy HH:mm:ss')<br><br>
+        <span class='total-points'>KOKKU PUNKTE: $TotalPoints / 20.0</span>
+    </div>
+    <table>
+        <tr>
+            <th>Ülesanne (Hindamismudel)</th>
+            <th>Oodatud</th>
+            <th>Leitud reaalsus</th>
+            <th>Staatus</th>
+            <th>Punktid</th>
+        </tr>
+"@
+
+foreach ($row in $Results) {
+    $Html += @"
+        <tr style='background-color:$($row.Color)'>
+            <td>$($row.Ylesanne)</td>
+            <td>$($row.Oodatud)</td>
+            <td>$($row.Leitud)</td>
+            <td><strong>$($row.Staatus)</strong></td>
+            <td><strong>$($row.Punktid)</strong></td>
+        </tr>
+"@
+}
+
+$Html += @"
+    </table>
+    <div class='details-box'>
+        <h3>AD Kasutajate pistelise otsingu detailid</h3>
+        $UserCheckDetails
+    </div>
+</body>
+</html>
+"@
+
+$Html | Out-File $ReportPath -Encoding UTF8
+Write-Host "Kontroll on lõpetatud! Kogutud punktid: $TotalPoints / 20.0" -ForegroundColor Yellow
+
+
+# --- JSON GENEREERIMINE JA ÜLESLAADIMINE ---
+$JsonPayload = @{
+    Nimi = "$OpilaseNimi - $TaisPilet"
+    Pilet = $TaisPilet
+    Aeg = (Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
+    KokkuPunkte = $TotalPoints
+    Masin = $ComputerName
+    Domeen = $ExpectedDomain
+    Tulemused = $Results
+    UserCheckDetails = $UserCheckDetails
+    FailiNimi = "HindamisRaport_${SafeName}_${SafePilet}"
+}
+
+$JsonString = $JsonPayload | ConvertTo-Json -Depth 5 -Compress
+$JsonString | Out-File $JsonPath -Encoding UTF8
+
+$ServeriURL = "http://192.168.124.64:5001/api/upload"
+
+Write-Host "Saadan andmed dashboardile..." -ForegroundColor Cyan
+
+try {
+    $Response = Invoke-RestMethod -Uri $ServeriURL -Method Post -Body $JsonString -ContentType "application/json; charset=utf-8"
+    Write-Host "Andmed edukalt üles laetud! ($($Response.message))" -ForegroundColor Green
+} catch { 
+    Write-Host "Viga andmete üleslaadimisel: $($_.Exception.Message)" -ForegroundColor Red 
+}
+
+if (Test-Path $ReportPath) { Remove-Item -Path $ReportPath -Force }
+if (Test-Path $JsonPath) { Remove-Item -Path $JsonPath -Force }
+
+Write-Host "Kohalikud failid puhastatud." -ForegroundColor Green
+
+```
