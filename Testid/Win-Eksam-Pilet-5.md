@@ -121,6 +121,28 @@ function Check-GPOSettings {
         $Gpo = $Gpos | Where-Object { ($_.DisplayName -replace '\s','' -replace '_','') -match "(?i)$shortName" } | Select-Object -First 1
     }
 
+    # 4. ÜLI-HÄGUNE OTSING SPETSIAALSELT TAUSTAPILDILE
+    if (!$Gpo -and $GpoName -match "(?i)Taustapilt") {
+        $Gpo = $Gpos | Where-Object { $_.DisplayName -match "(?i)töölau|tausta|tasuta|wallpaper" } | Select-Object -First 1
+        if ($Gpo) {
+            $testXml = [xml](Get-GPOReport -Guid $Gpo.Id -ReportType Xml -ErrorAction SilentlyContinue)
+            if ($testXml.InnerXml -notmatch "(?i)Wallpaper|Taustapilt") {
+                $Gpo = $null 
+            }
+        }
+    }
+    
+    # 5. ÜLI-HÄGUNE OTSING SISEPORTAALI GPO-le (kui nimeks on nt GPO_Siseportaal)
+    if (!$Gpo -and $GpoName -match "(?i)siseportaal") {
+        $Gpo = $Gpos | Where-Object { $_.DisplayName -match "(?i)siseportaal|edge" } | Select-Object -First 1
+        if ($Gpo) {
+            $testXml = [xml](Get-GPOReport -Guid $Gpo.Id -ReportType Xml -ErrorAction SilentlyContinue)
+            if ($testXml.InnerXml -notmatch "(?i)siseportaal|NewTabPage|New tab|Homepage|Home page") {
+                $Gpo = $null 
+            }
+        }
+    }
+
     if (!$Gpo) { 
         return @{ Pts = 0; Status = $false; Det = "GPO '$GpoName' (või sarnase nimega) puudub." } 
     }
@@ -271,12 +293,6 @@ if ($DHCPScope) {
         $dhcpDetails += "<li>DNS serverid (min 2 tk): <b style='color:red'>Viga! (Leiti: $dnsFound)</b></li>" 
     }
     
-    $RouterOption = Get-DhcpServerv4OptionValue -ScopeId $DHCPScope.ScopeId -OptionId 3 -ErrorAction SilentlyContinue
-    if ($RouterOption -and $RouterOption.Value) {
-        $dhcpDetails += "<li><i>Ruuter (Gateway): $($RouterOption.Value -join ", ")</i></li>"
-    } else {
-        $dhcpDetails += "<li><i>Ruuter (Gateway): Puudub</i></li>"
-    }
 } else { 
     $dhcpDetails += "<li>Skoop: <b style='color:red'>Puudu</b></li>" 
 }
@@ -368,23 +384,26 @@ $dnsRecordsStatus = ($DnsRecords.Count -gt 0)
 Add-Result "DNS serveris on tehtud A-kirjed kõikide Linux serverite jaoks" "Vähemalt 1 manuaalne A-kirje" "$($DnsRecords.Count) tk leitud" $dnsRecordsStatus 1.0
 
 
-# 14. AD Import
+# 14. AD Import (Otsib ka punktiga ja sisselogimisnimesid)
 $TestUsers = @{"Müük"="Aivo Teder"; "Personal"="Andres Karl Kukk"; "Raamatupidamine"="Anette Kuusk"; "Toimetajad"="Anneli Koppel"; "IT"="Anneli Roos"; "Juhtkond"="Annika Rand"; "Haldus"="Erki Niit"}
 $UsersFoundCount = 0
 $UserCheckDetails = "<ul style='margin:0; padding-left:20px;'>"
 
 foreach ($Dept in $TestUsers.Keys) {
     $ExpectedUser = $TestUsers[$Dept]
-    $FoundUser = Get-ADUser -Filter "Name -eq '$ExpectedUser'" -Properties DistinguishedName -ErrorAction SilentlyContinue
+    $ExpectedUserDot = $ExpectedUser -replace ' ', '.'
+    
+    $FoundUser = Get-ADUser -Filter "Name -eq '$ExpectedUser' -or Name -eq '$ExpectedUserDot' -or SamAccountName -eq '$ExpectedUserDot'" -Properties DistinguishedName -ErrorAction SilentlyContinue | Select-Object -First 1
+    
     if ($FoundUser) {
         if ($FoundUser.DistinguishedName -match "OU=$Dept") { 
             $UsersFoundCount++
-            $UserCheckDetails += "<li><b>$ExpectedUser</b> (OU=$Dept) - <span style='color:green'>OK</span></li>" 
+            $UserCheckDetails += "<li><b>$ExpectedUser</b> (Tuvastatud: $($FoundUser.Name) OU=$Dept) - <span style='color:green'>OK</span></li>" 
         } else { 
             $UserCheckDetails += "<li><b>$ExpectedUser</b> - <span style='color:orange'>VALE OU! ($(Convert-DNToReadable $FoundUser.DistinguishedName))</span></li>" 
         }
     } else { 
-        $UserCheckDetails += "<li><b>$ExpectedUser</b> - <span style='color:red'>PUUDUB</span></li>" 
+        $UserCheckDetails += "<li><b>$ExpectedUser</b> - <span style='color:red'>PUUDUB AD-st</span></li>" 
     }
 }
 $UserCheckDetails += "</ul>"
@@ -406,11 +425,15 @@ Add-Result "Grupipoliitika (GPO): Loo GPO nimega Edge_Siseportaal, mis määrab 
 # PILET 5 SPETSIIFILINE OSA - WDS (8 PUNKTI)
 # ====================================================================
 
-# Dünaamiline WDS kausta otsing (kui see pole C: kettal)
-$WdsPaths = @("C:\RemoteInstall", "D:\RemoteInstall", "E:\RemoteInstall", "F:\RemoteInstall")
-$ActualWdsPath = $null
-foreach ($p in $WdsPaths) { 
-    if (Test-Path $p) { $ActualWdsPath = $p; break } 
+# Dünaamiline ja lollikindel WDS kausta otsing registrist
+$ActualWdsPath = (Get-ItemPropertyValue -Path "HKLM:\SYSTEM\CurrentControlSet\Services\WDSServer\Providers\WDSPXE" -Name "InstPath" -ErrorAction SilentlyContinue)
+
+# Varuplaan, kui registrist ei leia
+if (!$ActualWdsPath) {
+    $WdsPaths = @("C:\RemoteInstall", "D:\RemoteInstall", "E:\RemoteInstall", "F:\RemoteInstall")
+    foreach ($p in $WdsPaths) { 
+        if (Test-Path $p) { $ActualWdsPath = $p; break } 
+    }
 }
 if (!$ActualWdsPath) { $ActualWdsPath = "C:\RemoteInstall" }
 
@@ -420,14 +443,22 @@ $wdsStatus = [bool]($WdsRole.Installed)
 Add-Result "Paigalda Windows Serverisse WDS (Windows Deployment Services) roll" "WDS roll paigaldatud" "Staatus: $(if($WdsRole){$WdsRole.InstallState}else{'Puudu'})" $wdsStatus 1.0
 
 # 18. Boot.wim tõmmisfail (1p)
-$bootWimFiles = Get-ChildItem -Path "$ActualWdsPath\Boot" -Filter "boot.wim" -Recurse -ErrorAction SilentlyContinue
-$bootExists = ($bootWimFiles.Count -gt 0)
-Add-Result "Lisa WDSi õige boot.wim tõmmisfail" "boot.wim fail olemas" "Leitud: $(if($bootExists){'Jah'}else{'Ei'})" $bootExists 1.0
+$bootWimFiles = @()
+if (Test-Path "$ActualWdsPath\Boot") {
+    $bootWimFiles = Get-ChildItem -Path "$ActualWdsPath\Boot" -Filter "*.wim" -Recurse -ErrorAction SilentlyContinue
+}
+$wdsBootCmd = Get-WdsBootImage -ErrorAction SilentlyContinue
+$bootExists = ($bootWimFiles.Count -gt 0 -or $wdsBootCmd)
+Add-Result "Lisa WDSi õige boot.wim tõmmisfail" "WDS-i on laetud boot tõmmis" "Leitud: $(if($bootExists){'Jah'}else{'Ei'})" $bootExists 1.0
 
 # 19. Install.wim tõmmisfail (1p)
-$installWimFiles = Get-ChildItem -Path "$ActualWdsPath\Images" -Filter "*.wim" -Recurse -ErrorAction SilentlyContinue
-$installExists = ($installWimFiles.Count -gt 0)
-Add-Result "Lisa WDSi õige install.wim tõmmisfail" "install.wim fail olemas" "Leitud: $(if($installExists){'Jah'}else{'Ei'})" $installExists 1.0
+$installWimFiles = @()
+if (Test-Path "$ActualWdsPath\Images") {
+    $installWimFiles = Get-ChildItem -Path "$ActualWdsPath\Images" -Filter "*.wim" -Recurse -ErrorAction SilentlyContinue
+}
+$wdsInstCmd = Get-WdsInstallImage -ErrorAction SilentlyContinue
+$installExists = ($installWimFiles.Count -gt 0 -or $wdsInstCmd)
+Add-Result "Lisa WDSi õige install.wim tõmmisfail" "WDS-i on laetud OS tõmmis" "Leitud: $(if($installExists){'Jah'}else{'Ei'})" $installExists 1.0
 
 # 20. DHCP seadistused WDS jaoks (1p)
 $WdsDhcpOptions = Get-DhcpServerv4OptionValue -ScopeId (Get-DhcpServerv4Scope | Select-Object -First 1).ScopeId -ErrorAction SilentlyContinue
@@ -602,5 +633,4 @@ if (Test-Path $ReportPath) { Remove-Item -Path $ReportPath -Force }
 if (Test-Path $JsonPath) { Remove-Item -Path $JsonPath -Force }
 
 Write-Host "Kohalikud failid puhastatud." -ForegroundColor Green
-
 ```
