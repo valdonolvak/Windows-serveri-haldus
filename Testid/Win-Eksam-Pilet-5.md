@@ -4,7 +4,7 @@
 <#
 .SYNOPSIS
     Täielik Windows Serveri auditi skript vastavalt 20-punktisele hindamiskriteeriumile (PILET 5 - WDS).
-    Sisaldab täpsustatud pealkirju, üli-otsingut GPO-dele, lollikindlat DC2 IP tuvastust ja dünaamilist WDS kontrolli.
+    Sisaldab täpsustatud pealkirju, üli-otsingut GPO-dele, lollikindlat DC2 IP tuvastust ja dünaamilist WDS kontrolli (Unattend 2 faasi + AD/DHCP kliendid).
     Käivitada DC1 serveris Domain Admin õigustes.
 #>
 
@@ -282,7 +282,6 @@ if ($DHCPScope) {
 }
 $dhcpDetails += "</ul>"
 $dhcpStatus = ($dhcpTasksMet -eq 4)
-# Pealkiri muudetud "mõlemad AD serverid" vastavalt Pilet 5 pildile
 Add-Result "Seadista WinServer2022 peal DHCP teenus, kus klientidele antakse reservereritud IP-aadressid. DHCP server jagab DNS serveritena välja mõlemad AD serverid" "Skoop, 4h, reserv, 2xDNS" $dhcpDetails $dhcpStatus 1.0 ($dhcpTasksMet * 0.25)
 
 
@@ -336,7 +335,6 @@ if ($Haldur) {
 }
 $haldurDetails += "</ul>"
 $haldurStatus = ($haldurTasksMet -eq 2)
-# Pealkiri kohandatud Domain Admins gruppi
 Add-Result "Domeeni on lisatud kasutaja haldur, kes on lisatud Domain Admins gruppi" "OU=Kasutajad ja Domain Admins" $haldurDetails $haldurStatus 0.5 ($haldurTasksMet * 0.25)
 
 
@@ -432,25 +430,62 @@ $installExists = ($installWimFiles.Count -gt 0)
 Add-Result "Lisa WDSi õige install.wim tõmmisfail" "install.wim fail olemas" "Leitud: $(if($installExists){'Jah'}else{'Ei'})" $installExists 1.0
 
 # 20. DHCP seadistused WDS jaoks (1p)
-# Otsib PXE kliendi või boot faili seadistusi (Option 60, 66 või 67)
 $WdsDhcpOptions = Get-DhcpServerv4OptionValue -ScopeId (Get-DhcpServerv4Scope | Select-Object -First 1).ScopeId -ErrorAction SilentlyContinue
 $pxeStatus = ($WdsDhcpOptions | Where-Object { $_.OptionId -eq 66 -or $_.OptionId -eq 67 -or $_.OptionId -eq 60 })
 $optStatus = [bool]$pxeStatus
 Add-Result "Tee AS oige DHCP serveris WDS jaoks vajalikud seadistused" "WDS optionid (60/66/67) seadistatud" "Seadistatud: $(if($optStatus){'Jah'}else{'Ei'})" $optStatus 1.0
 
-# 21. OS paigaldus üle võrgu (2p)
-$WdsLogs = Get-WinEvent -LogName "Microsoft-Windows-Deployment-Services-Diagnostics/Operational" -MaxEvents 500 -ErrorAction SilentlyContinue
-$wdsInstallSuccess = $false
-if ($WdsLogs) {
-    if ($WdsLogs.Message -match "(?i)Image applied successfully|Downloaded|completed") { $wdsInstallSuccess = $true }
-}
-$wdsInstallDet = if($wdsInstallSuccess){"Tuvastatud logidest: Jah"}else{"Logist ei leitud (vajalik visuaalne kontroll)"}
-Add-Result "Seadista testmasin üle võrgu alglaadima ja paigalda sinna läbi WDS-i Windows 11" "OS paigaldatud üle võrgu" $wdsInstallDet $wdsInstallSuccess 2.0
+# 21. OS paigaldus üle võrgu (2p) - Arvutite AD ja DHCP kontroll
+$AdKliendid = Get-ADComputer -Filter {Name -notlike "*DC1*" -and Name -notlike "*DC2*"} -ErrorAction SilentlyContinue
+$wdsDhcpScope = Get-DhcpServerv4Scope -ErrorAction SilentlyContinue | Select-Object -First 1
+$wdsDhcpLeases = if ($wdsDhcpScope) { Get-DhcpServerv4Lease -ScopeId $wdsDhcpScope.ScopeId -ErrorAction SilentlyContinue } else { @() }
 
-# 22. Automaatinstall (Unattend) (2p)
-$unattendFiles = Get-ChildItem -Path "$ActualWdsPath\WdsClientUnattend" -Filter "*.xml" -Recurse -ErrorAction SilentlyContinue
-$unattendExists = ($unattendFiles.Count -gt 0)
-Add-Result "Seadista automaatinstall, nii et klientmasin saaks OS-i paigaldatud ilma kasutaja poolse sekkumiseta" "Unattend fail WDS-is" "Leitud XML fail: $(if($unattendExists){'Jah'}else{'Ei'})" $unattendExists 2.0
+$wdsInstallPts = 0
+$wdsInstallDet = "<ul style='margin:0; padding-left:20px;'>"
+
+if ($AdKliendid.Count -ge 2) {
+    $wdsInstallPts = 2.0
+    $wdsInstallDet += "<li>AD kliendid ($($AdKliendid.Count) tk): <b style='color:green'>Jah (+2p)</b> [$($AdKliendid.Name -join ', ')]</li>"
+} elseif ($AdKliendid.Count -eq 1) {
+    $wdsInstallPts = 1.0
+    $wdsInstallDet += "<li>AD kliendid (ainult 1 tk): <b style='color:orange'>Osaline (+1p)</b> [$($AdKliendid[0].Name)]</li>"
+} else {
+    $wdsInstallDet += "<li>AD kliendid: <b style='color:red'>0 tk leitud</b></li>"
+}
+
+if ($wdsDhcpLeases.Count -gt 0) {
+    $leaseNames = $wdsDhcpLeases | ForEach-Object { if($_.HostName){$_.HostName}else{$_.IPAddress} }
+    $wdsInstallDet += "<li>DHCP rendid: <b style='color:blue'>$($leaseNames -join ', ')</b></li>"
+} else {
+    $wdsInstallDet += "<li>DHCP rendid: Puuduvad</li>"
+}
+$wdsInstallDet += "</ul>"
+$wdsInstallStatus = ($wdsInstallPts -eq 2.0)
+Add-Result "Seadista testmasin üle võrgu alglaadima ja paigalda sinna läbi WDS-i Windows 11" "AD-s ja DHCP-s uus masin tuvastatud" $wdsInstallDet $wdsInstallStatus 2.0 $wdsInstallPts
+
+# 22. Automaatinstall (Unattend 2 faasi) (2p)
+$unattendClientXML = Get-ChildItem -Path "$ActualWdsPath\WdsClientUnattend" -Filter "*.xml" -Recurse -ErrorAction SilentlyContinue
+$unattendImageXML = Get-ChildItem -Path "$ActualWdsPath\Images" -Filter "*.xml" -Recurse -ErrorAction SilentlyContinue
+
+$unattPts = 0
+$unattDet = "<ul style='margin:0; padding-left:20px;'>"
+
+if ($unattendClientXML.Count -gt 0) {
+    $unattPts += 1.0
+    $unattDet += "<li>WDS Boot (Client) Unattend: <b style='color:green'>Leitud (+1p)</b> [$($unattendClientXML[0].FullName)]</li>"
+} else {
+    $unattDet += "<li>WDS Boot (Client) Unattend: <b style='color:red'>Puudu WdsClientUnattend kaustast</b></li>"
+}
+
+if ($unattendImageXML.Count -gt 0) {
+    $unattPts += 1.0
+    $unattDet += "<li>WDS Install Image Unattend: <b style='color:green'>Leitud (+1p)</b> [$($unattendImageXML[0].FullName)]</li>"
+} else {
+    $unattDet += "<li>WDS Install Image Unattend: <b style='color:red'>Puudu Images alamkaustadest</b></li>"
+}
+$unattDet += "</ul>"
+$unattStatus = ($unattPts -eq 2.0)
+Add-Result "Seadista automaatinstall, nii et klientmasin saaks OS-i paigaldatud ilma kasutaja poolse sekkumiseta" "Unattend failid nii Boot kui Install küljes" $unattDet $unattStatus 2.0 $unattPts
 
 
 # --- HTML RAPORTI GENEREERIMINE ---
