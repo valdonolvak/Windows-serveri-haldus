@@ -1,7 +1,3 @@
-Siin on täiendatud ülesande kirjeldus. Lisasin nõutud GPO punkti (nr 12), täiendasin arvutite OU struktuuri (punkt 5) ning kohandasin hindamisjuhendis maksimaalse punktisumma 25 pealt 27 peale, et uus ülesanne sobituks loogiliselt hindamissüsteemi.
-
-Kuna Control Paneli ja Command Prompti keelamine on olemuselt kasutajapõhine poliitika (User Configuration), aga see soovitakse rakendada arvutite OU-le, lisasin õpilastele vihjeks ka *Loopback Processing* nõude – vastasel juhul see GPO ei rakenduks oodatud kujul.
-
 ---
 
 # MEELDETULETUSEKS: Windows operatsioonisüsteemide haldus
