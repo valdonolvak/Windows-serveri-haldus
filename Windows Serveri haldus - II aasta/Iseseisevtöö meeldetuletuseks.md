@@ -117,4 +117,4 @@ Maksimaalne punktisumma on **27 punkti**.
 
 ---
 
-**Edu lõputöö tegemisel! Kui kõik GPO-d on valmis, tee klientmasinatele `gpupdate /force` ja kontrolli tulemust.**
+**Edu ülesande lahendamisel tegemisel! Kui kõik GPO-d on valmis, tee klientmasinatele `gpupdate /force` ja kontrolli tulemust.**
