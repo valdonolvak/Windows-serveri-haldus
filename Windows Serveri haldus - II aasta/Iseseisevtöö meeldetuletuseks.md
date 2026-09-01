@@ -1,3 +1,4 @@
+---
 
 # MEELDETULETUSEKS: Windows operatsioonisüsteemide haldus
 
@@ -66,9 +67,8 @@ Võrguaadress moodustub valemiga **192.168.XXX.0/24**, kus **XXX** on sinu virtu
 
 10. **Tarkvara GPO-d:** Loo GPO-d **`GPO_Software_7zip`** ja **`GPO_Software_Chrome`** tarkvara automaatseks paigalduseks msi pakettidena. (2p.)
 11. **Chrome seadistamine:** Lisa Chrome ADMX paketid ja loo GPO nimega **`GPO_Chrome_Settings`**. Määra koduleheks `https://www.hkhk.edu.ee`.(2p.)
-12. **Piirangute GPO:** Loo GPO nimega **`GPO_piirangud`** ja lingi see OU-ga **OFFICE** (mis asub **ARVUTID** all).
-* Seadista poliitika nii, et selles OU-s olevates arvutites on keelatud käsurea (Command Prompt) ja juhtpaneeli (Control Panel) avamine.
-* *Vihje:* Kuna tegemist on kasutajasätetega (User Configuration), mis rakendatakse arvutite OU-le, pead GPO-s sisse lülitama ka *Group Policy Loopback Processing* funktsiooni. (2p.)
+12. **Sisselogimisekraani teavitustekst:** Loo GPO nimega **`GPO_autentimine`** ja lingi see OU-ga **OFFICE** (mis asub **ARVUTID** all).
+* Seadista arvutipõhine poliitika (*Interactive Logon Message*) nii, et enne kasutaja sisselogimist kuvatakse ekraanil teavitustekst 'Ainult lubatud kasutajatele!' ja pealkirjaks 'Hoiatus!'."**GPO_autentimine**. (2p.)
 
 
 13. **Teine DC (AD2):** Muuda AD2 nimi ja IP. Lisa see teiseks domeenikontrolleriks **PowerShelli** abil. (2p.)
@@ -111,7 +111,7 @@ Maksimaalne punktisumma on **27 punkti**.
 
 * **Infrastruktuur (4p):** AD/DNS seadistus, ketta F: initsialiseerimine, DHCP skoobi loomine, masinate domeeni lisamine.
 * **Kasutajahaldus (4p):** OU struktuuri korrektsus, sisselogimispiirangud, gruppide loomine.
-* **Grupipoliitikad (10p):** Taustapildid (õigustega), Kaustade suunamine, Tarkvara paigaldus, Chrome ADMX ja avaleht, Piirangute GPO (*Loopback processing*).
+* **Grupipoliitikad (10p):** Taustapildid (õigustega), Kaustade suunamine, Tarkvara paigaldus, Chrome ADMX ja avaleht, Sisselogimisekraani teavitustekst.
 * **Serveri haldus (3p):** AD2 lisamine PowerShelliga, DHCP Failover seadistus.
 * **Veebiteenused (6p):** IIS/Wordpressi toimimine, HTTPS sertifikaat, AD kasutajatega autentimine Wordpressis.
 
