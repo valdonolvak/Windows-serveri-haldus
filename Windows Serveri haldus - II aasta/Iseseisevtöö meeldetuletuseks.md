@@ -18,13 +18,16 @@ Pärast käsu kinnitamist tee masinale **Restart**.
 Võrguaadress moodustub valemiga **192.168.XXX.0/24**, kus **XXX** on sinu virtuaalmasina võrguseadme **vnet** number.
 > **Näide:** Kui vnet = 50, siis võrguaadress on **192.168.50.0/24**.
 
-| Masina nimi Proxmoxis | Masina nimi süsteemis | IP-aadress | Roll |
-| :--- | :--- | :--- | :--- |
-| TOO-WinServer-IT25-Nimi | **AD1** | `192.168.XXX.10` | DC, DNS, DHCP, IIS |
-| TOO-Win2022Core-IT25-Nimi | **AD2** | `192.168.XXX.11` | Secondary DC, DHCP Failover |
-| TOO-Winklient-IT25-Nimi | **Arvuti1** | DHCP | Klient (Win 10) |
-| TOO-Win11Ent-IT25-Nimi | **Arvuti2** | DHCP | Klient (Win 11) |
 
+| Masina nimi Proxmoxis | Masina nimi süsteemis | IP-aadress | Roll |
+| --- | --- | --- | --- |
+| win-it25-NIMI-winserver2022-2605-1 | AD1 | `192.168.XXX.10` | DC, DNS, DHCP, IIS |
+| win-it25-NIMI-winserver2022core-2605-1 | AD2 | `192.168.XXX.11` | Secondary DC, DHCP Failover |
+| win-it25-NIMI-winklientwds-1 | Arvuti1 | DHCP | Klient (Win 10 / WDS) |
+| win-it25-NIMI-win11ent2605-1 | Arvuti2 | DHCP | Klient (Win 11) |
+| win-it25-NIMI-win11ent2605-2 | Arvuti3 | DHCP | Klient (Win 11) |
+
+*Märkus: **NIMI** tähistab Proxmoxi masinate nimedes õpilase kasutajanime.*
 *   **Administraatori parool:** `Passw0rd`
 *   **Domeeni loodavate kasutajate parooliks tuleb panna:** `Par00LA!`
 
