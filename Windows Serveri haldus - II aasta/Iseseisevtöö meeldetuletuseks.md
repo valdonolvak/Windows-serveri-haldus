@@ -111,7 +111,7 @@ Maksimaalne punktisumma on **27 punkti**.
 
 * **Infrastruktuur (4p):** AD/DNS seadistus, ketta F: initsialiseerimine, DHCP skoobi loomine, masinate domeeni lisamine.
 * **Kasutajahaldus (4p):** OU struktuuri korrektsus, sisselogimispiirangud, gruppide loomine.
-* **Grupipoliitikad (10p):** Taustapildid (õigustega), Kaustade suunamine, Tarkvara paigaldus, Chrome ADMX ja avaleht, Sisselogimisekraani teavitustekst.
+* **Grupipoliitikad (9p):** Taustapildid (õigustega), Kaustade suunamine, Tarkvara paigaldus, Chrome ADMX ja avaleht, Sisselogimisekraani teavitustekst.
 * **Serveri haldus (3p):** AD2 lisamine PowerShelliga, DHCP Failover seadistus.
 * **Veebiteenused (6p):** IIS/Wordpressi toimimine, HTTPS sertifikaat, AD kasutajatega autentimine Wordpressis.
 
