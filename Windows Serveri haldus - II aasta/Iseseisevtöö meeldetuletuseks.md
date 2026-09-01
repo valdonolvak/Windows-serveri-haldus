@@ -28,7 +28,7 @@ Võrguaadress moodustub valemiga **192.168.XXX.0/24**, kus **XXX** on sinu virtu
 | --- | --- | --- | --- |
 | win-it25-NIMI-winserver2022-2605-1 | AD1 | `192.168.XXX.10` | DC, DNS, DHCP, IIS |
 | win-it25-NIMI-winserver2022core-2605-1 | AD2 | `192.168.XXX.11` | Secondary DC, DHCP Failover |
-| win-it25-NIMI-winklientwds-1 | Arvuti1 | DHCP | Klient (Win 10 / WDS) |
+| win-it25-NIMI-winklientwds-1 | Arvuti1 | DHCP | Klient (Win 11 / WDS) |
 | win-it25-NIMI-win11ent2605-1 | Arvuti2 | DHCP | Klient (Win 11) |
 | win-it25-NIMI-win11ent2605-2 | Arvuti3 | DHCP | Klient (Win 11) |
 
