@@ -1,4 +1,3 @@
----
 
 # MEELDETULETUSEKS: Windows operatsioonisüsteemide haldus
 
