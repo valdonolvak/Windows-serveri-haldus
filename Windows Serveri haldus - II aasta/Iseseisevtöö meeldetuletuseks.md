@@ -68,7 +68,7 @@ Võrguaadress moodustub valemiga **192.168.XXX.0/24**, kus **XXX** on sinu virtu
 10. **Tarkvara GPO-d:** Loo GPO-d **`GPO_Software_7zip`** ja **`GPO_Software_Chrome`** tarkvara automaatseks paigalduseks msi pakettidena. (2p.)
 11. **Chrome seadistamine:** Lisa Chrome ADMX paketid ja loo GPO nimega **`GPO_Chrome_Settings`**. Määra koduleheks `https://www.hkhk.edu.ee`.(2p.)
 12. **Sisselogimisekraani teavitustekst:** Loo GPO nimega **`GPO_autentimine`** ja lingi see OU-ga **OFFICE** (mis asub **ARVUTID** all).
-* Seadista arvutipõhine poliitika (*Interactive Logon Message*) nii, et enne kasutaja sisselogimist kuvatakse ekraanil teavitustekst 'Ainult lubatud kasutajatele!' ja pealkirjaks 'Hoiatus!'."**GPO_autentimine**. (2p.)
+* Seadista arvutipõhine poliitika (*Interactive Logon Message*) nii, et enne kasutaja sisselogimist kuvatakse ekraanil teavitustekst 'Ainult lubatud kasutajatele!' ja pealkirjaks 'Hoiatus!'."**GPO_autentimine**. (1p.)
 
 
 13. **Teine DC (AD2):** Muuda AD2 nimi ja IP. Lisa see teiseks domeenikontrolleriks **PowerShelli** abil. (2p.)
