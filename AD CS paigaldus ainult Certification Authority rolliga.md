@@ -1,6 +1,3 @@
-Jah — **sinu sise-domeeni `minuleht.perenimi.local` HTTPS-i jaoks ei ole CA Web Enrollment vajalik**. Microsofti järgi on CA Web Enrollment lihtsalt **brauseripõhine** sertifikaaditellimise viis; see sobib eriti siis, kui tahad teha käsitsi interaktiivseid taotlusi või töötada stand-alone CA-ga. Enterprise CA saab sertifikaaditaotlusi vastu võtta ka **Certificates MMC snap-in’i** või **PowerShelli `Get-Certificate` cmdleti** kaudu, seega võib Web Enrollmenti täiesti välja jätta. ([Microsoft Learn][1])
-
-Allpool ongi **ainult ilma Web Enrollmentita juhend**. 
 
 **NB! Vali kas Powershell või GUI (Graphical User Interface) - kui alguses Powershelliga paigaldada, siis GUI vaates on asi tehtud. Seega vali üks kahest meetodist, mis moodi sa seda teha soovid.
 **
