@@ -62,7 +62,7 @@ Võrguaadress moodustub valemiga **192.168.XXX.0/24**, kus **XXX** on sinu virtu
 
 9. **Kaustade suunamine (Folder Redirection):** Loo GPO nimega **`GPO_Folder_Redirection`**.
 * Suuna kasutajate **Desktop** ja **Documents** kaustad serverisse `\\AD1\Kasutajad$`.
-* *Juhend:* [https://shorturl.at/sZMcJ](https://shorturl.at/sZMcJ) (2p.)
+* *Juhend:* https://github.com/valdonolvak/Windows-serveri-haldus/blob/main/Kasutajate%20kaustade%20ymbersuunamine%20v%C3%B5rgukettale.md (2p.)
 
 
 10. **Tarkvara GPO-d:** Loo GPO-d **`GPO_Software_7zip`** ja **`GPO_Software_Chrome`** tarkvara automaatseks paigalduseks msi pakettidena. (2p.)
