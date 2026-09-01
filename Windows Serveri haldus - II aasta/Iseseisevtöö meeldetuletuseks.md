@@ -23,9 +23,9 @@ Võrguaadress moodustub valemiga **192.168.XXX.0/24**, kus **XXX** on sinu virtu
 | --- | --- | --- | --- |
 | win-it25-NIMI-winserver2022-2605-1 | AD1 | `192.168.XXX.10` | DC, DNS, DHCP, IIS |
 | win-it25-NIMI-winserver2022core-2605-1 | AD2 | `192.168.XXX.11` | Secondary DC, DHCP Failover |
-| win-it25-NIMI-winklientwds-1 | Arvuti1 | DHCP | Klient (Win 10 / WDS) |
-| win-it25-NIMI-win11ent2605-1 | Arvuti2 | DHCP | Klient (Win 11) |
-| win-it25-NIMI-win11ent2605-2 | Arvuti3 | DHCP | Klient (Win 11) |
+| win-it25-NIMI-winklientwds-1 | Arvuti3 | DHCP | Klient (Win 11 / WDS) |
+| win-it25-NIMI-win11ent2605-1 | Arvuti1 | DHCP | Klient (Win 11) |
+| win-it25-NIMI-win11ent2605-2 | Arvuti2 | DHCP | Klient (Win 11) |
 
 *Märkus: **NIMI** tähistab Proxmoxi masinate nimedes õpilase kasutajanime.*
 *   **Administraatori parool:** `Passw0rd`
@@ -40,7 +40,7 @@ Võrguaadress moodustub valemiga **192.168.XXX.0/24**, kus **XXX** on sinu virtu
     *   Loo kettale **F:** kaustad `STUFF`, `WWW` ja `Kasutajad$`. Kõik edasised jagatud ressursid peavad asuma sellel kettal.
 3.  **DHCP server:** Seadista AD1 peal DHCP skoop nimega **HKHK**. Vahemik: `192.168.XXX.100 - 120`. (1p.)
 4.  **Domeeniga liitumine:** Muuda klientarvutite nimed (**Arvuti1**, **Arvuti2**) ja lisa nad domeeni. (1p.)
-5.   **OU struktuur arvutite jaoks**: Loo domeeniarvutite jaoks OU nimega **ARVUTID** ning selle sisse OU'd **Win10** ja **Win11**. Seejärel pane Windows10 klientmasin OU sisse **Win10** ja Windows 11 operatsioonisüsteemiga klientmasin OU **Win11** alla. (1p.)
+5.   **OU struktuur arvutite jaoks**: Loo domeeniarvutite jaoks OU nimega **ARVUTID** ning selle sisse OU'd **STAFF** ja **OFFICE**. Seejärel pane Arvuti1 klientmasin OU sisse **STAFF** ja Arvuti2 operatsioonisüsteemiga klientmasin OU **OFFICE** alla. (1p.)
 6.   **OU struktuur:** Loo OU nimega **KASUTAJAD** ning selle alla alam-OU-d: **LEKTORID**, **TUDENGID** ja **VEEB**. (1p.)
 7.  **Kasutajad ja grupid:**
     *   **LEKTORID:** Grupp `Lektorid`, kasutajad `oppejoud1` ja `oppejoud2`.
