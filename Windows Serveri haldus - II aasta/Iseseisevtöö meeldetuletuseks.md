@@ -1,4 +1,4 @@
-# LÕPUTÖÖ: Windows operatsioonisüsteemide haldus
+# MEELDETULETUSEKS: Windows operatsioonisüsteemide haldus
 
 ### ⚠️ ETTEVALMISTUS JA LITSENTS
 Windowsi prooviversioonid sulgevad end automaatselt iga tunni järel, kui litsentsi aeg on läbi. 
