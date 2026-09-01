@@ -86,8 +86,8 @@ Võrguaadress moodustub valemiga **192.168.XXX.0/24**, kus **XXX** on sinu virtu
 * *Juhend:* [https://docs.google.com/document/d/1PdVANFAdp5Q0HSk4ERyRxOv9Xincgx7x](https://docs.google.com/document/d/1PdVANFAdp5Q0HSk4ERyRxOv9Xincgx7x) - sellele saate ligi kooli Gmaili kontoga
 
 
-16. **HTTPS seadistamine:** Seadista Wordpressi lehele HTTPS ühendus (Self-signed sertifikaat).
-* *Juhend:* [https://shorturl.at/QkQHJ](https://shorturl.at/QkQHJ) (2p.)
+16. **HTTPS seadistamine:** Seadista Wordpressi lehele HTTPS ühendus (CA sertifikaat - domeenis usaldatud läbi AD CSi teenuse).
+* *Juhend:* https://github.com/valdonolvak/Windows-serveri-haldus/blob/main/AD%20CS%20paigaldus%20ainult%20Certification%20Authority%20rolliga.md (2p.)
 
 
 17. **AD Autentimine WP-s:** Paigalda plugin, mis lubab **VEEB** OU kasutajatel (`Peatoimetaja`, `ToimetajaAbi`, parool `Toimetaja123!`) logida Wordpressi sisse oma domeenikasutajaga. (2p.)
