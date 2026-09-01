@@ -9,8 +9,8 @@ Pärast käsu kinnitamist tee masinale **Restart**.
 ---
 
 ### 1. Keskkond ja ligipääs
-*   **Aadress (sisevõrgus):** [https://10.231.231.2:8007](https://10.231.231.2:8007)
-*   **Aadress (väljast):** [https://proxmox.hkhk.edu.ee:8007](https://proxmox.hkhk.edu.ee:8007)
+*   **Aadress (sisevõrgus):** https://193.40.178.155:8006/ 
+*   **Aadress (väljast):** https://193.40.178.155:8006/
 *   **Realm:** `hkhk.edu.ee` | **Kasutaja:** eesnime esitäht + perekonnanimi
 *   **Info:** Töö ajal on lubatud kasutada internetis leiduvaid materjale ja juhendeid.
 
