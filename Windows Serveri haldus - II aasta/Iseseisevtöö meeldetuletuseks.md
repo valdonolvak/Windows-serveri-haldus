@@ -100,10 +100,10 @@ Maksimaalne punktisumma on **27 punkti**.
 
 | Punktid | Hinne | Kirjeldus |
 | --- | --- | --- |
-| **24 - 27** | **5 (Väga hea)** | Kõik teenused töötavad veatult, GPO-d on korrektselt nimega ja lingitud, dokumentatsioon/failitee (F:) on õige. |
-| **19 - 23** | **4 (Hea)** | Enamus teenuseid töötab, esineb väiksemaid loogikavigu või mõni GPO ei rakendu täielikult. |
-| **14 - 18** | **3 (Rahuldav)** | Põhiteenused (AD, DNS, DHCP) töötavad, kuid keerukamad osad (Failover, HTTPS, AD Auth) on puudulikud. |
-| **< 14** | **2 (Mittearvestatud)** | Kriitilised teenused ei tööta, masinad ei ole domeenis või seadistus on poolik. |
+| **23 - 25** | **5 (Väga hea)** | Kõik teenused töötavad veatult, GPO-d on korrektselt nimega ja lingitud, dokumentatsioon/failitee (F:) on õige. |
+| **18 - 22** | **4 (Hea)** | Enamus teenuseid töötab, esineb väiksemaid loogikavigu või mõni GPO ei rakendu täielikult. |
+| **13 - 17** | **3 (Rahuldav)** | Põhiteenused (AD, DNS, DHCP) töötavad, kuid keerukamad osad (Failover, HTTPS, AD Auth) on puudulikud. |
+| **< 13** | **2 (Mittearvestatud)** | Kriitilised teenused ei tööta, masinad ei ole domeenis või seadistus on poolik. |
 
 ---
 
