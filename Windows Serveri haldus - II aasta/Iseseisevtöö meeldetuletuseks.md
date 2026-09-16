@@ -82,7 +82,7 @@ Võrguaadress moodustub valemiga **192.168.XXX.0/24**, kus **XXX** on sinu virtu
 
 15. **IIS ja Wordpress:** Paigalda IIS ja Wordpress.
 * Nimi: `veebileht.perenimi.local` | Failid: `F:\WWW\veebileht.perenimi.local`
-* AB: `wp_loputoo`, kasutaja `wpuser`, parool `Passw0rd!`. (2p.)
+* AB: `wp_kordamine`, kasutaja `wpuser`, parool `Passw0rd!`. (2p.)
 * *Juhend:* [https://docs.google.com/document/d/1PdVANFAdp5Q0HSk4ERyRxOv9Xincgx7x](https://docs.google.com/document/d/1PdVANFAdp5Q0HSk4ERyRxOv9Xincgx7x) - sellele saate ligi kooli Gmaili kontoga
 
 
