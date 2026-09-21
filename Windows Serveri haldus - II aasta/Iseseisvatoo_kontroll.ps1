@@ -1135,22 +1135,22 @@ Add-DetailedTask "14. DHCP Failover" 1 {
 # ---------------------------------------------------------------------------
 # 15. IIS + WORDPRESS - 2p
 # ---------------------------------------------------------------------------
-
+ 
 Add-DetailedTask "15. IIS ja WordPress" 2 {
     $domain = $Domain
-
+ 
     if (-not $domain) {
         return @{
             Points = 0
             Feedback = "Domeeni ei õnnestunud tuvastada."
         }
     }
-
+ 
     $expectedName = "veebileht.$domain"
     $expectedPath = "F:\WWW\veebileht.$domain"
-
+ 
     $site = $null
-
+ 
     try {
         $site = Get-Website -ErrorAction SilentlyContinue |
             Where-Object {
@@ -1159,64 +1159,81 @@ Add-DetailedTask "15. IIS ja WordPress" 2 {
             } |
             Select-Object -First 1
     } catch {}
-
+ 
     $sitePath = $null
     if ($site) {
         $sitePath = $site.PhysicalPath
     } elseif (Test-Path $expectedPath) {
         $sitePath = $expectedPath
     }
-
+ 
     $wpConfigPath = $null
     $wpConfigOk = $false
     $dbNameOk = $false
     $dbUserOk = $false
     $dbPassOk = $false
-
+    $dbNameFound = $null
+    $dbUserFound = $null
+    $dbPassFound = $null
+ 
     if ($sitePath) {
         $wpConfigPath = Join-Path $sitePath "wp-config.php"
-
+ 
         if (Test-Path $wpConfigPath) {
             $wpConfigOk = $true
-
+ 
             try {
                 $content = Get-Content $wpConfigPath -Raw -ErrorAction Stop
-
-                $dbNameOk = $content -match "DB_NAME\s*,\s*['""]wp_kordamine['""]"
-                $dbUserOk = $content -match "DB_USER\s*,\s*['""]wpuser['""]"
-                $dbPassOk = $content -match "DB_PASSWORD\s*,\s*['""]Passw0rd!['""]"
+ 
+                if ($content -match "DB_NAME['""]\s*,\s*['""]([^'""]*)['""]") {
+                    $dbNameFound = $matches[1]
+                }
+                if ($content -match "DB_USER['""]\s*,\s*['""]([^'""]*)['""]") {
+                    $dbUserFound = $matches[1]
+                }
+                if ($content -match "DB_PASSWORD['""]\s*,\s*['""]([^'""]*)['""]") {
+                    $dbPassFound = $matches[1]
+                }
+ 
+                $dbNameOk = ($dbNameFound -eq "wp_kordamine")
+                $dbUserOk = ($dbUserFound -eq "wpuser")
+                $dbPassOk = ($dbPassFound -eq "Passw0rd!")
             } catch {}
         }
     }
-
+ 
     $p = 0
     $fb = @()
-
+ 
     if ($site) {
         $p += 1
         $fb += "IIS sait leitud: $($site.Name), path: $($site.PhysicalPath)"
     } else {
         $fb += "IIS saiti $expectedName / F:\WWW\ alt ei leitud"
     }
-
+ 
     if ($wpConfigOk) {
         if ($dbNameOk -and $dbUserOk -and $dbPassOk) {
             $p += 1
             $fb += "wp-config.php leitud ja AB/wpuser/parool vastavad"
         } else {
             $p += 0.5
-            $fb += "wp-config.php leitud, kuid AB/wpuser/parooli väärtused ei vasta täielikult"
+            $mismatch = @()
+            if (-not $dbNameOk) { $mismatch += "DB_NAME oodatud 'wp_kordamine', leitud '$dbNameFound'" }
+            if (-not $dbUserOk) { $mismatch += "DB_USER oodatud 'wpuser', leitud '$dbUserFound'" }
+            if (-not $dbPassOk) { $mismatch += "DB_PASSWORD oodatud 'Passw0rd!', leitud '$dbPassFound'" }
+            $fb += "wp-config.php leitud, kuid: $($mismatch -join '; ')"
         }
     } else {
-        $fb += "wp-config.php puudub"
+        $fb += "wp-config.php puudub (otsitud: $wpConfigPath)"
     }
-
+ 
     return @{
         Points = $p
         Feedback = ($fb -join " | ")
     }
 }
-
+ 
 # ---------------------------------------------------------------------------
 # 16. HTTPS + AD CS - 2p
 # ---------------------------------------------------------------------------
