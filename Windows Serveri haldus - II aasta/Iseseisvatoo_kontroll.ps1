@@ -1179,22 +1179,22 @@ Add-DetailedTask "14. DHCP Failover" 1 {
 # ---------------------------------------------------------------------------
 # 15. IIS + WORDPRESS - 2p
 # ---------------------------------------------------------------------------
-
+ 
 Add-DetailedTask "15. IIS ja WordPress" 2 {
     $domain = $Domain
-
+ 
     if (-not $domain) {
         return @{
             Points = 0
             Feedback = "Domeeni ei õnnestunud tuvastada."
         }
     }
-
+ 
     $expectedName = "veebileht.$domain"
     $expectedPath = "F:\WWW\veebileht.$domain"
-
+ 
     $site = $null
-
+ 
     try {
         $site = Get-Website -ErrorAction SilentlyContinue |
             Where-Object {
@@ -1203,14 +1203,14 @@ Add-DetailedTask "15. IIS ja WordPress" 2 {
             } |
             Select-Object -First 1
     } catch {}
-
+ 
     $sitePath = $null
     if ($site) {
         $sitePath = $site.PhysicalPath
     } elseif (Test-Path $expectedPath) {
         $sitePath = $expectedPath
     }
-
+ 
     $wpConfigPath = $null
     $wpConfigOk = $false
     $dbNameOk = $false
@@ -1219,16 +1219,16 @@ Add-DetailedTask "15. IIS ja WordPress" 2 {
     $dbNameFound = $null
     $dbUserFound = $null
     $dbPassFound = $null
-
+ 
     if ($sitePath) {
         $wpConfigPath = Join-Path $sitePath "wp-config.php"
-
+ 
         if (Test-Path $wpConfigPath) {
             $wpConfigOk = $true
-
+ 
             try {
                 $content = Get-Content $wpConfigPath -Raw -ErrorAction Stop
-
+ 
                 if ($content -match "DB_NAME['""]\s*,\s*['""]([^'""]*)['""]") {
                     $dbNameFound = $matches[1]
                 }
@@ -1238,24 +1238,24 @@ Add-DetailedTask "15. IIS ja WordPress" 2 {
                 if ($content -match "DB_PASSWORD['""]\s*,\s*['""]([^'""]*)['""]") {
                     $dbPassFound = $matches[1]
                 }
-
+ 
                 $dbNameOk = ($dbNameFound -eq "wp_kordamine")
                 $dbUserOk = ($dbUserFound -eq "wpuser")
                 $dbPassOk = ($dbPassFound -eq "Passw0rd!")
             } catch {}
         }
     }
-
+ 
     $p = 0
     $fb = @()
-
+ 
     if ($site) {
         $p += 1
         $fb += "IIS sait leitud: $($site.Name), path: $($site.PhysicalPath)"
     } else {
         $fb += "IIS saiti $expectedName / F:\WWW\ alt ei leitud"
     }
-
+ 
     if ($wpConfigOk) {
         if ($dbNameOk -and $dbUserOk -and $dbPassOk) {
             $p += 1
@@ -1271,13 +1271,13 @@ Add-DetailedTask "15. IIS ja WordPress" 2 {
     } else {
         $fb += "wp-config.php puudub (otsitud: $wpConfigPath)"
     }
-
+ 
     return @{
         Points = $p
         Feedback = ($fb -join " | ")
     }
 }
-
+ 
 # ---------------------------------------------------------------------------
 # 16. HTTPS + AD CS - 2p
 # ---------------------------------------------------------------------------
