@@ -877,41 +877,60 @@ Add-DetailedTask "10. GPO Software 7zip ja Chrome" 2 {
 # ---------------------------------------------------------------------------
 # 11. CHROME ADMX + KODULEHT - 2p
 # ---------------------------------------------------------------------------
-
+ 
 Add-DetailedTask "11. GPO_Chrome_Settings" 2 {
     $r = Test-GpoExistsAndLinked -GpoName "GPO_Chrome_Settings"
-
-    $admxCandidates = @(
-        "$env:SystemRoot\SYSVOL\domain\Policies\PolicyDefinitions\chrome.admx",
-        "$env:SystemRoot\SYSVOL\sysvol\$Domain\Policies\PolicyDefinitions\chrome.admx",
-        "$env:SystemRoot\SYSVOL\sysvol\$Domain\Policies\PolicyDefinitions\chrome.admx"
+ 
+    # Rekursiivne otsing täpse tee arvamise asemel - otsime chrome.admx
+    # nii kohalikust PolicyDefinitions kaustast kui kogu SYSVOL puust,
+    # ükskõik millise domeeninime/käänu all see peidus on.
+    $searchRoots = @(
+        "$env:SystemRoot\PolicyDefinitions",
+        "$env:SystemRoot\SYSVOL"
     )
-
-    $admxOk = $false
-    foreach ($path in $admxCandidates) {
-        if (Test-Path $path) {
-            $admxOk = $true
-            break
+ 
+    $admxFile = $null
+    foreach ($root in $searchRoots) {
+        if (Test-Path $root) {
+            $found = Get-ChildItem -Path $root -Recurse -Filter "chrome.admx" `
+                -ErrorAction SilentlyContinue -Force |
+                Select-Object -First 1
+            if ($found) {
+                $admxFile = $found
+                break
+            }
         }
     }
-
+ 
+    $admxOk = $false
+    $admxLocation = "puudub"
+ 
+    if ($admxFile) {
+        if ($admxFile.FullName -match "SYSVOL") {
+            $admxOk = $true
+            $admxLocation = "Central Store ($($admxFile.FullName))"
+        } else {
+            $admxLocation = "kohalik PolicyDefinitions ($($admxFile.FullName))"
+        }
+    }
+ 
     $homepageOk = $false
-
+ 
     try {
         $val = Get-GPRegistryValue `
             -Name "GPO_Chrome_Settings" `
             -Key "HKLM\Software\Policies\Google\Chrome" `
             -ValueName "HomepageLocation" `
             -ErrorAction SilentlyContinue
-
+ 
         if ($val -and $val.Value -eq "https://www.hkhk.edu.ee") {
             $homepageOk = $true
         }
     } catch {}
-
+ 
     $p = 0
     $fb = @()
-
+ 
     if ($r.Exists -and $r.Linked) {
         $p += 0.5
         $fb += "GPO olemas ja lingitud"
@@ -921,27 +940,32 @@ Add-DetailedTask "11. GPO_Chrome_Settings" 2 {
     } else {
         $fb += "GPO puudub"
     }
-
+ 
     if ($admxOk) {
         $p += 0.75
-        $fb += "Chrome ADMX leitud"
+        $fb += "chrome.admx leitud: $admxLocation"
+    } elseif ($admxFile) {
+        # Leitud, aga mitte Central Store'is - anname osalised punktid,
+        # kuna ADMX PÕHIMÕTTELISELT on masinas olemas ja töötab,
+        # lihtsalt vales (mitte-domeeni) asukohas.
+        $p += 0.35
+        $fb += "chrome.admx leitud AINULT kohalikult, MITTE Central Store'ist: $admxLocation. Selle tõttu sai GPO-d küll konfigureerida, aga nõue oli lisada ADMX domeeni Central Store'i (SYSVOL), et kõik masinad/administraatorid näeksid seadeid ühtemoodi."
     } else {
-        $fb += "Chrome ADMX ei leitud"
+        $fb += "chrome.admx-i ei leitud ei Central Store'ist ega kohalikust PolicyDefinitions kaustast"
     }
-
+ 
     if ($homepageOk) {
         $p += 0.75
         $fb += "Koduleht on https://www.hkhk.edu.ee"
     } else {
         $fb += "Kodulehe registriväärtust ei õnnestunud kinnitada"
     }
-
+ 
     return @{
         Points = $p
         Feedback = ($fb -join " | ")
     }
 }
-
 # ---------------------------------------------------------------------------
 # 12. GPO_autentimine - 1p
 # ---------------------------------------------------------------------------
