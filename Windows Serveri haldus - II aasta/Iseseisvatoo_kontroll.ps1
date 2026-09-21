@@ -942,29 +942,36 @@ Add-DetailedTask "12. GPO_autentimine" 1 {
         -GpoName "GPO_autentimine" `
         -ExpectedLinkOuNameContains "OFFICE"
  
-    # Interactive logon Message text/title on "Security Options" säte, mis
-    # EI ole Registry.pol-is (Get-GPRegistryValue ei näe seda), vaid
-    # GptTmpl.inf-is / GPO Report'is. Loeme selle seetõttu otse siin,
-    # ilma eraldi funktsioonita (vältimaks skriptiploki skoobiprobleeme).
+    # Interactive logon Message text/title on "Security Options" säte.
+    # Kõige usaldusväärsem allikas on GPO enda GptTmpl.inf fail SYSVOL-is
+    # (lihtne INI-formaat: LegalNoticeCaption=1,"Hoiatus!"), mitte
+    # Registry.pol (Get-GPRegistryValue ei näe seda) ega GPO Report XML
+    # (mille struktuur mitmerealiste/lühikeste väärtuste vahel erineb).
     $captionValue = $null
     $textValue = $null
  
     try {
         $gpo12 = Get-GPO -Name "GPO_autentimine" -ErrorAction Stop
-        [xml]$report12 = Get-GPOReport -Guid $gpo12.Id -ReportType Xml -ErrorAction Stop
  
-        $secNodes = $report12.SelectNodes("//*[local-name()='SecurityOptions']")
-        foreach ($node in $secNodes) {
-            $keyNode = $node.SelectSingleNode("*[local-name()='KeyName']")
-            if (-not $keyNode) { continue }
+        $gptCandidates = @(
+            "$env:SystemRoot\SYSVOL\domain\Policies\{$($gpo12.Id)}\MACHINE\Microsoft\Windows NT\SecEdit\GptTmpl.inf",
+            "$env:SystemRoot\SYSVOL\sysvol\$Domain\Policies\{$($gpo12.Id)}\MACHINE\Microsoft\Windows NT\SecEdit\GptTmpl.inf"
+        )
  
-            if ($keyNode.InnerText -match "LegalNoticeCaption") {
-                $settingNode = $node.SelectSingleNode("*[local-name()='SettingString']")
-                if ($settingNode -and $settingNode.InnerText) { $captionValue = $settingNode.InnerText }
+        $gptContent = $null
+        foreach ($path in $gptCandidates) {
+            if (Test-Path $path) {
+                $gptContent = Get-Content -Path $path -Raw -ErrorAction Stop
+                break
             }
-            elseif ($keyNode.InnerText -match "LegalNoticeText") {
-                $settingNode = $node.SelectSingleNode("*[local-name()='SettingString']")
-                if ($settingNode -and $settingNode.InnerText) { $textValue = $settingNode.InnerText }
+        }
+ 
+        if ($gptContent) {
+            if ($gptContent -match 'LegalNoticeCaption\s*=\s*\d+\s*,\s*"([^"]*)"') {
+                $captionValue = $matches[1]
+            }
+            if ($gptContent -match 'LegalNoticeText\s*=\s*\d+\s*,\s*"([^"]*)"') {
+                $textValue = $matches[1]
             }
         }
     } catch {}
@@ -972,7 +979,42 @@ Add-DetailedTask "12. GPO_autentimine" 1 {
     $captionOk = ($captionValue -eq "Hoiatus!")
     $textOk = ($textValue -eq "Ainult lubatud kasutajatele!")
  
-    # Varuvariant - kui väärtus on siiski Registry.pol kaudu seadistatud.
+    # Varuvariant nr 1 - GPO Report XML (kui GptTmpl.inf ei olnud loetav).
+    if (-not $captionOk -or -not $textOk) {
+        try {
+            [xml]$report12 = Get-GPOReport -Guid $gpo12.Id -ReportType Xml -ErrorAction Stop
+            $secNodes = $report12.SelectNodes("//*[local-name()='SecurityOptions']")
+            foreach ($node in $secNodes) {
+                $keyNode = $node.SelectSingleNode("*[local-name()='KeyName']")
+                if (-not $keyNode) { continue }
+ 
+                # Väärtus võib olla kas üksik SettingString või mitmerealine
+                # SettingStrings (Value elementide list) - proovime mõlemat
+                # ja eemaldame ümbritsevad jutumärgid, kui neid leidub.
+                $settingNode = $node.SelectSingleNode("*[local-name()='SettingString']")
+                $val = $null
+                if ($settingNode -and $settingNode.InnerText) {
+                    $val = $settingNode.InnerText.Trim('"')
+                } else {
+                    $stringsNodes = $node.SelectNodes("*[local-name()='SettingStrings']/*[local-name()='Value']")
+                    if ($stringsNodes -and $stringsNodes.Count -gt 0) {
+                        $val = (($stringsNodes | ForEach-Object { $_.InnerText }) -join "`n").Trim('"')
+                    }
+                }
+ 
+                if (-not $captionOk -and $keyNode.InnerText -match "LegalNoticeCaption" -and $val) {
+                    $captionValue = $val
+                    $captionOk = ($captionValue -eq "Hoiatus!")
+                }
+                if (-not $textOk -and $keyNode.InnerText -match "LegalNoticeText" -and $val) {
+                    $textValue = $val
+                    $textOk = ($textValue -eq "Ainult lubatud kasutajatele!")
+                }
+            }
+        } catch {}
+    }
+ 
+    # Varuvariant nr 2 - Registry.pol (harva asjakohane, aga kahjutu proovida).
     if (-not $captionOk -or -not $textOk) {
         try {
             $captionReg = Get-GPRegistryValue `
