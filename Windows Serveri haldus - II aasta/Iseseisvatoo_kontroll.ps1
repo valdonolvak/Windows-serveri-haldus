@@ -730,6 +730,48 @@ function Test-GpoExistsAndLinked {
     }
 }
 
+function Get-GpoSecurityOptionValue {
+    <#
+    (Ei ole enam kasutuses - loogika on toodud otse punkt 12 sisse, et
+    vältida skriptiploki skoobiga seotud probleeme. Jäetud alles juhuks,
+    kui seda mujal kasutada soovid.)
+    #>
+    param(
+        [string]$GpoName,
+        [string]$KeyNameSuffix
+    )
+
+    try {
+        $gpo = Get-GPO -Name $GpoName -ErrorAction Stop
+        [xml]$report = Get-GPOReport -Guid $gpo.Id -ReportType Xml -ErrorAction Stop
+    }
+    catch {
+        return $null
+    }
+
+    if (-not $report) { return $null }
+
+    $nodes = $report.SelectNodes("//*[local-name()='SecurityOptions']")
+
+    foreach ($node in $nodes) {
+        $keyNode = $node.SelectSingleNode("*[local-name()='KeyName']")
+        if ($keyNode -and $keyNode.InnerText -match [regex]::Escape($KeyNameSuffix)) {
+
+            $settingNode = $node.SelectSingleNode("*[local-name()='SettingString']")
+            if ($settingNode -and $settingNode.InnerText) {
+                return $settingNode.InnerText
+            }
+
+            $displayNode = $node.SelectSingleNode("*[local-name()='Display']/*[local-name()='DisplayString']")
+            if ($displayNode -and $displayNode.InnerText) {
+                return $displayNode.InnerText
+            }
+        }
+    }
+
+    return $null
+}
+
 # ---------------------------------------------------------------------------
 # 8. TAUSTAPILDI GPO - 2p
 # ---------------------------------------------------------------------------
@@ -877,33 +919,33 @@ Add-DetailedTask "10. GPO Software 7zip ja Chrome" 2 {
 # ---------------------------------------------------------------------------
 # 11. CHROME ADMX + KODULEHT - 2p
 # ---------------------------------------------------------------------------
- 
+
 Add-DetailedTask "11. GPO_Chrome_Settings" 2 {
     $r = Test-GpoExistsAndLinked -GpoName "GPO_Chrome_Settings"
- 
+
     # Kontrollime chrome.admx olemasolu ainult kohalikus PolicyDefinitions
     # kaustas (C:\Windows\PolicyDefinitions) - domeeni Central Store'i
     # (SYSVOL) EI kontrollita.
     $admxPath = "$env:SystemRoot\PolicyDefinitions\chrome.admx"
     $admxOk = Test-Path $admxPath
- 
+
     $homepageOk = $false
- 
+
     try {
         $val = Get-GPRegistryValue `
             -Name "GPO_Chrome_Settings" `
             -Key "HKLM\Software\Policies\Google\Chrome" `
             -ValueName "HomepageLocation" `
             -ErrorAction SilentlyContinue
- 
+
         if ($val -and $val.Value -eq "https://www.hkhk.edu.ee") {
             $homepageOk = $true
         }
     } catch {}
- 
+
     $p = 0
     $fb = @()
- 
+
     if ($r.Exists -and $r.Linked) {
         $p += 0.5
         $fb += "GPO olemas ja lingitud"
@@ -913,35 +955,36 @@ Add-DetailedTask "11. GPO_Chrome_Settings" 2 {
     } else {
         $fb += "GPO puudub"
     }
- 
+
     if ($admxOk) {
         $p += 0.75
         $fb += "chrome.admx leitud kaustast $admxPath"
     } else {
         $fb += "chrome.admx ei leitud kaustast $admxPath"
     }
- 
+
     if ($homepageOk) {
         $p += 0.75
         $fb += "Koduleht on https://www.hkhk.edu.ee"
     } else {
         $fb += "Kodulehe registriväärtust ei õnnestunud kinnitada"
     }
- 
+
     return @{
         Points = $p
         Feedback = ($fb -join " | ")
     }
 }
+
 # ---------------------------------------------------------------------------
 # 12. GPO_autentimine - 1p
 # ---------------------------------------------------------------------------
- 
+
 Add-DetailedTask "12. GPO_autentimine" 1 {
     $r = Test-GpoExistsAndLinked `
         -GpoName "GPO_autentimine" `
         -ExpectedLinkOuNameContains "OFFICE"
- 
+
     # Interactive logon Message text/title on "Security Options" säte.
     # Kõige usaldusväärsem allikas on GPO enda GptTmpl.inf fail SYSVOL-is
     # (lihtne INI-formaat: LegalNoticeCaption=1,"Hoiatus!"), mitte
@@ -949,15 +992,15 @@ Add-DetailedTask "12. GPO_autentimine" 1 {
     # (mille struktuur mitmerealiste/lühikeste väärtuste vahel erineb).
     $captionValue = $null
     $textValue = $null
- 
+
     try {
         $gpo12 = Get-GPO -Name "GPO_autentimine" -ErrorAction Stop
- 
+
         $gptCandidates = @(
             "$env:SystemRoot\SYSVOL\domain\Policies\{$($gpo12.Id)}\MACHINE\Microsoft\Windows NT\SecEdit\GptTmpl.inf",
             "$env:SystemRoot\SYSVOL\sysvol\$Domain\Policies\{$($gpo12.Id)}\MACHINE\Microsoft\Windows NT\SecEdit\GptTmpl.inf"
         )
- 
+
         $gptContent = $null
         foreach ($path in $gptCandidates) {
             if (Test-Path $path) {
@@ -965,7 +1008,7 @@ Add-DetailedTask "12. GPO_autentimine" 1 {
                 break
             }
         }
- 
+
         if ($gptContent) {
             if ($gptContent -match 'LegalNoticeCaption\s*=\s*\d+\s*,\s*"([^"]*)"') {
                 $captionValue = $matches[1]
@@ -975,10 +1018,10 @@ Add-DetailedTask "12. GPO_autentimine" 1 {
             }
         }
     } catch {}
- 
+
     $captionOk = ($captionValue -eq "Hoiatus!")
     $textOk = ($textValue -eq "Ainult lubatud kasutajatele!")
- 
+
     # Varuvariant nr 1 - GPO Report XML (kui GptTmpl.inf ei olnud loetav).
     if (-not $captionOk -or -not $textOk) {
         try {
@@ -987,7 +1030,7 @@ Add-DetailedTask "12. GPO_autentimine" 1 {
             foreach ($node in $secNodes) {
                 $keyNode = $node.SelectSingleNode("*[local-name()='KeyName']")
                 if (-not $keyNode) { continue }
- 
+
                 # Väärtus võib olla kas üksik SettingString või mitmerealine
                 # SettingStrings (Value elementide list) - proovime mõlemat
                 # ja eemaldame ümbritsevad jutumärgid, kui neid leidub.
@@ -1001,7 +1044,7 @@ Add-DetailedTask "12. GPO_autentimine" 1 {
                         $val = (($stringsNodes | ForEach-Object { $_.InnerText }) -join "`n").Trim('"')
                     }
                 }
- 
+
                 if (-not $captionOk -and $keyNode.InnerText -match "LegalNoticeCaption" -and $val) {
                     $captionValue = $val
                     $captionOk = ($captionValue -eq "Hoiatus!")
@@ -1013,7 +1056,7 @@ Add-DetailedTask "12. GPO_autentimine" 1 {
             }
         } catch {}
     }
- 
+
     # Varuvariant nr 2 - Registry.pol (harva asjakohane, aga kahjutu proovida).
     if (-not $captionOk -or -not $textOk) {
         try {
@@ -1022,13 +1065,13 @@ Add-DetailedTask "12. GPO_autentimine" 1 {
                 -Key "HKLM\Software\Microsoft\Windows\CurrentVersion\Policies\System" `
                 -ValueName "LegalNoticeCaption" `
                 -ErrorAction SilentlyContinue
- 
+
             $textReg = Get-GPRegistryValue `
                 -Name "GPO_autentimine" `
                 -Key "HKLM\Software\Microsoft\Windows\CurrentVersion\Policies\System" `
                 -ValueName "LegalNoticeText" `
                 -ErrorAction SilentlyContinue
- 
+
             if (-not $captionOk -and $captionReg -and $captionReg.Value -eq "Hoiatus!") {
                 $captionOk = $true
                 $captionValue = $captionReg.Value
@@ -1039,26 +1082,27 @@ Add-DetailedTask "12. GPO_autentimine" 1 {
             }
         } catch {}
     }
- 
+
     if ($r.Exists -and $r.Linked -and $captionOk -and $textOk) {
         return @{
             Points = 1
             Feedback = "GPO_autentimine on olemas, lingitud OFFICE OU-ga ning teavituse tekst/pealkiri on õiged."
         }
     }
- 
+
     $fb = @(
         "GPO olemas: $($r.Exists)"
         "OFFICE link: $($r.Linked)"
         "Pealkiri Hoiatus!: $captionOk (tegelik väärtus: '$captionValue')"
         "Tekst Ainult lubatud kasutajatele!: $textOk (tegelik väärtus: '$textValue')"
     )
- 
+
     return @{
         Points = 0
         Feedback = ($fb -join " | ")
     }
 }
+
 # ---------------------------------------------------------------------------
 # 13. AD2 TEINE DC - 2p
 # ---------------------------------------------------------------------------
@@ -1135,22 +1179,22 @@ Add-DetailedTask "14. DHCP Failover" 1 {
 # ---------------------------------------------------------------------------
 # 15. IIS + WORDPRESS - 2p
 # ---------------------------------------------------------------------------
- 
+
 Add-DetailedTask "15. IIS ja WordPress" 2 {
     $domain = $Domain
- 
+
     if (-not $domain) {
         return @{
             Points = 0
             Feedback = "Domeeni ei õnnestunud tuvastada."
         }
     }
- 
+
     $expectedName = "veebileht.$domain"
     $expectedPath = "F:\WWW\veebileht.$domain"
- 
+
     $site = $null
- 
+
     try {
         $site = Get-Website -ErrorAction SilentlyContinue |
             Where-Object {
@@ -1159,14 +1203,14 @@ Add-DetailedTask "15. IIS ja WordPress" 2 {
             } |
             Select-Object -First 1
     } catch {}
- 
+
     $sitePath = $null
     if ($site) {
         $sitePath = $site.PhysicalPath
     } elseif (Test-Path $expectedPath) {
         $sitePath = $expectedPath
     }
- 
+
     $wpConfigPath = $null
     $wpConfigOk = $false
     $dbNameOk = $false
@@ -1175,16 +1219,16 @@ Add-DetailedTask "15. IIS ja WordPress" 2 {
     $dbNameFound = $null
     $dbUserFound = $null
     $dbPassFound = $null
- 
+
     if ($sitePath) {
         $wpConfigPath = Join-Path $sitePath "wp-config.php"
- 
+
         if (Test-Path $wpConfigPath) {
             $wpConfigOk = $true
- 
+
             try {
                 $content = Get-Content $wpConfigPath -Raw -ErrorAction Stop
- 
+
                 if ($content -match "DB_NAME['""]\s*,\s*['""]([^'""]*)['""]") {
                     $dbNameFound = $matches[1]
                 }
@@ -1194,24 +1238,24 @@ Add-DetailedTask "15. IIS ja WordPress" 2 {
                 if ($content -match "DB_PASSWORD['""]\s*,\s*['""]([^'""]*)['""]") {
                     $dbPassFound = $matches[1]
                 }
- 
+
                 $dbNameOk = ($dbNameFound -eq "wp_kordamine")
                 $dbUserOk = ($dbUserFound -eq "wpuser")
                 $dbPassOk = ($dbPassFound -eq "Passw0rd!")
             } catch {}
         }
     }
- 
+
     $p = 0
     $fb = @()
- 
+
     if ($site) {
         $p += 1
         $fb += "IIS sait leitud: $($site.Name), path: $($site.PhysicalPath)"
     } else {
         $fb += "IIS saiti $expectedName / F:\WWW\ alt ei leitud"
     }
- 
+
     if ($wpConfigOk) {
         if ($dbNameOk -and $dbUserOk -and $dbPassOk) {
             $p += 1
@@ -1227,13 +1271,13 @@ Add-DetailedTask "15. IIS ja WordPress" 2 {
     } else {
         $fb += "wp-config.php puudub (otsitud: $wpConfigPath)"
     }
- 
+
     return @{
         Points = $p
         Feedback = ($fb -join " | ")
     }
 }
- 
+
 # ---------------------------------------------------------------------------
 # 16. HTTPS + AD CS - 2p
 # ---------------------------------------------------------------------------
@@ -1431,10 +1475,6 @@ foreach ($res in $global:Results) {
     Write-Host "[$sym] $($res.Nimi): $($res.Punktid) / $($res.Maksimum)p ($($res.Protsent)%)" -ForegroundColor $color
     Write-Host "      $($res.Selgitus)" -ForegroundColor Gray
 }
-
-# ---------------------------------------------------------------------------
-# JSON PAYLOAD
-# ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
 # JSON PAYLOAD
