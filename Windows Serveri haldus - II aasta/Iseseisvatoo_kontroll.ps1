@@ -881,38 +881,11 @@ Add-DetailedTask "10. GPO Software 7zip ja Chrome" 2 {
 Add-DetailedTask "11. GPO_Chrome_Settings" 2 {
     $r = Test-GpoExistsAndLinked -GpoName "GPO_Chrome_Settings"
  
-    # Rekursiivne otsing täpse tee arvamise asemel - otsime chrome.admx
-    # nii kohalikust PolicyDefinitions kaustast kui kogu SYSVOL puust,
-    # ükskõik millise domeeninime/käänu all see peidus on.
-    $searchRoots = @(
-        "$env:SystemRoot\PolicyDefinitions",
-        "$env:SystemRoot\SYSVOL"
-    )
- 
-    $admxFile = $null
-    foreach ($root in $searchRoots) {
-        if (Test-Path $root) {
-            $found = Get-ChildItem -Path $root -Recurse -Filter "chrome.admx" `
-                -ErrorAction SilentlyContinue -Force |
-                Select-Object -First 1
-            if ($found) {
-                $admxFile = $found
-                break
-            }
-        }
-    }
- 
-    $admxOk = $false
-    $admxLocation = "puudub"
- 
-    if ($admxFile) {
-        if ($admxFile.FullName -match "SYSVOL") {
-            $admxOk = $true
-            $admxLocation = "Central Store ($($admxFile.FullName))"
-        } else {
-            $admxLocation = "kohalik PolicyDefinitions ($($admxFile.FullName))"
-        }
-    }
+    # Kontrollime chrome.admx olemasolu ainult kohalikus PolicyDefinitions
+    # kaustas (C:\Windows\PolicyDefinitions) - domeeni Central Store'i
+    # (SYSVOL) EI kontrollita.
+    $admxPath = "$env:SystemRoot\PolicyDefinitions\chrome.admx"
+    $admxOk = Test-Path $admxPath
  
     $homepageOk = $false
  
@@ -943,15 +916,9 @@ Add-DetailedTask "11. GPO_Chrome_Settings" 2 {
  
     if ($admxOk) {
         $p += 0.75
-        $fb += "chrome.admx leitud: $admxLocation"
-    } elseif ($admxFile) {
-        # Leitud, aga mitte Central Store'is - anname osalised punktid,
-        # kuna ADMX PÕHIMÕTTELISELT on masinas olemas ja töötab,
-        # lihtsalt vales (mitte-domeeni) asukohas.
-        $p += 0.35
-        $fb += "chrome.admx leitud AINULT kohalikult, MITTE Central Store'ist: $admxLocation. Selle tõttu sai GPO-d küll konfigureerida, aga nõue oli lisada ADMX domeeni Central Store'i (SYSVOL), et kõik masinad/administraatorid näeksid seadeid ühtemoodi."
+        $fb += "chrome.admx leitud kaustast $admxPath"
     } else {
-        $fb += "chrome.admx-i ei leitud ei Central Store'ist ega kohalikust PolicyDefinitions kaustast"
+        $fb += "chrome.admx ei leitud kaustast $admxPath"
     }
  
     if ($homepageOk) {
