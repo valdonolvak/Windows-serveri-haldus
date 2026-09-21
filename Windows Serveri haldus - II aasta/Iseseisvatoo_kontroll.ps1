@@ -936,51 +936,56 @@ Add-DetailedTask "11. GPO_Chrome_Settings" 2 {
 # ---------------------------------------------------------------------------
 # 12. GPO_autentimine - 1p
 # ---------------------------------------------------------------------------
-
+ 
 Add-DetailedTask "12. GPO_autentimine" 1 {
     $r = Test-GpoExistsAndLinked `
         -GpoName "GPO_autentimine" `
         -ExpectedLinkOuNameContains "OFFICE"
-
-    $captionOk = $false
-    $textOk = $false
-
-    try {
-        $caption = Get-GPRegistryValue `
-            -Name "GPO_autentimine" `
-            -Key "HKLM\Software\Microsoft\Windows\CurrentVersion\Policies\System" `
-            -ValueName "LegalNoticeCaption" `
-            -ErrorAction SilentlyContinue
-
-        $text = Get-GPRegistryValue `
-            -Name "GPO_autentimine" `
-            -Key "HKLM\Software\Microsoft\Windows\CurrentVersion\Policies\System" `
-            -ValueName "LegalNoticeText" `
-            -ErrorAction SilentlyContinue
-
-        if ($caption -and $caption.Value -eq "Hoiatus!") {
-            $captionOk = $true
-        }
-
-        if ($text -and $text.Value -eq "Ainult lubatud kasutajatele!") {
-            $textOk = $true
-        }
-    } catch {}
-
+ 
+    # Interactive logon Message text/title on "Security Options" säte, mis
+    # EI ole Registry.pol-is (Get-GPRegistryValue ei näe seda), vaid
+    # GptTmpl.inf-is / GPO Report'is. Loeme selle seetõttu
+    # Get-GpoSecurityOptionValue kaudu.
+    $captionValue = Get-GpoSecurityOptionValue -GpoName "GPO_autentimine" -KeyNameSuffix "LegalNoticeCaption"
+    $textValue = Get-GpoSecurityOptionValue -GpoName "GPO_autentimine" -KeyNameSuffix "LegalNoticeText"
+ 
+    $captionOk = ($captionValue -eq "Hoiatus!")
+    $textOk = ($textValue -eq "Ainult lubatud kasutajatele!")
+ 
+    # Varuvariant - kui keegi on selle siiski Registry.pol kaudu seadistanud.
+    if (-not $captionOk -or -not $textOk) {
+        try {
+            $caption = Get-GPRegistryValue `
+                -Name "GPO_autentimine" `
+                -Key "HKLM\Software\Microsoft\Windows\CurrentVersion\Policies\System" `
+                -ValueName "LegalNoticeCaption" `
+                -ErrorAction SilentlyContinue
+ 
+            $text = Get-GPRegistryValue `
+                -Name "GPO_autentimine" `
+                -Key "HKLM\Software\Microsoft\Windows\CurrentVersion\Policies\System" `
+                -ValueName "LegalNoticeText" `
+                -ErrorAction SilentlyContinue
+ 
+            if (-not $captionOk -and $caption -and $caption.Value -eq "Hoiatus!") { $captionOk = $true }
+            if (-not $textOk -and $text -and $text.Value -eq "Ainult lubatud kasutajatele!") { $textOk = $true }
+        } catch {}
+    }
+ 
     if ($r.Exists -and $r.Linked -and $captionOk -and $textOk) {
         return @{
             Points = 1
             Feedback = "GPO_autentimine on olemas, lingitud OFFICE OU-ga ning teavituse tekst/pealkiri on õiged."
         }
     }
-
+ 
     $fb = @(
         "GPO olemas: $($r.Exists)"
         "OFFICE link: $($r.Linked)"
-        "Pealkiri Hoiatus!: $captionOk"
-        "Tekst Ainult lubatud kasutajatele!: $textOk"
+        "Pealkiri Hoiatus!: $captionOk (tegelik väärtus: '$captionValue')"
+        "Tekst Ainult lubatud kasutajatele!: $textOk (tegelik väärtus: '$textValue')"
     )
-
+ 
     return @{
         Points = 0
         Feedback = ($fb -join " | ")
