@@ -883,6 +883,7 @@ Add-DetailedTask "11. GPO_Chrome_Settings" 2 {
 
     $admxCandidates = @(
         "$env:SystemRoot\SYSVOL\domain\Policies\PolicyDefinitions\chrome.admx",
+        "$env:SystemRoot\SYSVOL\sysvol\$Domain\Policies\PolicyDefinitions\chrome.admx",
         "$env:SystemRoot\SYSVOL\sysvol\$Domain\Policies\PolicyDefinitions\chrome.admx"
     )
 
