@@ -933,7 +933,7 @@ Add-DetailedTask "11. GPO_Chrome_Settings" 2 {
         Feedback = ($fb -join " | ")
     }
 }
-# ---------------------------------------------------------------------------
+---------
 # 12. GPO_autentimine - 1p
 # ---------------------------------------------------------------------------
  
@@ -944,31 +944,57 @@ Add-DetailedTask "12. GPO_autentimine" 1 {
  
     # Interactive logon Message text/title on "Security Options" säte, mis
     # EI ole Registry.pol-is (Get-GPRegistryValue ei näe seda), vaid
-    # GptTmpl.inf-is / GPO Report'is. Loeme selle seetõttu
-    # Get-GpoSecurityOptionValue kaudu.
-    $captionValue = Get-GpoSecurityOptionValue -GpoName "GPO_autentimine" -KeyNameSuffix "LegalNoticeCaption"
-    $textValue = Get-GpoSecurityOptionValue -GpoName "GPO_autentimine" -KeyNameSuffix "LegalNoticeText"
+    # GptTmpl.inf-is / GPO Report'is. Loeme selle seetõttu otse siin,
+    # ilma eraldi funktsioonita (vältimaks skriptiploki skoobiprobleeme).
+    $captionValue = $null
+    $textValue = $null
+ 
+    try {
+        $gpo12 = Get-GPO -Name "GPO_autentimine" -ErrorAction Stop
+        [xml]$report12 = Get-GPOReport -Guid $gpo12.Id -ReportType Xml -ErrorAction Stop
+ 
+        $secNodes = $report12.SelectNodes("//*[local-name()='SecurityOptions']")
+        foreach ($node in $secNodes) {
+            $keyNode = $node.SelectSingleNode("*[local-name()='KeyName']")
+            if (-not $keyNode) { continue }
+ 
+            if ($keyNode.InnerText -match "LegalNoticeCaption") {
+                $settingNode = $node.SelectSingleNode("*[local-name()='SettingString']")
+                if ($settingNode -and $settingNode.InnerText) { $captionValue = $settingNode.InnerText }
+            }
+            elseif ($keyNode.InnerText -match "LegalNoticeText") {
+                $settingNode = $node.SelectSingleNode("*[local-name()='SettingString']")
+                if ($settingNode -and $settingNode.InnerText) { $textValue = $settingNode.InnerText }
+            }
+        }
+    } catch {}
  
     $captionOk = ($captionValue -eq "Hoiatus!")
     $textOk = ($textValue -eq "Ainult lubatud kasutajatele!")
  
-    # Varuvariant - kui keegi on selle siiski Registry.pol kaudu seadistanud.
+    # Varuvariant - kui väärtus on siiski Registry.pol kaudu seadistatud.
     if (-not $captionOk -or -not $textOk) {
         try {
-            $caption = Get-GPRegistryValue `
+            $captionReg = Get-GPRegistryValue `
                 -Name "GPO_autentimine" `
                 -Key "HKLM\Software\Microsoft\Windows\CurrentVersion\Policies\System" `
                 -ValueName "LegalNoticeCaption" `
                 -ErrorAction SilentlyContinue
  
-            $text = Get-GPRegistryValue `
+            $textReg = Get-GPRegistryValue `
                 -Name "GPO_autentimine" `
                 -Key "HKLM\Software\Microsoft\Windows\CurrentVersion\Policies\System" `
                 -ValueName "LegalNoticeText" `
                 -ErrorAction SilentlyContinue
  
-            if (-not $captionOk -and $caption -and $caption.Value -eq "Hoiatus!") { $captionOk = $true }
-            if (-not $textOk -and $text -and $text.Value -eq "Ainult lubatud kasutajatele!") { $textOk = $true }
+            if (-not $captionOk -and $captionReg -and $captionReg.Value -eq "Hoiatus!") {
+                $captionOk = $true
+                $captionValue = $captionReg.Value
+            }
+            if (-not $textOk -and $textReg -and $textReg.Value -eq "Ainult lubatud kasutajatele!") {
+                $textOk = $true
+                $textValue = $textReg.Value
+            }
         } catch {}
     }
  
@@ -991,7 +1017,6 @@ Add-DetailedTask "12. GPO_autentimine" 1 {
         Feedback = ($fb -join " | ")
     }
 }
-
 # ---------------------------------------------------------------------------
 # 13. AD2 TEINE DC - 2p
 # ---------------------------------------------------------------------------
