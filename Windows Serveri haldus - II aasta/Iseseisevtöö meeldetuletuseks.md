@@ -72,7 +72,7 @@ Võrguaadress moodustub valemiga **192.168.XXX.0/24**, kus **XXX** on sinu virtu
 
 
 13. **Teine DC (AD2):** Muuda AD2 nimi ja IP. Lisa see teiseks domeenikontrolleriks **PowerShelli** abil. (2p.)
-* *Käsud:* `Install-WindowsFeature AD-Domain-Services -IncludeManagementTools` ja `Install-ADDSDomainController -InstallDns -DomainName perenimi.local -Credential (Get-Credential PERENIMI\administrator`
+* *Käsud:* `Install-WindowsFeature AD-Domain-Services -IncludeManagementTools` ja `Install-ADDSDomainController -InstallDns -DomainName perenimi.local -Credential (Get-Credential PERENIMI\administrator)`
 * *Juhend:* [RDR-IT juhend](https://rdr-it.com/en/active-directory-add-a-domain-controller-to-powershell/)
 
 
