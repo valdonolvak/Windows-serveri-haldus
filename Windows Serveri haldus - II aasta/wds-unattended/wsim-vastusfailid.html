@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="et">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Unattended vastusfailide koostamine WSIM-is</title>
+<style>
+:root{--bg:#f3f5f4;--fg:#14201f;--mut:#51615f;--card:#fff;--bd:#c9d3d1;--acc:#0b7a75;--pkt:#d98a00;--soft:#e3efed;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1716;--fg:#e6efed;--mut:#9db0ad;--card:#16211f;--bd:#2d3f3c;--acc:#3cc4bb;--pkt:#f2b53a;--soft:#1d2e2c}}
+:root[data-theme="dark"]{--bg:#0f1716;--fg:#e6efed;--mut:#9db0ad;--card:#16211f;--bd:#2d3f3c;--acc:#3cc4bb;--pkt:#f2b53a;--soft:#1d2e2c}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*:before,*:after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.55 system-ui,"Segoe UI",Roboto,sans-serif}
+.w{max-width:1000px;margin:0 auto;padding:20px 16px 40px}
+h1{font:600 clamp(1.5rem,4vw,2.1rem)/1.2 "Iowan Old Style",Georgia,serif;margin:0 0 4px}
+.sub{color:var(--mut);margin:0 0 16px}
+button,select{font:inherit;color:var(--fg);background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:8px 14px;cursor:pointer;min-height:40px}
+button.p{background:var(--acc);border-color:var(--acc);color:#fff}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) button.p{color:#06201e}}
+:root[data-theme="dark"] button.p{color:#06201e}
+button:focus-visible,select:focus-visible{outline:3px solid var(--pkt);outline-offset:2px}
+.tabs{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.tabs button[aria-selected="true"]{background:var(--soft);border-color:var(--acc);font-weight:600}
+.win{border:1px solid var(--bd);border-radius:10px;background:var(--card);overflow:hidden}
+.tt{background:var(--soft);padding:6px 12px;font-size:.85rem;color:var(--mut);border-bottom:1px solid var(--bd)}
+.pn{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));min-height:250px}
+@media (max-width:760px){.pn{grid-template-columns:minmax(0,1fr)}}
+.pn section{padding:10px 12px;border-right:1px solid var(--bd);overflow-x:auto}
+.pn section:last-child{border-right:0}
+h4{margin:0 0 8px;font-size:.85rem;color:var(--mut);font-weight:600}
+ul{list-style:none;margin:0;padding:0;font-size:.85rem}
+li{padding:3px 6px;border-radius:5px;margin:2px 0;word-break:break-word}
+li.on{background:var(--soft);outline:2px solid var(--acc)}
+li.dn:after{content:" ✓";color:var(--acc)}
+li.ps{font-weight:600;color:var(--mut);margin-top:6px}
+li.new{animation:in .6s}
+@keyframes in{from{background:var(--pkt)}to{background:transparent}}
+table{border-collapse:collapse;width:100%;font-size:.85rem}
+td{padding:3px 4px;border-bottom:1px solid var(--bd);vertical-align:top}
+td:first-child{color:var(--mut);width:48%}
+td:last-child{font-family:ui-monospace,Consolas,monospace;font-size:.82rem}
+.ms{border-top:1px solid var(--bd);padding:7px 12px;font-size:.85rem;min-height:36px}
+.ms b{color:var(--mut)}
+.ctl{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:14px 0}
+.bar{height:6px;background:var(--soft);border-radius:3px;margin:0 0 4px}
+.bar i{display:block;height:100%;background:var(--acc);border-radius:3px;transition:width .3s}
+.g{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.5fr);gap:16px;align-items:start}
+@media (max-width:760px){.g{grid-template-columns:minmax(0,1fr)}}
+ol.l{list-style:none;margin:0;padding:0;border:1px solid var(--bd);border-radius:10px;background:var(--card);overflow:hidden}
+ol.l li{padding:0;margin:0;border-radius:0}
+ol.l li+li{border-top:1px solid var(--bd)}
+ol.l button{display:block;width:100%;text-align:left;border:0;border-radius:0;background:none;padding:9px 12px;min-height:42px}
+ol.l button[aria-current="step"]{background:var(--soft);font-weight:600;box-shadow:inset 4px 0 0 var(--acc)}
+.d{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:16px}
+.d h2{font:600 1.2rem/1.3 "Iowan Old Style",Georgia,serif;margin:0 0 8px}
+.d p{margin:0 0 12px;max-width:62ch}
+.k{border-left:4px solid var(--acc);padding:6px 10px;background:var(--soft);border-radius:0 6px 6px 0}
+.k b{display:block;font-size:.85rem;color:var(--mut)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+a{color:var(--acc)}.nv{margin:0 0 16px}</style>
+</head>
+<body>
+<div class="w">
+<h1>Unattended vastusfailide koostamine WSIM-is</h1>
+<p class="sub">Vaata, kuidas kaks vastusfaili samm-sammult valmivad. Mängi läbi käed vabalt või liigu ise sammhaaval.</p>
+<p class="nv"><a href="index.html">Võrgupaigalduse käik (esimene animatsioon)</a></p>
+<div class="tabs" role="tablist"><button role="tab" id="t0" aria-selected="true">1. WDS kliendi vastusfail</button><button role="tab" id="t1" aria-selected="false">2. Tõmmisfaili vastusfail</button></div>
+
+<div class="win">
+<div class="tt">Windows System Image Manager</div>
+<div class="pn">
+<section><h4>Windows Image</h4><ul id="im"></ul></section>
+<section><h4>Answer File</h4><ul id="an"></ul></section>
+<section><h4>Properties</h4><table id="pr"></table></section>
+</div>
+<div class="ms"><b>Messages: </b><span id="ms"></span></div>
+</div>
+
+<div class="ctl">
+<button id="bp">Eelmine</button><button id="bt" class="p">Mängi</button><button id="bn">Järgmine</button><button id="br">Algusesse</button>
+<label>Kiirus <select id="sp"><option value="0.5">aeglane</option><option value="1" selected>tavaline</option><option value="2">kiire</option></select></label>
+</div>
+<div class="bar"><i id="pb" style="width:0"></i></div>
+<div class="g" style="margin-top:12px">
+<ol class="l" id="ls"></ol>
+<div class="d" aria-live="polite"><h2 id="dt"></h2><p id="dx"></p><div class="k"><b>Miks nii?</b><span id="dw"></span></div></div>
+</div>
+</div>
+
+<script>
+var LC=[["InputLocale","et-EE"],["SystemLocale","et-EE"],["UserLocale","et-EE"],["UILanguage","en-US"]];
+var CAT={k:"cat",t:"Vali tõmmis ja loo kataloog",x:"File → Select Windows Image. Vali install.wim ja väljaanne Windows 11 Pro. WSIM loob kataloogi (.clg).",w:"Kataloog loetleb kõik sätted, mis selles tõmmises olemas on. WSIM valideerib sinu väärtusi selle vastu, seega peab tõmmis olema sama versiooni ja arhitektuuriga.",m:"Kataloog loodud.",r:[["Fail","install.wim"],["Väljaanne","Windows 11 Pro"],["Kataloog",".clg luuakse automaatselt"]]};
+var NEW={k:"new",t:"Loo uus vastusfail",x:"File → New Answer File. Vasakule paneelile tekib tühi vastusfail passide kaupa.",w:"Iga säte kuulub kindlasse passi, ehk paigalduse faasi. Pass otsustab, millal Windows sätet rakendab.",m:"",r:[["Fail","Untitled.xml"]]};
+var T=[
+{f:"Win11-wds-client.xml",s:[CAT,NEW,
+{k:"c",p:"windowsPE",c:"Intl-Core-WinPE",t:"Keel ja klaviatuur",x:"Paremklõps komponendil Microsoft-Windows-International-Core-WinPE → Add Setting to Pass 1 windowsPE. Täida väärtused Properties paneelis.",w:"Ilma selleta küsib Setup keelt ja klaviatuuri. UILanguage peab olema keel, mis on tõmmises olemas.",r:LC.concat([["SetupUILanguage → UILanguage","en-US"]])},
+{k:"c",p:"windowsPE",c:"Setup → DiskConfiguration",t:"Ketta partitsioonid",x:"Lisa Microsoft-Windows-Setup → DiskConfiguration. Disk all loo kolm partitsiooni ja vorminda need.",w:"Windows 11 vajab UEFI-d ja GPT ketast: EFI (FAT32), MSR ja põhipartitsioon (NTFS). WillWipeDisk kustutab ketta enne paigaldust, seega kõik andmed kaovad.",r:[["WillShowUI","OnError"],["DiskID","0"],["WillWipeDisk","true"],["CreatePartition 1","EFI, 260 MB"],["CreatePartition 2","MSR, 16 MB"],["CreatePartition 3","Primary, Extend"],["ModifyPartition 1","FAT32, System"],["ModifyPartition 3","NTFS, Windows, C"]]},
+{k:"c",p:"windowsPE",c:"Setup → WindowsDeploymentServices → Login",t:"Autentimine WDS-iga",x:"Lisa WindowsDeploymentServices → Login → Credentials.",w:"Windows PE ühendub SMB kaudu WDS-i REMINST kaustaga ja peab seal end autentima. Kasuta kontot, millel on ainult lugemisõigus.",r:[["Domain","lab.local"],["Username","svc-wds-read"],["Password","••••••••"]]},
+{k:"c",p:"windowsPE",c:"Setup → WindowsDeploymentServices → ImageSelection",t:"Viide tõmmisele",x:"Lisa ImageSelection ning täida InstallImage ja InstallTo. Väärtused kopeeri käsu Get-WdsInstallImage väljundist.",w:"Need sätted ütlevad, millist tõmmist serverist võtta ja kuhu paigaldada. Kui nimed ei klapi, Setup tõmmist ei leia.",r:[["WillShowUI","OnError"],["ImageGroup","Windows11"],["Filename","install.wim"],["ImageName","Windows 11 Pro"],["InstallTo → DiskID","0"],["InstallTo → PartitionID","3"]]},
+{k:"c",p:"windowsPE",c:"Setup → UserData",t:"EULA",x:"Lisa UserData ja märgi AcceptEula.",w:"Ilma EULA heakskiiduta jääb Setup seda küsima.",r:[["AcceptEula","true"]]},
+{k:"v",t:"Valideeri",x:"Tools → Validate Answer File. Messages paneel peab olema vigadeta.",w:"WSIM kontrollib väärtusi kataloogi vastu. Vead leiad siit, mitte paigalduse ajal.",m:"Validation: 0 viga, 0 hoiatust.",r:[]},
+{k:"s",t:"Salvesta",x:"Tools → Options: Hide sensitive data on sees. Salvesta fail nimega Win11-wds-client.xml.",w:"Peitmine kodeerib paroolid Base64 kujul, mitte ei krüpteeri. Faili ei tohi jagada.",m:"Salvestatud: Win11-wds-client.xml",r:[["Hide sensitive data","true"],["Fail","Win11-wds-client.xml"]]},
+{k:"l",t:"Seosta WDS-iga",x:"WDS konsool → serveri Properties → Client. Märgi Enable unattended installation ja vali x64 juures fail.",w:"Kliendi vastusfail kehtib kogu serveri jaoks ja rakendub Windows PE-s enne tõmmise valikut.",m:"WDS: kliendi vastusfail seotud.",r:[["Enable unattended installation","true"],["x64","Win11-wds-client.xml"]]}]},
+{f:"Win11-image.xml",s:[CAT,NEW,
+{k:"c",p:"specialize",c:"Shell-Setup",t:"Arvuti nimi ja ajavöönd",x:"Lisa Microsoft-Windows-Shell-Setup passi 4 specialize.",w:"Specialize on faas, kus Windows kohandatakse konkreetsele masinale. Tärn genereerib unikaalse nime.",r:[["ComputerName","*"],["TimeZone","FLE Standard Time"]]},
+{k:"c",p:"specialize",c:"International-Core",t:"Keeleseaded",x:"Lisa Microsoft-Windows-International-Core passi 4 specialize.",w:"Määrab paigaldatud Windowsi vormingud ja klaviatuuri.",r:LC},
+{k:"c",p:"specialize",c:"UnattendedJoin",t:"Domeeniga liitumine",x:"Lisa Microsoft-Windows-UnattendedJoin → Identification.",w:"Liitumine käib specialize faasis, sest alles nüüd on masinal oma identiteet. Kliendi DNS peab olema domeenikontroller. Delegeeri kontole ainult arvutiobjektide loomise õigus.",r:[["JoinDomain","lab.local"],["MachineObjectOU","OU=Workstations,DC=lab,DC=local"],["Credentials → Domain","lab.local"],["Credentials → Username","svc-domjoin"],["Credentials → Password","••••••••"]]},
+{k:"c",p:"oobeSystem",c:"International-Core ",t:"Keeleseaded OOBE-s",x:"Lisa Microsoft-Windows-International-Core ka passi 7 oobeSystem.",w:"OOBE küsib keelt uuesti, kui seda ei ole siin määratud.",r:LC},
+{k:"c",p:"oobeSystem",c:"Shell-Setup → OOBE",t:"OOBE lehtede peitmine",x:"Lisa Microsoft-Windows-Shell-Setup → OOBE.",w:"Ilma nende sätteteta jääb paigaldus esimesel käivitusel ekraani taha ootama. Uuemates Windows 11 ehitustes ei tööta OOBE piiramise nipid, seega tugine domeeniga liitumisele.",r:[["HideEULAPage","true"],["HideOnlineAccountScreens","true"],["HideLocalAccountScreen","true"],["HideWirelessSetupInOOBE","true"],["NetworkLocation","Work"],["ProtectYourPC","3"]]},
+{k:"c",p:"oobeSystem",c:"Shell-Setup → UserAccounts",t:"Kohalik administraator",x:"Lisa UserAccounts → LocalAccounts → LocalAccount.",w:"Kohalik konto väldib Microsofti konto nõuet ja annab sisselogimiseks konto.",r:[["Name","localadmin"],["Group","Administrators"],["Password → Value","••••••••"],["PlainText","true"]]},
+{k:"v",t:"Valideeri",x:"Tools → Validate Answer File.",w:"Kontrolli, et ka siin pole vigu enne WDS-iga seostamist.",m:"Validation: 0 viga, 0 hoiatust.",r:[]},
+{k:"s",t:"Salvesta",x:"Salvesta fail nimega Win11-image.xml.",w:"Faili nimi peab vastama sellele, mille valid WDS-is.",m:"Salvestatud: Win11-image.xml",r:[["Hide sensitive data","true"],["Fail","Win11-image.xml"]]},
+{k:"l",t:"Seosta tõmmisega",x:"WDS konsool → Install Images → tõmmise Properties. Märgi Allow image to install in unattended mode ja vali fail.",w:"Tõmmisfaili vastusfail rakendub alles pärast tõmmise kettale laotamist, seega seostatakse see tõmmisega, mitte serveriga.",m:"WDS: tõmmisfaili vastusfail seotud.",r:[["Allow image to install in unattended mode","true"],["Fail","Win11-image.xml"]]}]}
+];
+var $=function(s){return document.querySelector(s)};
+var tr=0,cur=0,play=false,tok=0,sp=1,red=matchMedia("(prefers-reduced-motion: reduce)").matches;
+var PS=["windowsPE","specialize","oobeSystem"];
+function sl(ms){return new Promise(function(r){setTimeout(r,ms)})}
+function el(tag,txt,cls){var e=document.createElement(tag);if(txt!=null)e.textContent=txt;if(cls)e.className=cls;return e}
+function side(){var S=T[tr].s,s=S[cur],im=$("#im"),an=$("#an");im.innerHTML="";an.innerHTML="";
+var comps=S.filter(function(x){return x.k=="c"}),made=cur>=0&&S.indexOf(s)>=1;
+if(cur==0)im.appendChild(el("li","Select Windows Image → install.wim"));
+else comps.forEach(function(c){var li=el("li",c.c.trim());var i=S.indexOf(c);if(i<cur)li.className="dn";if(i==cur)li.className="on";im.appendChild(li)});
+if(cur<1)an.appendChild(el("li","(vastusfaili pole veel)"));
+else PS.forEach(function(p){var cs=S.filter(function(x,i){return x.k=="c"&&x.p==p&&i<=cur});if(!cs.length)return;
+an.appendChild(el("li",p,"ps"));cs.forEach(function(c){var li=el("li","• "+c.c.trim());if(S.indexOf(c)==cur)li.className="new";an.appendChild(li)})});
+if(cur>=1&&!S.some(function(x,i){return x.k=="c"&&i<=cur}))an.appendChild(el("li","(tühi)"))}
+async function type(k){var s=T[tr].s[cur],pr=$("#pr");pr.innerHTML="";var cells=[];
+s.r.forEach(function(r){var row=document.createElement("tr"),a=el("td",r[0]),b=el("td","");row.appendChild(a);row.appendChild(b);pr.appendChild(row);cells.push([b,r[1]])});
+for(var i=0;i<cells.length;i++){var v=cells[i][1];
+if(red||!play&&false){cells[i][0].textContent=v;continue}
+for(var j=1;j<=v.length;j++){if(k!==tok)return;cells[i][0].textContent=v.slice(0,j);await sl(22/sp)}
+await sl(120/sp)}}
+function ui(){var S=T[tr].s,s=S[cur];side();$("#dt").textContent=(cur+1)+". "+s.t;$("#dx").textContent=s.x;$("#dw").textContent=" "+s.w;
+$("#ms").textContent=s.m||"";$("#pb").style.width=((cur+1)/S.length*100)+"%";
+document.querySelectorAll("#ls button").forEach(function(b,i){if(i==cur)b.setAttribute("aria-current","step");else b.removeAttribute("aria-current")});
+$("#bt").textContent=play?"Paus":"Mängi"}
+async function run(i){var k=++tok;cur=i;ui();await type(k);if(k!==tok)return;
+if(play){await sl(1500/sp);if(k!==tok)return;if(i<T[tr].s.length-1)run(i+1);else{play=false;ui()}}}
+function go(i){play=false;run(Math.max(0,Math.min(T[tr].s.length-1,i)))}
+function list(){var o=$("#ls");o.innerHTML="";T[tr].s.forEach(function(s,i){var li=document.createElement("li"),b=el("button",(i+1)+". "+s.t);b.onclick=function(){go(i)};li.appendChild(b);o.appendChild(li)})}
+function tab(n){tr=n;play=false;tok++;$("#t0").setAttribute("aria-selected",n==0);$("#t1").setAttribute("aria-selected",n==1);list();run(0)}
+$("#t0").onclick=function(){tab(0)};$("#t1").onclick=function(){tab(1)};
+$("#bp").onclick=function(){go(cur-1)};$("#bn").onclick=function(){go(cur+1)};$("#br").onclick=function(){go(0)};
+$("#bt").onclick=function(){if(play){play=false;ui();return}play=true;run(cur==T[tr].s.length-1?0:cur)};
+$("#sp").onchange=function(e){sp=parseFloat(e.target.value)};
+document.addEventListener("keydown",function(e){if(e.target.tagName=="SELECT")return;if(e.key=="ArrowRight")go(cur+1);if(e.key=="ArrowLeft")go(cur-1)});
+tab(0);
+</script>
+</body>
+</html>

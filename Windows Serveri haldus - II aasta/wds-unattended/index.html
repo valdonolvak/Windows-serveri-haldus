@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="et">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>WDS võrgupaigaldus: animeeritud selgitus</title>
+<style>
+:root{--bg:#f3f5f4;--fg:#14201f;--mut:#51615f;--card:#fff;--bd:#c9d3d1;--acc:#0b7a75;--pkt:#d98a00;--soft:#e3efed;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1716;--fg:#e6efed;--mut:#9db0ad;--card:#16211f;--bd:#2d3f3c;--acc:#3cc4bb;--pkt:#f2b53a;--soft:#1d2e2c}}
+:root[data-theme="dark"]{--bg:#0f1716;--fg:#e6efed;--mut:#9db0ad;--card:#16211f;--bd:#2d3f3c;--acc:#3cc4bb;--pkt:#f2b53a;--soft:#1d2e2c}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*:before,*:after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.55 system-ui,"Segoe UI",Roboto,sans-serif}
+.w{max-width:960px;margin:0 auto;padding:20px 16px 40px}
+h1{font:600 clamp(1.5rem,4vw,2.1rem)/1.2 "Iowan Old Style",Georgia,serif;margin:0 0 4px}
+.sub{color:var(--mut);margin:0 0 18px}
+.stage{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:8px}
+svg{display:block;width:100%;height:auto}
+.n rect{fill:var(--card);stroke:var(--bd);stroke-width:2;transition:stroke .25s}
+.n.on rect{stroke:var(--acc);stroke-width:3.5}
+.n text{fill:var(--fg);font:600 15px system-ui,sans-serif}
+.n .s{fill:var(--mut);font:400 12px system-ui,sans-serif}
+.ln{stroke:var(--bd);stroke-width:3;stroke-dasharray:6 5}
+#cap{fill:var(--fg);font:500 14px system-ui,sans-serif;text-anchor:middle}
+#st{fill:var(--acc);font:600 12px system-ui,sans-serif}
+.bar{height:6px;background:var(--soft);border-radius:3px;margin:10px 2px 0}
+.bar i{display:block;height:100%;background:var(--acc);border-radius:3px;transition:width .3s}
+.ctl{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:14px 0}
+button,select{font:inherit;color:var(--fg);background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:8px 14px;cursor:pointer;min-height:40px}
+button.p{background:var(--acc);border-color:var(--acc);color:#fff}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) button.p{color:#06201e}}
+:root[data-theme="dark"] button.p{color:#06201e}
+button:focus-visible,select:focus-visible{outline:3px solid var(--pkt);outline-offset:2px}
+.g{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.5fr);gap:16px;align-items:start}
+@media (max-width:720px){.g{grid-template-columns:minmax(0,1fr)}}
+ol.l{list-style:none;margin:0;padding:0;border:1px solid var(--bd);border-radius:10px;background:var(--card);overflow:hidden}
+ol.l li+li{border-top:1px solid var(--bd)}
+ol.l button{display:block;width:100%;text-align:left;border:0;border-radius:0;background:none;padding:10px 12px;min-height:44px}
+ol.l button[aria-current="step"]{background:var(--soft);font-weight:600;box-shadow:inset 4px 0 0 var(--acc)}
+.d{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:16px}
+.d h2{font:600 1.25rem/1.3 "Iowan Old Style",Georgia,serif;margin:0 0 8px}
+.d p{margin:0 0 12px;max-width:62ch}
+.k{border-left:4px solid var(--acc);padding:6px 10px;margin:0 0 12px;background:var(--soft);border-radius:0 6px 6px 0;overflow-x:auto}
+.k b{display:block;font-size:.85rem;color:var(--mut)}
+code{font:.9em ui-monospace,Consolas,monospace}
+.pv{border:1px dashed var(--pkt);border-radius:6px;padding:6px 10px;font-size:.92rem}
+.pv b{color:var(--pkt)}
+.x{margin-top:32px}.x h2{font:600 1.3rem/1.3 "Iowan Old Style",Georgia,serif;margin:0 0 8px}.x h3{font:600 1rem/1.3 system-ui,sans-serif;margin:18px 0 8px;display:inline-block}.x ol{padding-left:22px;max-width:70ch}.x li{margin:4px 0}.x button{margin-left:10px;padding:4px 12px;min-height:32px}pre{overflow-x:auto;background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:12px;font-size:.8rem;line-height:1.45;margin:0}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+a{color:var(--acc)}.nv{margin:0 0 16px}</style>
+</head>
+<body>
+<div class="w">
+<h1>Windows 11 võrgupaigaldus WDS-iga</h1>
+<p class="sub">Vaata, mis juhtub kliendi, WDS-serveri ja domeenikontrolleri vahel. Mängi läbi või liigu sammhaaval.</p>
+<p class="nv"><a href="wsim-vastusfailid.html">Vastusfailide koostamine WSIM-is (teine animatsioon)</a></p>
+
+<div class="stage">
+<svg viewBox="0 0 720 250" role="img" aria-label="DC01, CLIENT01 ja WDS01 vahelised paketid paigalduse ajal">
+<line class="ln" x1="185" y1="135" x2="275" y2="135"/><line class="ln" x1="445" y1="135" x2="535" y2="135"/>
+<g class="n" id="n-dc"><rect x="15" y="90" width="170" height="90" rx="8"/><text x="100" y="125" text-anchor="middle">DC01</text><text class="s" x="100" y="146" text-anchor="middle">AD · DNS · DHCP</text></g>
+<g class="n" id="n-cl"><rect x="275" y="90" width="170" height="90" rx="8"/><text x="360" y="120" text-anchor="middle">CLIENT01</text><text class="s" x="360" y="140" text-anchor="middle">tühi VM, UEFI</text><text id="st" x="360" y="165" text-anchor="middle"></text></g>
+<g class="n" id="n-wds"><rect x="535" y="90" width="170" height="90" rx="8"/><text x="620" y="125" text-anchor="middle">WDS01</text><text class="s" x="620" y="146" text-anchor="middle">WDS · REMINST</text></g>
+<g id="pkt" style="display:none"><circle r="9" cy="0" fill="var(--pkt)"/><circle r="3.5" fill="#fff"/></g>
+<text id="cap" x="360" y="225"></text>
+</svg>
+<div class="bar"><i id="bar" style="width:0"></i></div>
+</div>
+
+<div class="ctl">
+<button id="bp">Eelmine</button><button id="bt" class="p">Mängi</button><button id="bn">Järgmine</button><button id="br">Algusesse</button>
+<label>Kiirus <select id="sp"><option value="0.5">aeglane</option><option value="1" selected>tavaline</option><option value="2">kiire</option></select></label>
+</div>
+
+<div class="g">
+<ol class="l" id="ls"></ol>
+<div class="d" aria-live="polite"><h2 id="dt"></h2><p id="dx"></p><div class="k"><b>Vastusfaili või WDS-i säte</b><code id="ds"></code></div><div class="pv" id="dp"></div></div>
+</div>
+
+<section class="x"><h2>Ettevalmistus enne paigaldust</h2>
+<ol>
+<li>Paigalda WDS roll: <code>Install-WindowsFeature -Name WDS -IncludeManagementTools</code>.</li>
+<li>Seadista WDS: <code>wdsutil /initialize-server /reminst:D:\RemoteInstall</code>, PXE vastab kõigile klientidele, DHCP või relay on korras.</li>
+<li>Impordi käivitustõmmis <code>boot.wim</code>.</li>
+<li>Impordi paigaldustõmmis <code>install.wim</code> tõmmisegruppi <code>Windows11</code>.</li>
+<li>Paigalda Windows ADK (Deployment Tools) ja loo WSIM-is tõmmise kataloog.</li>
+<li>Koosta WDS kliendi vastusfail (<code>windowsPE</code> pass).</li>
+<li>Koosta tõmmisfaili vastusfail (<code>specialize</code> ja <code>oobeSystem</code> passid).</li>
+<li>Seosta kliendi vastusfail serveriga (Properties → Client) ja tõmmisfaili vastusfail tõmmisega (Properties → Allow image to install in unattended mode).</li>
+<li>Käivita CLIENT01 võrgust ja kontrolli tulemust (animatsioon ülal).</li>
+</ol></section>
+
+<section class="x"><h2>Näidis-XML failid</h2>
+<p>Võrdluseks oma WSIM-is koostatud failidega. Paroolid ja nimed on kohahoidjad, asenda need enda keskkonna omadega ja valideeri failid WSIM-is.</p>
+<h3>Win11-wds-client.xml</h3><button id="ca">Kopeeri</button><pre><code id="xa"></code></pre>
+<h3>Win11-image.xml</h3><button id="cb">Kopeeri</button><pre><code id="xb"></code></pre>
+</section>
+</div>
+
+<script>
+var S=[
+{n:"PXE käivitus ja IP",st:"UEFI → PXE",t:[["cl","dc","DHCP Discover"],["dc","cl","DHCP Offer: IP-aadress"]],
+x:"Klient käivitub võrgust ja küsib DHCP-lt IP-aadressi. Kui DHCP ja WDS on eri serverites samas alamvõrgus, ei vaja DHCP erisätteid.",
+s:"DHCP-s option 60 on vaja ainult siis, kui DHCP ja WDS töötavad samas serveris.",
+p:"VM-i BIOS = OVMF (UEFI). Pane Boot Order'is net0 esimeseks või vajuta käivitusel Esc ja vali võrk."},
+{n:"PXE vastus WDS-ilt",st:"PXE",t:[["cl","wds","PXE päring (broadcast)"],["wds","cl","PXE vastus: käivitusfail"]],
+x:"WDS-server vastab PXE-päringule ja ütleb, millist käivitusprogrammi klient laadima peab.",
+s:"WDS Properties → PXE Response: Respond to all client computers. Boot: boot\\x64\\wdsmgfw.efi",
+p:"OVMF toetab PXE-d tavaliselt nii Intel E1000E kui ka VirtIO võrgukaardiga."},
+{n:"Käivitustõmmis mällu",st:"Windows PE (mälus)",t:[["wds","cl","TFTP: wdsmgfw.efi"],["wds","cl","TFTP: boot.wim"]],
+x:"Klient laeb TFTP kaudu käivitusprogrammi ja käivitustõmmise boot.wim. Tõmmis käivitub mälus Windows PE-na.",
+s:"WDS → Boot Images → Windows 11 WinPE x64",
+p:"Windows PE-s peab võrgukaardi draiver olema olemas. E1000E töötab tavaliselt ilma lisadeta, VirtIO jaoks lisa virtio-win draiver käivitustõmmisesse."},
+{n:"Setup rakendab kliendi vastusfaili",st:"Windows Setup",t:[["wds","cl","WDS kliendi vastusfail"]],
+x:"Setup käivitub ja rakendab WDS kliendi vastusfaili. Keel, klaviatuur ja EULA on ette vastatud, seega ei küsita neid.",
+s:"windowsPE pass: International-Core-WinPE, UserData → AcceptEula",
+p:""},
+{n:"Ühendus ja autentimine",st:"Ühendus WDS-iga",t:[["cl","wds","SMB: \\\\WDS01\\REMINST"],["wds","cl","Autentimine õnnestus"]],
+x:"Setup ühendub SMB kaudu WDS-i jagatud kausta REMINST. Parooli ei küsita, sest vastusfail annab konto.",
+s:"Login → Credentials: lab.local / svc-wds-read",
+p:""},
+{n:"Tõmmise leidmine WDS-ist",st:"Tõmmise valik",t:[["cl","wds","Otsi: Windows11 / install.wim / Windows 11 Pro"],["wds","cl","install.wim (paigaldustõmmis)"]],
+x:"Setup otsib serverist tõmmise vastusfaili väärtuste järgi. Fail asub kataloogis RemoteInstall\\Images\\Windows11\\install.wim.",
+s:"ImageSelection → InstallImage: ImageGroup, Filename, ImageName",
+p:""},
+{n:"Ketas ja tõmmise kopeerimine",st:"Ketta ettevalmistus",t:[["wds","cl","install.wim → C:"]],
+x:"Setup kustutab ketta (WillWipeDisk), loob EFI, MSR ja põhipartitsiooni ning laotab tõmmise Windowsi partitsioonile.",
+s:"DiskConfiguration + InstallTo → PartitionID = 3",
+p:"VirtIO SCSI või Block ketas vajab Windows PE-s draiverit. Lihtsaim on kasutada SATA ketast või lisada draiver käivitustõmmisesse."},
+{n:"Esimene käivitus: specialize",st:"specialize",t:[["cl","dc","Domeeniga liitumine"],["dc","cl","Arvutikonto loodud"]],
+x:"Windows kohandub konkreetsele masinale: arvuti nimi, ajavöönd ja liitumine domeeniga. Siit alates kasutab Windows tõmmisfaili vastusfaili.",
+s:"ComputerName, TimeZone, Microsoft-Windows-UnattendedJoin",
+p:"Klient peab kasutama DNS-iks domeenikontrollerit, muidu liitumine ebaõnnestub."},
+{n:"OOBE ja valmis",st:"Valmis",t:[],
+x:"OOBE lehed jäetakse vahele, kohalik administraator luuakse ja arvuti jõuab sisselogimisekraanile. Küsimusi ei esitatud.",
+s:"oobeSystem: OOBE, UserAccounts → LocalAccounts",
+p:"Windows 11 nõuab TPM 2.0 ja Secure Booti. Proxmoxis lisa VM-ile TPM State (v2.0) ja EFI Disk koos pre-enrolled keys."}
+];
+var $=function(s){return document.querySelector(s)};
+var nm={dc:"DC01",cl:"CLIENT01",wds:"WDS01"},cur=0,play=false,tok=0,sp=1;
+var red=matchMedia("(prefers-reduced-motion: reduce)").matches;
+function ex(f,t){var a=f=="dc"?185:f=="wds"?535:(t=="dc"?275:445);var b=t=="dc"?185:t=="wds"?535:(f=="dc"?275:445);return[a,b]}
+function sl(ms){return new Promise(function(r){setTimeout(r,ms)})}
+function mv(f,t,l,k){return new Promise(function(res){
+var e=ex(f,t),p=$("#pkt");p.style.display="";$("#cap").textContent=l+"  ("+nm[f]+" → "+nm[t]+")";
+var D=red?0:1100/sp,t0=performance.now();
+(function fr(n){if(k!==tok)return res();var q=D?Math.min(1,(n-t0)/D):1;
+p.setAttribute("transform","translate("+(e[0]+(e[1]-e[0])*q)+",135)");
+if(q<1)requestAnimationFrame(fr);else res()})(t0)})}
+function ui(){var s=S[cur],on={cl:1};
+s.t.forEach(function(x){on[x[0]]=1;on[x[1]]=1});
+["dc","cl","wds"].forEach(function(k){$("#n-"+k).classList.toggle("on",!!on[k])});
+$("#st").textContent=s.st;$("#dt").textContent=(cur+1)+". "+s.n;$("#dx").textContent=s.x;$("#ds").textContent=s.s;
+var pv=$("#dp");pv.style.display=s.p?"":"none";pv.innerHTML="";
+if(s.p){var b=document.createElement("b");b.textContent="Proxmox: ";pv.appendChild(b);pv.appendChild(document.createTextNode(s.p))}
+$("#bar").style.width=((cur+1)/S.length*100)+"%";
+document.querySelectorAll("#ls button").forEach(function(b,i){if(i==cur)b.setAttribute("aria-current","step");else b.removeAttribute("aria-current")});
+$("#bt").textContent=play?"Paus":"Mängi"}
+async function run(i){var k=++tok;cur=i;ui();$("#pkt").style.display="none";$("#cap").textContent="";
+var s=S[i];for(var j=0;j<s.t.length;j++){if(k!==tok)return;await mv(s.t[j][0],s.t[j][1],s.t[j][2],k);await sl(200/sp)}
+if(k!==tok)return;
+if(play){await sl(1400/sp);if(k!==tok)return;if(i<S.length-1)run(i+1);else{play=false;ui()}}}
+function go(i){play=false;run(Math.max(0,Math.min(S.length-1,i)))}
+S.forEach(function(s,i){var li=document.createElement("li"),b=document.createElement("button");
+b.textContent=(i+1)+". "+s.n;b.onclick=function(){go(i)};li.appendChild(b);$("#ls").appendChild(li)});
+$("#bp").onclick=function(){go(cur-1)};$("#bn").onclick=function(){go(cur+1)};$("#br").onclick=function(){go(0)};
+$("#bt").onclick=function(){if(play){play=false;ui();return}play=true;run(cur==S.length-1?0:cur)};
+$("#sp").onchange=function(e){sp=parseFloat(e.target.value)};
+document.addEventListener("keydown",function(e){if(e.target.tagName=="SELECT")return;if(e.key=="ArrowRight")go(cur+1);if(e.key=="ArrowLeft")go(cur-1)});
+var H=function(n){return '<component name="'+n+'" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">'};
+var LC=['<InputLocale>et-EE</InputLocale>','<SystemLocale>et-EE</SystemLocale>','<UILanguage>en-US</UILanguage>','<UserLocale>et-EE</UserLocale>'];
+var ind=function(n,a){return a.map(function(x){return ' '.repeat(n)+x})};
+var XA=['<?xml version="1.0" encoding="utf-8"?>','<unattend xmlns="urn:schemas-microsoft-com:unattend">','  <settings pass="windowsPE">','    '+H('Microsoft-Windows-International-Core-WinPE'),'      <SetupUILanguage><UILanguage>en-US</UILanguage></SetupUILanguage>'].concat(ind(6,LC),['    </component>','    '+H('Microsoft-Windows-Setup'),'      <DiskConfiguration>','        <WillShowUI>OnError</WillShowUI>','        <Disk wcm:action="add">','          <DiskID>0</DiskID>','          <WillWipeDisk>true</WillWipeDisk>','          <CreatePartitions>','            <CreatePartition wcm:action="add"><Order>1</Order><Type>EFI</Type><Size>260</Size></CreatePartition>','            <CreatePartition wcm:action="add"><Order>2</Order><Type>MSR</Type><Size>16</Size></CreatePartition>','            <CreatePartition wcm:action="add"><Order>3</Order><Type>Primary</Type><Extend>true</Extend></CreatePartition>','          </CreatePartitions>','          <ModifyPartitions>','            <ModifyPartition wcm:action="add"><Order>1</Order><PartitionID>1</PartitionID><Format>FAT32</Format><Label>System</Label></ModifyPartition>','            <ModifyPartition wcm:action="add"><Order>2</Order><PartitionID>2</PartitionID></ModifyPartition>','            <ModifyPartition wcm:action="add"><Order>3</Order><PartitionID>3</PartitionID><Format>NTFS</Format><Label>Windows</Label><Letter>C</Letter></ModifyPartition>','          </ModifyPartitions>','        </Disk>','      </DiskConfiguration>','      <UserData><AcceptEula>true</AcceptEula></UserData>','      <WindowsDeploymentServices>','        <Login>','          <WillShowUI>OnError</WillShowUI>','          <Credentials><Domain>lab.local</Domain><Username>svc-wds-read</Username><Password>PAROOL_SIIA</Password></Credentials>','        </Login>','        <ImageSelection>','          <WillShowUI>OnError</WillShowUI>','          <InstallImage><Filename>install.wim</Filename><ImageGroup>Windows11</ImageGroup><ImageName>Windows 11 Pro</ImageName></InstallImage>','          <InstallTo><DiskID>0</DiskID><PartitionID>3</PartitionID></InstallTo>','        </ImageSelection>','      </WindowsDeploymentServices>','    </component>','  </settings>','</unattend>']);
+var XB=['<?xml version="1.0" encoding="utf-8"?>','<unattend xmlns="urn:schemas-microsoft-com:unattend">','  <settings pass="specialize">','    '+H('Microsoft-Windows-Shell-Setup'),'      <ComputerName>*</ComputerName>','      <TimeZone>FLE Standard Time</TimeZone>','    </component>','    '+H('Microsoft-Windows-International-Core')].concat(ind(6,LC),['    </component>','    '+H('Microsoft-Windows-UnattendedJoin'),'      <Identification>','        <Credentials><Domain>lab.local</Domain><Password>PAROOL_SIIA</Password><Username>svc-domjoin</Username></Credentials>','        <JoinDomain>lab.local</JoinDomain>','        <MachineObjectOU>OU=Workstations,DC=lab,DC=local</MachineObjectOU>','      </Identification>','    </component>','  </settings>','  <settings pass="oobeSystem">','    '+H('Microsoft-Windows-International-Core')],ind(6,LC),['    </component>','    '+H('Microsoft-Windows-Shell-Setup'),'      <OOBE>','        <HideEULAPage>true</HideEULAPage>','        <HideLocalAccountScreen>true</HideLocalAccountScreen>','        <HideOnlineAccountScreens>true</HideOnlineAccountScreens>','        <HideWirelessSetupInOOBE>true</HideWirelessSetupInOOBE>','        <NetworkLocation>Work</NetworkLocation>','        <ProtectYourPC>3</ProtectYourPC>','      </OOBE>','      <UserAccounts><LocalAccounts>','        <LocalAccount wcm:action="add"><Name>localadmin</Name><Group>Administrators</Group><Password><Value>PAROOL_SIIA</Value><PlainText>true</PlainText></Password></LocalAccount>','      </LocalAccounts></UserAccounts>','    </component>','  </settings>','</unattend>']);
+$('#xa').textContent=XA.join('\n');$('#xb').textContent=XB.join('\n');
+[['ca','xa'],['cb','xb']].forEach(function(p){var b=$('#'+p[0]);b.onclick=function(){var t=$('#'+p[1]).textContent;
+var ok=function(){b.textContent='Kopeeritud';setTimeout(function(){b.textContent='Kopeeri'},1500)};
+var sel=function(){var r=document.createRange();r.selectNodeContents($('#'+p[1]));var s=getSelection();s.removeAllRanges();s.addRange(r);b.textContent='Valitud, vajuta Ctrl+C';};
+try{navigator.clipboard.writeText(t).then(ok,sel)}catch(e){sel()}}});
+ui();
+</script>
+</body>
+</html>
