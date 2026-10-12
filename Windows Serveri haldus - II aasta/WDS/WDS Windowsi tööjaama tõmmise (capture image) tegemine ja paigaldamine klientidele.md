@@ -24,7 +24,7 @@ Terminid, mida selles juhises kasutatakse:
 ## 2. Eeldused
 
 - WDS-i roll on Windows Server 2022 peal paigaldatud ja **konfigureeritud** (Configure Server on tehtud, RemoteInstall kaust olemas, soovitavalt eraldi NTFS-kettal, mitte C: peal).
-- Serveris on olemas vähemalt üks käivitustõmmis (boot.wim) ja üks paigaldustõmmis. Võta need Windows 11 meediast kaustast `sources` (`boot.wim` ja `install.wim`).
+- Serveris on olemas vähemalt üks käivitustõmmis (boot.wim) ja üks paigaldustõmmis. Võta paigaldustõmmis Windows 11 meediast ja käivitustõmmis Windows 10 meediast, mõlemad kaustast `sources` (`boot.wim` ja `install.wim`).
 - DHCP töötab ja kliendid jõuavad PXE kaudu WDS-serverini (sama võrk või DHCP relay/IP helper).
 - Näidisarvuti ja kliendid on **sama käivitusrežiimiga**: UEFI tõmmis paigaldatakse UEFI arvutisse, BIOS tõmmis BIOS-arvutisse. Segamini minnes paigaldus ei käivitu.
 - Kontol, millega serverisse tõmmist laed, on WDS-i halduse õigused (nt Domain Admins või WDS Administrators).
@@ -68,7 +68,7 @@ See tehakse **WDS-serveris**.
 
 1. Ava **Windows Deployment Services** konsool (Server Manager → Tools → Windows Deployment Services).
 2. Laienda serveri nimi ja vali **Boot Images**.
-3. Kui Boot Images all pole veel ühtegi käivitustõmmist, lisa see: paremklõps **Boot Images** → **Add Boot Image** → vali `boot.wim` Windows 11 meedia `sources` kaustast.
+3. Kui Boot Images all pole veel ühtegi käivitustõmmist, lisa see: paremklõps **Boot Images** → **Add Boot Image** → vali `boot.wim` Windows 10 meedia `sources` kaustast.
 4. Paremklõps käivitustõmmisel (nt *Microsoft Windows Setup (x64)*) → **Create Capture Image...**
 5. Täida viisard:
    - **Image Name**: nt `Capture Win11 x64`
@@ -78,7 +78,7 @@ See tehakse **WDS-serveris**.
 7. Viisardi lõpus märgi **Add image to the Windows Deployment Server now** ja vajuta **Finish**. Kui seda linnukest ei olnud, lisa fail käsitsi: paremklõps **Boot Images** → **Add Boot Image** → vali loodud `capture.wim`.
 8. Kontrolli, et **Boot Images** all on nüüd nii tavaline käivitustõmmis kui ka capture-tõmmis.
 
-**Soovitus:** loo capture-tõmmis alati **uuema Windowsi meedia boot.wim-ist** (Windows 11), sest vana WinPE ei pruugi Windows 11 kettamudelit ja riistvara toetada.
+**Soovitus:** loo capture-tõmmis alati **Windows 10 meedia boot.wim-ist** (Windows 10), sest see töötab ilma muudatusteta. Windows 11 boot.wim kontrollib paigaldusel arvuti nõudeid (TPM 2.0, Secure Boot) ja vajab seetõttu eriti virtuaalmasinas lisamuudatusi. Windows 10 boot.wim ei takista Windows 11 paigaldustõmmise paigaldamist, sest käivitustõmmis ja paigaldustõmmis võivad olla eri versioonidest.
 
 ## 6. Paigaldustõmmiste grupi ja jagatud kausta loomine
 
@@ -155,7 +155,7 @@ Kui upload ebaõnnestus (nt võrguviga), jääb .wim-fail näidisarvuti kettale 
 | Sysprep annab vea | Vaata `setuperr.log`. Sageli on põhjuseks Store'i rakendus, mis on ühele kasutajale uuendatud. Eemalda rakendus PowerShelliga (`Get-AppxPackage`, `Remove-AppxPackage`). |
 | PXE-käivitus ei jõua WDS-ini | Kontrolli DHCP-d, VLAN-i, DHCP relay'd ja WDS-i PXE vastamise sätteid. |
 | VM ei näe boot.wim-is kettaid | Storage-kontrolleri draiver puudub. Kasuta Proxmoxis SATA/SCSI (LSI), või lisa VirtIO draiverid boot.wim-i. |
-| Windows 11 paigaldus ütleb, et arvuti ei vasta nõuetele | VM-il puudub TPM 2.0 või Secure Boot. Lisa vTPM ja UEFI. |
+| Windows 11 paigaldus ütleb, et arvuti ei vasta nõuetele | VM-il puudub TPM 2.0 või Secure Boot. Lisa vTPM ja UEFI või kasuta käivitustõmmisena Windows 10 boot.wim-i. |
 | Capture-tõmmis ei käivitu | Käivitusrežiim (UEFI/BIOS) või arhitektuur ei klapi tõmmisega. |
 | Üleslaadimine katkes | Failis on tõmmis alles kohalikul kettal. Lisa see käsitsi (vt jaotis 8). |
 | Üleslaadimine serverisse ebaõnnestub (õiguste viga) | Kontrolli REMINST jagamist, kasutaja õigusi ja SMB-d (vt märkus jaotises 7). Vajadusel salvesta .wim kohalikku või eraldi jagatud kausta ja lisa WDS-i käsitsi. |
