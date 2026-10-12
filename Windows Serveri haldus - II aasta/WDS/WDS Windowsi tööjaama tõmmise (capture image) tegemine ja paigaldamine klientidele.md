@@ -73,7 +73,7 @@ See tehakse **WDS-serveris**.
 5. Täida viisard:
    - **Image Name**: nt `Capture Win11 x64`
    - **Image Description**: lühike kirjeldus
-   - **Location and File Name**: kuhu capture-fail salvestatakse, nt `D:\RemoteInstall\Boot\x64\Images\capture.wim`
+   - **Location and File Name**: kuhu capture-fail salvestatakse, nt `F:\RemoteInstall\Boot\x64\Images\capture.wim`
 6. Vajuta **Next** ja oota, kuni tõmmis on loodud.
 7. Viisardi lõpus märgi **Add image to the Windows Deployment Server now** ja vajuta **Finish**. Kui seda linnukest ei olnud, lisa fail käsitsi: paremklõps **Boot Images** → **Add Boot Image** → vali loodud `capture.wim`.
 8. Kontrolli, et **Boot Images** all on nüüd nii tavaline käivitustõmmis kui ka capture-tõmmis.
@@ -91,7 +91,7 @@ Tõmmise üleslaadimisel peab olema grupp, kuhu see paigutatakse.
 
 Laboris tee serverisse kaust, mis on jagatud kõigile kirjutusõigusega. Ilma selleta võib tõmmise üleslaadimine võrku ebaõnnestuda.
 
-1. Tee serveris kaust, nt `D:\Tõmmised`.
+1. Tee serveris kaust, nt `F:\Tõmmised`.
 2. Ava kausta **Properties** → **Sharing** → **Advanced Sharing**, märgi **Share this folder** ja anna jagatud nimeks nt `tõmmised`.
 3. Vajuta **Permissions**, lisa **Everyone** ja anna talle **Change** õigus (vajadusel **Full Control**).
 4. Lisa kaardil **Security** kasutaja **Everyone** ja anna talle **Modify** õigus.
@@ -100,8 +100,8 @@ Laboris tee serverisse kaust, mis on jagatud kõigile kirjutusõigusega. Ilma se
 Jagamise saab luua ka PowerShellis (NTFS-õigused tuleb lisada eraldi kaardil **Security**):
 
 ```
-New-Item -Path D:\Tõmmised -ItemType Directory
-New-SmbShare -Name tõmmised -Path D:\Tõmmised -FullAccess Everyone
+New-Item -Path F:\Tõmmised -ItemType Directory
+New-SmbShare -Name tõmmised -Path F:\Tõmmised -FullAccess Everyone
 ```
 
 > **Hoiatus:** Everyone õigus sobib ainult laborisse või õppekeskkonda. Päris keskkonnas kasuta kitsamat gruppi (nt WDS-i administraatorid) ja eemalda jagamine, kui seda enam vaja pole.
