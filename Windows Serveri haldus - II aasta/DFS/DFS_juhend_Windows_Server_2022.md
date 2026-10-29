@@ -109,6 +109,19 @@ Get-ADGroupMember -Identity "DFS_Tudengitele"
 AD1 serveris loo F:-kettale kaust DFS_Tudengitele. Ava Server Manager > File and Storage Services > Shares > Tasks > New Share. Vali SMB Share – Quick, server AD1 ja kaust F:\DFS_Tudengitele. Jaga kaust nimega DFS_Tudengitele.
 
 - Jaga valitud kaust viisardis nimega DFS_Tudengitele. Kui viisard avab õiguste muutmise akna, vali kohandatud õigused ja kontrolli neid järgmises sammus.
+<img width="313" height="230" alt="image" src="https://github.com/user-attachments/assets/a4dac210-6dae-4eb8-ace8-6f06ed1403cd" />
+<img width="301" height="205" alt="image" src="https://github.com/user-attachments/assets/9ab5234c-a6f1-4637-8c54-a5a334bf3506" />
+
+Lehel **Other Settings** märgi **Enable access-based enumeration**. Jäta **Allow caching of share** märgituks ja **Encrypt data access** märkimata.
+<img width="317" height="231" alt="image" src="https://github.com/user-attachments/assets/6d946182-71ed-4795-a740-e67159ef9fcb" />
+
+- Lehel **Permissions** vali **Customize permissions…**. Avanevas aknas määra vahelehtedel **Share** (jagamisõigused) ja **Permissions** (NTFS-õigused) õigused järgmise sammu järgi.
+
+> **Mis on access-based enumeration?**
+> Access-based enumeration (ABE) ei muuda õigusi. See peidab kasutaja eest kaustad ja failid, millele tal lugemisõigust ei ole. Kui kõigil tudengitel on kaustas samad õigused, ei muuda ABE praegu midagi. Kui kausta lisanduvad hiljem isiklikud kodukaustad, näeb iga tudeng tänu ABE-le ainult oma kausta. Säte on hea tava, sest kasutaja ei näe isegi nende kaustade nimesid, kuhu tal ligipääsu pole. Hiljem saab selle sisse või välja lülitada jagamise atribuutidest (Properties > Settings) või käsuga `Set-SmbShare -Name "DFS_Tudengitele" -FolderEnumerationMode AccessBased`.
+
+
+
 
 - Share Permissions all määra õigused sama moodi nagu olemasoleval DFS_Lektoritele jagamisel. Asenda ainult ÕPPEJÕUD_DFS grupiga DFS_Tudengitele. Säilita administraatorite vajalik haldusõigus.
 
