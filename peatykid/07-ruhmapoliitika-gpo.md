@@ -28,7 +28,7 @@ Poliitikad rakenduvad järjekorras **L → S → D → OU** (vt skeem allpool). 
 
 Mida lähemal objektile GPO on lingitud, seda hiljem see rakendub ja seda suurem on tema sõna konflikti korral.
 
-> **Interaktiivne harjutus:** [GPO rakendamise simulaator](https://valdonolvak.github.io/windows-server-2022-oppematerjal/interaktiivne/gpo-simulaator.html) – lülita linke, *Enforced*, *Block Inheritance* ja turvafiltrit, käi rakendamine samm-sammult läbi ja lahenda kuus stsenaariumiülesannet.
+> **Interaktiivne harjutus:** [GPO rakendamise simulaator](https://valdonolvak.github.io/Windows-serveri-haldus/interaktiivne/gpo-simulaator.html) – lülita linke, *Enforced*, *Block Inheritance* ja turvafiltrit, käi rakendamine samm-sammult läbi ja lahenda kuus stsenaariumiülesannet.
 
 Erandid tavajärjekorrast:
 

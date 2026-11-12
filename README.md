@@ -10,8 +10,8 @@
 
 | Simulaator | Teema |
 | --- | --- |
-| [Autentimise ja autoriseerimise simulaator](https://valdonolvak.github.io/windows-server-2022-oppematerjal/interaktiivne/autentimise-simulaator.html) | Domeeniga liitmine, arvuti käivitamine, kasutaja sisselogimine (Kerberos, PAC, token, GPO-d), ligipääs failiserverile; rikked |
-| [GPO rakendamise simulaator](https://valdonolvak.github.io/windows-server-2022-oppematerjal/interaktiivne/gpo-simulaator.html) | LSDOU järjekord, Enforced, Block Inheritance, turvafilter; 6 stsenaariumiülesannet |
+| [Autentimise ja autoriseerimise simulaator](https://valdonolvak.github.io/Windows-serveri-haldus/interaktiivne/autentimise-simulaator.html) | Domeeniga liitmine, arvuti käivitamine, kasutaja sisselogimine (Kerberos, PAC, token, GPO-d), ligipääs failiserverile; rikked |
+| [GPO rakendamise simulaator](https://valdonolvak.github.io/Windows-serveri-haldus/interaktiivne/gpo-simulaator.html) | LSDOU järjekord, Enforced, Block Inheritance, turvafilter; 6 stsenaariumiülesannet |
 
 ## Sisukord
 

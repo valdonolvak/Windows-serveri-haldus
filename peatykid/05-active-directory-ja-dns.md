@@ -27,7 +27,7 @@ Vaikekonteinerid `Users` ja `Computers` on olemas igas domeenis, kuid neile GPO-
 
 Seetõttu kehtib kõige olulisem AD reegel: **domeeni liikmete (kõik kliendid ja serverid) DNS-serveriks tohib olla ainult domeeni DNS-server.** Kui Windows 11 kliendi DNS on 8.8.8.8, ei leia ta domeeni üles. Interneti nimed lahendab domeeni DNS edastaja (*forwarder*) kaudu.
 
-> **Interaktiivne harjutus:** [Autentimise ja autoriseerimise simulaator](https://valdonolvak.github.io/windows-server-2022-oppematerjal/interaktiivne/autentimise-simulaator.html) – domeeniga liitmine, arvuti käivitamine, kasutaja sisselogimine (Kerberos, PAC, token, GPO-d) ja ligipääs failiserverile samm-sammult; lülita sisse rikkeid ja vaata, kus ahel katkeb.
+> **Interaktiivne harjutus:** [Autentimise ja autoriseerimise simulaator](https://valdonolvak.github.io/Windows-serveri-haldus/interaktiivne/autentimise-simulaator.html) – domeeniga liitmine, arvuti käivitamine, kasutaja sisselogimine (Kerberos, PAC, token, GPO-d) ja ligipääs failiserverile samm-sammult; lülita sisse rikkeid ja vaata, kus ahel katkeb.
 
 ### 5.3 Domeenikontrolleri paigaldus
 
