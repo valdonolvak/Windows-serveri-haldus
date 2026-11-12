@@ -48,7 +48,7 @@ DC loomine on kaheastmeline: esmalt paigaldatakse roll (binaarfailid), seejärel
 **DC1: uus mets**
 
 1. *Server Manager* → *Manage → Add Roles and Features* → *Next* → **Role-based or feature-based installation** → server **DC1**.
-2. *Server Roles*: märgi **Active Directory Domain Services** → *Add Features* → *Next* kuni lõpuni → *Install*.
+2. *Server Roles*: märgi **Active Directory Domain Services** → *Add Features* ja **DNS Server** → *Add Features* → *Next* kuni lõpuni → *Install*.
 3. Kui paigaldus on lõppenud, klõpsa ülal kollasel lipul → **Promote this server to a domain controller**.
 4. *Deployment Configuration*: **Add a new forest**, *Root domain name* `perenimi.local`.
 5. *Domain Controller Options*: *Forest/Domain functional level* **Windows Server 2016**, märgitud **DNS server** ja **Global Catalog (GC)**, sisesta **DSRM-parool** (hoia alles!).
