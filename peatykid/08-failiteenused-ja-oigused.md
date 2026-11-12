@@ -69,6 +69,10 @@ Lisamärk `$` jagamise nime lõpus teeb jagamise sirvimisel nähtamatuks (nt `Ka
 6. **NTFS-õigused:** ava `\\CORE1\F$\Osakonnad` → paremklikk `Raamatupidamine` → *Properties → Security → Edit... → Add...* → `DL_Raamatupidamine_RW` → märgi **Modify**; *Add...* → `DL_Raamatupidamine_R` → jäta **Read & execute** → OK. Kaustal `IT` lisa samamoodi `DL_IT_RW` (**Modify**).
 7. Kontroll: *Security → Advanced* – veerus *Applies to* peab olema *This folder, subfolders and files*; vahekaart **Effective Access** näitab valitud kasutaja tegelikke õigusi.
 
+![Skeem · NTFS-õigused: Permissions for Raamatupidamine](joonised/08-skeem-ntfs-oigused.png)
+
+*Skeem · NTFS-õigused: Permissions for Raamatupidamine*
+
 #### Variant B: PowerShell
 
 ```powershell

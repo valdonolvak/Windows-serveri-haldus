@@ -60,6 +60,14 @@ Kuidas see töötab: Mari saab juurkausta luua kausta (`Create folders`). Loodud
 6. *Add* → `Domain Users` → *Applies to*: **This folder only** → *Show advanced permissions* → jäta märgituks ainult **Traverse folder / execute file**, **List folder / read data**, **Read attributes**, **Create folders / append data** → OK.
 7. *Apply* → OK. Kontroll: *Advanced* aknas on täpselt neli kirjet ja veerus *Inherited from* „None“.
 
+![Skeem · NTFS: Advanced Security Settings for Kasutajad](joonised/15-skeem-advanced-security.png)
+
+*Skeem · NTFS: Advanced Security Settings for Kasutajad*
+
+![Skeem · NTFS: Permission Entry, Domain Users](joonised/15-skeem-permission-entry.png)
+
+*Skeem · NTFS: Permission Entry, Domain Users*
+
 #### Variant B: PowerShell (icacls)
 
 ```powershell
