@@ -30,7 +30,26 @@ Discover ja Request on leviedastused, sest kliendil pole veel aadressi; Request 
 
 Valikuid saab seada kolmel tasandil: **serveri** (kehtib kõigile ulatustele), **ulatuse** ja **reserveeringu** tasandil. Kitsam tasand võidab.
 
-### 6.3 Paigaldus ja seadistus PowerShelliga
+### 6.3 Paigaldus ja seadistus
+
+> **NB!** Allpool on sama töö kahel viisil: **A) GUI** ja **B) PowerShell**. Piisab ühest – kui teed GUI juhendi järgi, pole PowerShelli osa vaja (ja vastupidi). DHCP paigaldatakse CORE1-le, GUI-sammud tehakse DC1-st.
+
+#### Variant A: GUI (samm-sammult)
+
+1. DC1 *Server Manager* → *Manage → Add Roles and Features* → server **CORE1** → *Server Roles*: **DHCP Server** → *Add Features* → *Install*.
+2. Kollane lipp → **Complete DHCP configuration** → *Next* → *Authorization*: **Use the following user's credentials** (`PERENIMI\Administrator`) → *Commit* → *Close*. Viisard loob rühmad *DHCP Administrators* ja *DHCP Users*, autoriseerib serveri AD-s ja kaotab hoiatuse.
+3. *Tools → DHCP*. Kui CORE1 puudub: paremklikk *DHCP* → *Add Server...* → `core1.perenimi.local`.
+4. *core1 → IPv4* → paremklikk **New Scope...** → viisard:
+   - *Name* `Labor-LAN`;
+   - *IP Address Range*: `192.168.10.100` – `192.168.10.200`, *Length* 24 (mask `255.255.255.0`);
+   - *Add Exclusions*: `192.168.10.100` – `192.168.10.109` → *Add*;
+   - *Lease Duration*: 8 päeva;
+   - *Yes, I want to configure these options now*: *Router* `192.168.10.1` → *Add*; *Parent domain* `perenimi.local`, *DNS servers* `192.168.10.10` ja `192.168.10.11`; *WINS* jäta tühjaks;
+   - **Yes, I want to activate this scope now** → *Finish*.
+5. **Reserveering:** *Scope → Reservations* → paremklikk **New Reservation...** → *Reservation name* `WIN11-01`, *IP address* `192.168.10.150`, *MAC address* WIN11-01 võrgukaardi MAC (Proxmoxis *VM → Hardware → Network Device*, nt `BC-24-11-...`) → *Add*.
+6. Kontroll: *Scope → Address Leases* (renditud aadressid) ja *Scope Options*.
+
+#### Variant B: PowerShell
 
 ```powershell
 # Kas otse CORE1-l või DC1-st: Enter-PSSession CORE1

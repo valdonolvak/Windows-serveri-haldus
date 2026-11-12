@@ -42,7 +42,32 @@ Miks on kasutajakaustade teine sihtmärk välja lülitatud? Kasutaja dokumente m
 
 Nimeruum ainult suunab: klient küsib viite ja avab faili otse serverist. Andmeid kopeerib serverite vahel DFS replikatsioon.
 
-### 14.3 Paigaldus ja seadistus PowerShelliga
+### 14.3 Paigaldus ja seadistus
+
+> **NB!** Allpool on sama töö kahel viisil: **A) GUI** ja **B) PowerShell**. Piisab ühest – kui teed GUI juhendi järgi, pole PowerShelli osa vaja (ja vastupidi). Kõik GUI-sammud tehakse DC1-st.
+
+#### Variant A: GUI (samm-sammult)
+
+1. **Rollid:** *Server Manager → Add Roles and Features* → server **CORE1** → *File and Storage Services → File and iSCSI Services* → märgi **File Server**, **DFS Namespaces**, **DFS Replication** → *Add Features* → *Install*. Korda sama serverile **DC1** (DC1-le tuleb nii ka konsool *DFS Management*).
+2. **DC1 ketas F:** `diskmgmt.msc` → uus ketas *Online* → *Initialize Disk* (GPT) → *New Simple Volume* → täht **F**, NTFS, silt `Andmed` (vt 3.6).
+3. **Jagamised mõlemas serveris:** *File and Storage Services → Shares → TASKS → New Share... → SMB Share – Quick* → server CORE1 → *Type a custom path* (puuduva kausta loob viisard ise):
+   - `F:\Osakonnad` → nimi `Osakonnad`, **Enable access-based enumeration**, *Share*-õigused: *Authenticated Users* **Change**, *Domain Admins* **Full Control**;
+   - `F:\Yldine` → nimi `Yldine`, samad õigused;
+   - `F:\Kasutajad` → nimi `Kasutajad$`, **Enable access-based enumeration**, *Authenticated Users* **Full Control** (NTFS-õigused vt 15.3).
+
+   Korda sama serverile **DC1**. Juurkausta jagamise `Andmed` loob nimeruumi viisard järgmises sammus ise.
+4. **Nimeruum:** *Tools → DFS Management* → paremklikk *Namespaces* → **New Namespace...** → *Server* `CORE1` → *Name* `Andmed` → *Edit Settings...*: *Local path* `F:\DFSRoots\Andmed`, *Administrators have full access; other users have read-only permissions* → **Domain-based namespace**, märgitud **Enable Windows Server 2008 mode** → *Create*.
+5. **ABE nimeruumis:** paremklikk `\\perenimi.local\Andmed` → *Properties → Advanced* → märgi **Enable access-based enumeration for this namespace** → OK.
+6. **Teine nimeruumiserver:** paremklikk nimeruum → **Add Namespace Server...** → `DC1` → *Edit Settings*: `F:\DFSRoots\Andmed` → OK.
+7. **Kaust ja replikatsioon (Osakonnad):** paremklikk nimeruum → **New Folder...** → *Name* `Osakonnad` → *Add...* `\\core1.perenimi.local\Osakonnad` → *Add...* `\\dc1.perenimi.local\Osakonnad` → OK. Küsimusele replikatsioonirühma loomise kohta vasta **Yes** → *Replicate Folder Wizard*:
+   - *Replication group name* `RG-Osakonnad`, *Replicated folder name* `Osakonnad`;
+   - *Primary Member*: **CORE1** (tema sisu on esialgsel sünkroniseerimisel „õige“);
+   - *Topology*: **Full mesh**; *Replication schedule*: *Replicate continuously using the specified bandwidth* (Full) → *Create*.
+8. Korda sammu 7 kaustale `Yldine` (`RG-Yldine`).
+9. **Kasutajad:** *New Folder...* → `Kasutajad` → sihtmärgid `\\core1.perenimi.local\Kasutajad$` ja `\\dc1.perenimi.local\Kasutajad$` → replikatsioon nagu sammus 7 (`RG-Kasutajad`, esmane liige CORE1). Seejärel kaustal `Kasutajad` vahekaardil *Folder Targets* paremklikk DC1 sihtmärgil → **Disable Folder Target** (jääb ainult varukoopiaks).
+10. Kontroll: *Replication → RG-...* → vahekaart *Memberships*; esialgne sünkroniseerimine algab kuni 15 minuti jooksul.
+
+#### Variant B: PowerShell
 
 ```powershell
 # 1. Mõlemale serverile (DC1 ja CORE1) DFS rollid; DC1-le ka haldusvahend

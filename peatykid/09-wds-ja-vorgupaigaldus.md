@@ -41,6 +41,20 @@ DHCP ja WDS vastavad samale DISCOVER-ile eraldi: CORE1 annab aadressi, DC1 ütle
 
 WDS vajab: AD-d (integreeritud režiimis), toimivat DNS-i ja DHCP-d võrgus ning NTFS-köidet tõmmiste jaoks (mitte süsteemiketast).
 
+> **NB!** Allpool on sama töö kahel viisil: **A) GUI** ja **B) PowerShell**. Piisab ühest – kui teed GUI juhendi järgi, pole PowerShelli osa vaja (ja vastupidi).
+
+#### Variant A: GUI (samm-sammult)
+
+1. DC1 *Server Manager → Add Roles and Features* → server **DC1** → *Server Roles*: **Windows Deployment Services** → *Add Features* → *Role Services*: **Deployment Server** ja **Transport Server** → *Install*.
+2. *Tools → Windows Deployment Services* (`wdsmgmt.msc`) → *Servers* → paremklikk **DC1** → **Configure Server** → *Next*.
+3. *Install Options*: **Integrated with Active Directory**.
+4. *Remote Installation Folder Location*: `E:\RemoteInstall` (mitte süsteemiketas).
+5. *PXE Server Initial Settings*: **Respond to all client computers (known and unknown)** → *Next*. Lõpus eemalda linnuke *Add images to the server now* → *Finish*.
+6. Paremklikk **DC1 → Properties** → vahekaart **Boot**: nii *Known clients* kui ka *Unknown clients* → **Require the user to press the F12 key to continue the PXE boot**.
+7. Samas aknas vahekaart **AD DS** → *Computer Account Location* → **The following location** → *Browse* → `Labor → Arvutid` → OK.
+
+#### Variant B: PowerShell
+
 ```powershell
 Install-WindowsFeature WDS -IncludeManagementTools
 
@@ -54,8 +68,6 @@ wdsutil /Set-Server /PxePromptPolicy /Known:OptIn /New:OptIn
 # Uued arvutiobjektid õigesse OU-sse
 wdsutil /Set-Server /NewMachineOU /Type:Custom /OU:"OU=Arvutid,OU=Labor,DC=perenimi,DC=local"
 ```
-
-GUI-s: `wdsmgmt.msc` → server → paremklikk *Configure Server* → *Integrated with Active Directory* → tee `E:\RemoteInstall` → *Respond to all client computers (known and unknown)*.
 
 ### 9.5 Kohandatud WinPE alglaadimistõmmis
 

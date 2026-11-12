@@ -29,6 +29,18 @@ WSUS (*Windows Server Update Services*) on Windows Serveri roll, mis laeb Micros
 
 WSUS vajab sünkroonimiseks **internetiühendust** (otse või proksi kaudu) ning vähemalt mitukümmend GB vaba ruumi. Kui laboris internetti pole, saab seadistada serveri, GPO ja rühmad ning näha klientide aruandeid, kuid uuendusi alla ei laeta.
 
+> **NB!** Peatükkides 20.2 ja 20.3 on sama töö kahel viisil: **A) GUI** ja **B) PowerShell**. Piisab ühest – kui teed GUI juhendi järgi, pole PowerShelli osa vaja (ja vastupidi). WSUS paigaldatakse CORE1-le, GUI-sammud tehakse DC1-st.
+
+#### Variant A: GUI (samm-sammult)
+
+1. DC1 *Server Manager → Add Roles and Features* → server **CORE1** → *Server Roles*: **Windows Server Update Services** → *Add Features*.
+2. *Role Services*: **WID Connectivity** ja **WSUS Services** (mitte *SQL Server Connectivity*).
+3. *Content*: märgi *Store updates in the following location* → `F:\WSUS` → *Install*.
+4. Kollane lipp → **Launch Post-Installation tasks** (sama mis `wsusutil postinstall`); oota teadet *Configuration completed*.
+5. Konsool DC1-le: *Add Roles and Features* → server **DC1** → *Features → Remote Server Administration Tools → Role Administration Tools* → **Windows Server Update Services Tools** → *Install*.
+
+#### Variant B: PowerShell
+
 ```powershell
 # CORE1-l: roll koos WID andmebaasiga
 Install-WindowsFeature UpdateServices -IncludeManagementTools
@@ -39,7 +51,26 @@ New-Item F:\WSUS -ItemType Directory
 Install-WindowsFeature UpdateServices-RSAT
 ```
 
-### 20.3 Seadistus PowerShelliga
+### 20.3 Seadistus
+
+#### Variant A: GUI (samm-sammult)
+
+1. DC1: *Tools → Windows Server Update Services* → **Connect to Server**: `core1.perenimi.local`, port **8530** → *Connect*.
+2. Esimesel avamisel käivitub *WSUS Configuration Wizard* (hiljem *Options → WSUS Server Configuration Wizard*):
+   - *Microsoft Update Improvement Program*: eemalda linnuke;
+   - *Upstream Server*: **Synchronize from Microsoft Update**; *Proxy*: vajadusel;
+   - *Connect to Upstream Server* → **Start Connecting** (laadib ainult toodete ja klasside nimekirja) → oota → *Next*;
+   - *Languages*: **Download updates only in these languages** → **English**;
+   - *Products*: eemalda ülemine **Windows**, märgi **Windows 11** ja **Microsoft Server operating system-21H2**;
+   - *Classifications*: **Critical Updates**, **Definition Updates**, **Security Updates**, **Updates**;
+   - *Sync Schedule*: **Synchronize automatically**, *First synchronization* 01:00, *Synchronizations per day* 1;
+   - *Finished*: märgi **Begin initial synchronization** → *Finish*.
+3. **Arvutirühmad:** *Computers → All Computers* → paremklikk **Add Computer Group...** → `Testgrupp`; korda `Tootmine`.
+4. *Options → Computers* → **Use Group Policy or registry settings on computers** (client-side targeting) → OK.
+5. **Kinnitamine:** *Updates → Security Updates* → filtrid *Approval*: **Unapproved**, *Status*: **Failed or Needed** → *Refresh* → vali uuendused (Ctrl+A) → paremklikk **Approve...** → `Testgrupp` → **Approved for Install** → OK.
+6. **Hooldus (iga kuu):** *Options → Server Cleanup Wizard* → märgi kõik valikud → *Next*.
+
+#### Variant B: PowerShell
 
 ```powershell
 $w = Get-WsusServer -Name core1.perenimi.local -PortNumber 8530
@@ -77,8 +108,6 @@ Get-WsusUpdate -Classification Security -Approval Unapproved -Status FailedOrNee
 # Hooldus (iga kuu): asendatud ja aegunud uuendused tagasi, kasutamata failid ära
 Invoke-WsusServerCleanup -DeclineSupersededUpdates -DeclineExpiredUpdates -CleanupObsoleteUpdates -CleanupUnneededContentFiles
 ```
-
-GUI-s: DC1-l *Windows Server Update Services* konsool → *Connect to Server* `core1.perenimi.local`, port 8530. Esmase seadistuse saab teha ka viisardiga *Options → WSUS Server Configuration Wizard*. *Options → Computers*: vali **Use Group Policy or registry settings on computers** (client-side targeting).
 
 ### 20.4 GPO klientidele
 

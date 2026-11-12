@@ -31,6 +31,23 @@ Tähtis: **ainult PDC emulaator** seadistatakse välise NTP-serveri järgi. Kõi
 
 ### 19.3 Seadistus
 
+> **NB!** Allpool on sama töö kahel viisil: **A) GUI (rühmapoliitikaga)** ja **B) PowerShell / w32tm**. Piisab ühest – kui teed GUI juhendi järgi, pole käsurea seadistust vaja (ja vastupidi). GUI-variant on ka soovitatav, sest seadistus liigub automaatselt kaasa, kui PDC roll kolib teisele DC-le.
+
+#### Variant A: GUI (samm-sammult)
+
+1. **Kes on PDC?** `dsa.msc` → paremklikk `perenimi.local` → **Operations Masters...** → vahekaart **PDC**.
+2. **WMI-filter:** `gpmc.msc` → *perenimi.local → WMI Filters* → paremklikk **New...** → nimi `PDC-emulaator` → *Add* → *Namespace* `root\CIMv2`, *Query* `SELECT * FROM Win32_ComputerSystem WHERE DomainRole = 5` (5 = esmane domeenikontroller) → OK → *Save*.
+3. **GPO:** paremklikk *Group Policy Objects* → *New* → `C_PDC_Aeg` → paremklikk → **Edit** → *Computer Configuration → Policies → Administrative Templates → System → Windows Time Service → Time Providers*:
+   - **Configure Windows NTP Client** → *Enabled*, *NtpServer* `0.ee.pool.ntp.org,0x8 1.ee.pool.ntp.org,0x8`, *Type* **NTP**;
+   - **Enable Windows NTP Client** → *Enabled*;
+   - **Enable Windows NTP Server** → *Enabled* → sulge redaktor.
+4. Vali `C_PDC_Aeg` → vahekaart *Scope* → *WMI Filtering* → vali `PDC-emulaator`.
+5. **Lingi:** paremklikk OU-l *Domain Controllers* → *Link an Existing GPO...* → `C_PDC_Aeg`.
+6. **CORE1 ja liikmed:** midagi muuta pole vaja – nad kasutavad vaikimisi domeenihierarhiat (*NT5DS*).
+7. Kontroll: *Event Viewer → Windows Logs → System*, allikas **Time-Service** (sündmus 35/37). Ajaallika nägemiseks on siiski kiireim `w32tm /query /source` – see on ainult kontroll, mitte seadistus.
+
+#### Variant B: PowerShell / w32tm
+
 ```powershell
 # Kes on PDC emulaator?
 Get-ADDomain | Select-Object PDCEmulator
@@ -52,8 +69,6 @@ w32tm /query /configuration       # Type: NTP või NT5DS
 w32tm /monitor                    # kõigi DC-de aeg ja nihe
 w32tm /stripchart /computer:dc1.perenimi.local /samples:5 /dataonly   # nihe sekundites
 ```
-
-**GPO-ga PDC seadistus (soovitatav):** kui PDC roll kolib teisele DC-le, peab ka NTP seadistus kaasa liikuma. Selleks loo GPO `C_PDC_Aeg`, lingi see OU-le *Domain Controllers* ja lisa **WMI-filter** `SELECT * FROM Win32_ComputerSystem WHERE DomainRole = 5` (5 = esmane domeenikontroller). Seaded: *Computer → Admin Templates → System → Windows Time Service → Time Providers* → *Configure Windows NTP Client* (NtpServer `0.ee.pool.ntp.org,0x8 1.ee.pool.ntp.org,0x8`, Type **NTP**) ja *Enable Windows NTP Client* = Enabled. Nii saab uus PDC automaatselt õige seadistuse ja vana läheb tagasi domeenihierarhiale.
 
 ### 19.4 Tõrkeotsing
 

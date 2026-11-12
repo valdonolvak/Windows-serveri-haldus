@@ -56,6 +56,18 @@ Get-WinEvent -FilterHashtable @{LogName='Security'; Id=4625} -MaxEvents 20 |
 
 Windows Serveris on tasuta komponent **Windows Server Backup** (`wbadmin`). Domeenikontrolleri jaoks varundatakse **System State** (AD andmebaas, SYSVOL, register, boot-failid).
 
+> **NB!** Allpool on sama töö kahel viisil: **A) GUI** ja **B) PowerShell**. Piisab ühest – kui teed GUI juhendi järgi, pole PowerShelli osa vaja (ja vastupidi).
+
+#### Variant A: GUI (samm-sammult)
+
+1. *Server Manager → Add Roles and Features* → *Features*: **Windows Server Backup** → *Install*.
+2. *Tools → Windows Server Backup* (`wbadmin.msc`) → *Local Backup* → paremal **Backup Once...**.
+3. *Different options* → *Select Backup Configuration*: **Custom** → *Add Items* → märgi **System state** → OK → *Next*.
+4. *Specify Destination Type*: **Local drives** → *Select Backup Destination*: `E:` → *Next* → **Backup**.
+5. Kontroll: akna *Messages* osas on varundus olekuga *Successful*. Ajastatud varunduse jaoks kasuta *Backup Schedule...* viisardit.
+
+#### Variant B: PowerShell
+
 ```powershell
 Install-WindowsFeature Windows-Server-Backup
 # System State varundus eraldi kettale

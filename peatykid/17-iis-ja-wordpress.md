@@ -43,6 +43,16 @@ Kuna labori võrgus pole tavaliselt internetti, laadi failid alla oma arvutis ja
 
 ### 17.3 DNS-kirje
 
+> **NB!** Allpool on sama töö kahel viisil: **A) GUI** ja **B) PowerShell**. Piisab ühest – kui teed GUI juhendi järgi, pole PowerShelli osa vaja (ja vastupidi). See kehtib kõigi peatüki 17 alajaotuste kohta.
+
+#### Variant A: GUI (samm-sammult)
+
+1. DC1: *Tools → DNS* → *Forward Lookup Zones → perenimi.local* → paremklikk **New Host (A or AAAA)...**.
+2. *Name* `veeb`, *IP address* `192.168.10.10` (märgi *Create associated pointer (PTR) record*) → *Add Host* → *Done*.
+3. Kontroll: kliendi käsureal `nslookup veeb.perenimi.local`.
+
+#### Variant B: PowerShell
+
 ```powershell
 # DC1-l: veeb.perenimi.local -> DC1 IP
 Add-DnsServerResourceRecordA -ZoneName "perenimi.local" -Name "veeb" -IPv4Address 192.168.10.10
@@ -50,6 +60,18 @@ Resolve-DnsName veeb.perenimi.local
 ```
 
 ### 17.4 IIS ja PHP
+
+#### Variant A: GUI (samm-sammult)
+
+1. DC1 *Server Manager → Add Roles and Features* → server **DC1** → *Server Roles*: **Web Server (IIS)** → *Add Features* → *Role Services*, märgi lisaks vaikimisi valikutele:
+   - *Common HTTP Features* → **HTTP Redirection**;
+   - *Security* → **URL Authorization** ja **Windows Authentication**;
+   - *Application Development* → **CGI** (see paigaldab FastCGI);
+   - *Management Tools* → **IIS Management Console** (vaikimisi märgitud) → *Install*.
+2. Topeltklikk `C:\Install\vc_redist.x64.exe` → nõustu litsentsiga → *Install* → *Close*.
+3. Paremklikk PHP zip-failil → **Extract All...** → sihtkaust `C:\PHP` → *Extract*. Kaustas `C:\PHP` tee failist `php.ini-production` koopia ja nimeta see `php.ini` (File Exploreris lülita sisse *View → Show → File name extensions*, et laiend oleks näha).
+
+#### Variant B: PowerShell
 
 ```powershell
 # 1. IIS koos CGI (FastCGI), haldusvahendi, suunamise ja Windowsi autentimisega
@@ -88,6 +110,20 @@ post_max_size = 32M
 expose_php = Off
 ```
 
+**FastCGI ja PHP käsitleja** – jälle kaks samaväärset viisi, tee üks neist.
+
+**Variant A: GUI**
+
+1. *Tools → Internet Information Services (IIS) Manager* → vasakult server **DC1**.
+2. Topeltklikk **Handler Mappings** → paremal **Add Module Mapping...**:
+   - *Request path* `*.php`, *Module* **FastCgiModule**, *Executable* `C:\PHP\php-cgi.exe`, *Name* `PHP-FastCGI`;
+   - *Request Restrictions...* → *Mapping*: märgi *Invoke handler only if request is mapped to* → **File or folder** → OK → OK;
+   - küsimusele „Do you want to create a FastCGI application for this executable?“ vasta **Yes**.
+3. Tagasi serveri vaatesse → topeltklikk **FastCGI Settings** → `C:\PHP\php-cgi.exe` → *Edit...* → *Instance MaxRequests* `10000` → OK.
+4. Serveri vaates topeltklikk **Default Document** → *Add...* `index.php` → vali see → *Move Up*, kuni see on nimekirjas esimene.
+
+**Variant B: PowerShell**
+
 ```powershell
 # 4. FastCGI rakendus ja *.php käsitleja serveri tasemel
 Import-Module WebAdministration
@@ -98,8 +134,6 @@ New-WebHandler -Name "PHP-FastCGI" -Path "*.php" -Verb "*" -Modules FastCgiModul
 Add-WebConfigurationProperty -Filter /system.webServer/defaultDocument/files -PSPath IIS:\ `
   -Name . -Value @{value='index.php'} -AtIndex 0
 ```
-
-Sama GUI-s: IIS Manager → server → *Handler Mappings → Add Module Mapping* (`*.php`, `FastCgiModule`, `C:\PHP\php-cgi.exe`) ja *Default Document → Add* `index.php`.
 
 ### 17.5 MySQL ja andmebaas
 
@@ -116,6 +150,16 @@ FLUSH PRIVILEGES;
 WordPressi kasutaja saab õigused **ainult oma andmebaasile** (vähima õiguse põhimõte). Ära kasuta WordPressis `root` kontot.
 
 ### 17.6 Sait, rakenduskogum ja õigused
+
+#### Variant A: GUI (samm-sammult)
+
+1. **Rakenduskogum:** IIS Manager → *DC1 → Application Pools* → paremal **Add Application Pool...** → *Name* `veeb`, *.NET CLR version* **No Managed Code**, *Managed pipeline mode* *Integrated* → OK.
+2. **WordPress:** paremklikk WordPressi zip-failil → *Extract All...* → `C:\Install\wp` → liiguta tekkinud kaust `wordpress` asukohta `C:\inetpub` ja nimeta see `veeb`.
+3. **Sait:** paremklikk *Sites* → **Add Website...** → *Site name* `veeb`, *Application pool* *Select...* → `veeb`, *Physical path* `C:\inetpub\veeb`; *Binding*: *Type* http, *Port* 80, *Host name* `veeb.perenimi.local` → OK.
+4. **Anonüümne kasutaja:** vali sait `veeb` → topeltklikk **Authentication** → *Anonymous Authentication* → *Edit...* → **Application pool identity** → OK.
+5. **NTFS-õigused:** paremklikk `C:\inetpub\veeb` → *Properties → Security → Edit... → Add...* → kirjuta `IIS AppPool\veeb` → *Check Names* → OK → jäta **Read & execute** → OK. Kaustal `C:\inetpub\veeb\wp-content` lisa samale kontole **Modify**.
+
+#### Variant B: PowerShell
 
 ```powershell
 # Rakenduskogum ilma .NET-ita (PHP ei vaja .NET CLR-i)

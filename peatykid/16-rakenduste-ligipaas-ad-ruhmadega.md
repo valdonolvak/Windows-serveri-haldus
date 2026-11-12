@@ -43,6 +43,21 @@ Märkus: paigaldus ja otsetee ei ole turvameetmed – kui kasutaja leiab program
 
 Mehhanismid ei tea midagi osakondadest: nad vaatavad ainult `DL_APP_` rühma. Kes millise rakenduse saab, otsustab rühmade pesastus.
 
+> **NB!** Allpool on sama töö kahel viisil: **A) GUI** ja **B) PowerShell**. Piisab ühest – kui teed GUI juhendi järgi, pole PowerShelli osa vaja (ja vastupidi).
+
+#### Variant A: GUI (samm-sammult)
+
+1. DC1: `dsa.msc` → paremklikk `Labor → Ryhmad` → *New → Group* → nimi `DL_APP_7Zip`, *Group scope* **Domain local**, *Group type* **Security** → OK. Korda rühmadele `DL_APP_Firefox`, `DL_APP_VLC`, `DL_APP_Raamat`, `DL_APP_Intranet`.
+2. Topeltklikk rühmal → vahekaart **Members** → *Add...* → kirjuta globaalrühmad (mitu korraga semikooloniga, nt `GG_IT; GG_Myyk`) → *Check Names* → OK:
+   - `DL_APP_7Zip` ← `GG_IT`
+   - `DL_APP_Firefox` ← `GG_IT`, `GG_Raamatupidamine`, `GG_Myyk`
+   - `DL_APP_VLC` ← `GG_IT`
+   - `DL_APP_Raamat` ← `GG_Raamatupidamine`
+   - `DL_APP_Intranet` ← `GG_Myyk`, `GG_IT`
+3. Kontroll: globaalrühma omadustes vahekaart **Member Of** näitab, millistesse `DL_APP_` rühmadesse ta kuulub.
+
+#### Variant B: PowerShell
+
 ```powershell
 $ou = "OU=Ryhmad,OU=Labor,DC=perenimi,DC=local"
 '7Zip','Firefox','VLC','Raamat','Intranet' | ForEach-Object {

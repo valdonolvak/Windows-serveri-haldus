@@ -31,6 +31,15 @@ Kodune WiFi kasutab ühist parooli (**WPA2/WPA3-Personal**, PSK). Ettevõttes on
 
 NPS paigaldatakse DC1-le (laboris; tootmises soovitatavalt eraldi serverile või kahele serverile tõrkekindluse jaoks).
 
+> **NB!** Peatükkides 21.2 ja 21.3 on sama töö kahel viisil: **A) GUI** ja **B) PowerShell**. Piisab ühest – kui teed GUI juhendi järgi, pole PowerShelli osa vaja (ja vastupidi).
+
+#### Variant A: GUI (samm-sammult)
+
+1. DC1 *Server Manager → Add Roles and Features* → server **DC1** → *Server Roles*: **Network Policy and Access Services** → *Add Features* → *Install*.
+2. *Tools → Network Policy Server* → paremklikk **NPS (Local)** → **Register server in Active Directory** → OK → OK (DC1 lisatakse rühma *RAS and IAS Servers*).
+
+#### Variant B: PowerShell
+
 ```powershell
 # DC1-l
 Install-WindowsFeature NPAS -IncludeManagementTools
@@ -41,6 +50,17 @@ netsh nps add registeredserver
 Sertifikaat (vt peatükk 18): CORE1 CA-l avalda mall **RAS and IAS Server** (`certsrv.msc` → *Certificate Templates → New → Certificate Template to Issue*). Mall lubab taotleda rühmal *RAS and IAS Servers*, kuhu DC1 eelmise käsuga lisati. Taaskäivita DC1 (rühmaliikmesus) ja taotle sertifikaat: `certlm.msc` → *Personal → Request New Certificate* → *RAS and IAS Server*. Sertifikaadi nimi on DC1 FQDN.
 
 ### 21.3 RADIUS-kliendid ja rühmad
+
+#### Variant A: GUI (samm-sammult)
+
+1. **Rühmad:** `dsa.msc` → paremklikk `Labor → Ryhmad` → *New → Group* → `DL_WIFI_Sisevork`, **Domain local**, **Security**; korda `DL_WIFI_Internet`.
+2. Liikmed (*Members → Add...*): `DL_WIFI_Sisevork` ← `GG_IT`, `GG_Raamatupidamine`; `DL_WIFI_Internet` ← `GG_Myyk`.
+3. **RADIUS-kliendid:** `nps.msc` → *RADIUS Clients and Servers* → paremklikk **RADIUS Clients** → **New**:
+   - *Friendly name* `AP-Labor`, *Address* `192.168.10.50`, *Shared Secret*: **Manual**, pikk juhuslik saladus (või *Generate*) → OK;
+   - korda: `Test-WIN11-01`, `192.168.10.150`, teine saladus.
+4. Kontroll: *RADIUS Clients* vaates on mõlemad kirjed olekuga *Enabled*.
+
+#### Variant B: PowerShell
 
 ```powershell
 # AD rühmad (AGDLP)

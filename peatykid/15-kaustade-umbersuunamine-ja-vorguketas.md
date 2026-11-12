@@ -48,6 +48,20 @@ Kaustade ümbersuunamine loob kausta enne, kui Drive Maps üritab seda `H:`-ks k
 
 Kuidas see töötab: Mari saab juurkausta luua kausta (`Create folders`). Loodud kausta omanikuks saab Mari ning *CREATOR OWNER* reegel muutub tema jaoks täielikuks õiguseks just sellele kaustale. Teised kasutajad ei saa Mari kausta avada, sest nende õigus juurkaustas kehtib „ainult sellele kaustale“. ABE peidab teiste kaustad ka nimekirjast.
 
+> **NB!** Allpool on sama töö kahel viisil: **A) GUI** ja **B) PowerShell (icacls)**. Piisab ühest – kui teed GUI juhendi järgi, pole käsurea osa vaja (ja vastupidi).
+
+#### Variant A: GUI (samm-sammult)
+
+1. DC1 File Exploreris ava `\\CORE1\F$` → paremklikk `Kasutajad` → *Properties → Security → Advanced*.
+2. **Disable inheritance** → **Remove all inherited permissions from this object**.
+3. *Add* → *Select a principal* `SYSTEM` → *Basic permissions*: **Full control**, *Applies to*: *This folder, subfolders and files* → OK.
+4. *Add* → `Domain Admins` → **Full control**, *This folder, subfolders and files* → OK.
+5. *Add* → `CREATOR OWNER` → **Full control**, *Applies to*: **Subfolders and files only** → OK.
+6. *Add* → `Domain Users` → *Applies to*: **This folder only** → *Show advanced permissions* → jäta märgituks ainult **Traverse folder / execute file**, **List folder / read data**, **Read attributes**, **Create folders / append data** → OK.
+7. *Apply* → OK. Kontroll: *Advanced* aknas on täpselt neli kirjet ja veerus *Inherited from* „None“.
+
+#### Variant B: PowerShell (icacls)
+
 ```powershell
 # CORE1-l: pärimine maha ja õigused Microsofti soovituse järgi
 icacls F:\Kasutajad /inheritance:r

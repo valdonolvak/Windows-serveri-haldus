@@ -32,6 +32,19 @@ Olulised piirangud:
 
 ### 13.3 Paigaldus ja üldseaded
 
+> **NB!** Peatükkides 13.3–13.6 on iga töö kirjeldatud kahel viisil: **A) GUI** ja **B) PowerShell**. Piisab ühest – kui teed GUI juhendi järgi, pole PowerShelli osa vaja (ja vastupidi). FSRM paigaldatakse CORE1-le, GUI-sammud tehakse DC1-st.
+
+#### Variant A: GUI (samm-sammult)
+
+1. DC1 *Server Manager → Add Roles and Features* → server **CORE1** → *Server Roles → File and Storage Services → File and iSCSI Services* → märgi **File Server Resource Manager** → *Add Features* → *Install*.
+2. Konsool DC1-le: *Add Roles and Features* → server **DC1** → *Features → Remote Server Administration Tools → Role Administration Tools → File Services Tools* → **File Server Resource Manager Tools** → *Install*.
+3. *Tools → File Server Resource Manager* (`fsrm.msc`) → paremklikk *File Server Resource Manager (Local)* → **Connect to Another Computer** → `CORE1` → OK.
+4. Paremklikk *File Server Resource Manager (CORE1)* → **Configure Options...**:
+   - vahekaart *Email Notifications*: *SMTP server* `smtp.perenimi.local`, *Default administrator recipients* `it@perenimi.local`, *From* `fsrm@perenimi.local` (kui SMTP-serverit pole, jäta tühjaks – kasutame sündmuste logi);
+   - vahekaart *Report Locations*: `F:\FSRM\Aruanded\Intsidendid`, `...\Ajastatud`, `...\Kohe` → OK.
+
+#### Variant B: PowerShell
+
 ```powershell
 # CORE1-l
 Install-WindowsFeature FS-Resource-Manager -IncludeManagementTools
@@ -45,9 +58,20 @@ Set-FsrmSetting -ReportLocationIncident F:\FSRM\Aruanded\Intsidendid `
   -ReportLocationScheduled F:\FSRM\Aruanded\Ajastatud -ReportLocationOnDemand F:\FSRM\Aruanded\Kohe
 ```
 
-GUI-s hallatakse FSRM-i DC1-lt: `fsrm.msc` → paremklikk *File Server Resource Manager (Local)* → *Connect to Another Computer* → CORE1.
-
 ### 13.4 Kvoodid
+
+#### Variant A: GUI (samm-sammult)
+
+1. `fsrm.msc` (ühendatud CORE1-ga) → *Quota Management → Quota Templates* → paremklikk **Create Quota Template...**:
+   - *Template name* `Kasutaja 100 MB`, *Limit* **100 MB**, **Hard quota**;
+   - *Add...* → *Generate notifications when usage reaches (%)* **85** → vahekaart **Event Log** → märgi *Send warning to event log* → kirjuta teade (muutujad *Insert Variable* nupust, nt `[Source Io Owner]`, `[Quota Used Percent]`) → OK;
+   - *Add...* → **100** % → *Event Log* → teade „Kvoot täis“ → OK → OK.
+2. Teine mall: *Create Quota Template...* → `Osakond 5 GB pehme`, *Limit* **5 GB**, **Soft quota**, lävi 85% (*Event Log*) → OK.
+3. **Automaatkvoot:** *Quotas* → paremklikk **Create Quota...** → *Quota path* `F:\Kasutajad` → **Auto apply template and create quotas on existing and new subfolders** → *Derive properties from this quota template*: `Kasutaja 100 MB` → *Create*.
+4. **Tavaline kvoot:** *Create Quota...* → `F:\Osakonnad\Raamatupidamine` → **Create quota on path** → mall `Osakond 5 GB pehme` → *Create*.
+5. Kontroll: *Quotas* vaates veerud *Limit*, *% Used* ja *Quota Type* (*Hard/Soft*, automaatkvoodil *Auto Apply*).
+
+#### Variant B: PowerShell
 
 ```powershell
 # Läved: 85% -> hoiatus logisse, 100% -> viga logisse
@@ -77,6 +101,15 @@ Muutujad nagu `[Source Io Owner]`, `[Quota Path]`, `[Quota Used Percent]` asenda
 
 ### 13.5 Failiekraanid
 
+#### Variant A: GUI (samm-sammult)
+
+1. *File Screening Management → File Groups* → paremklikk **Create File Group...** → *File group name* `Meedia` → *Files to include*: lisa ükshaaval `*.mp3`, `*.mp4`, `*.mkv`, `*.avi`, `*.wav`, `*.flac` (iga järel *Add*) → OK.
+2. **Aktiivne ekraan:** *File Screens* → paremklikk **Create File Screen...** → *File screen path* `F:\Osakonnad` → **Define custom file screen properties** → *Custom Properties...* → **Active screening**, märgi rühm `Meedia` → vahekaart *Event Log*: *Send warning to event log* + teade → OK → *Create* → **Save the custom file screen without creating a template** → OK.
+3. **Passiivne ekraan:** sama tee `F:\Yldine` → **Passive screening**, rühm **Executable Files** → *Event Log* teade → *Create*.
+4. **Erand:** loo kaust `\\CORE1\F$\Osakonnad\IT\Koolitusvideod` → *File Screens* → paremklikk **Create File Screen Exception...** → *Exception path* see kaust → märgi `Meedia` → OK.
+
+#### Variant B: PowerShell
+
 ```powershell
 # Oma failirühm (vaikimisi rühmad on inglise keeles: "Audio and Video Files", "Executable Files")
 New-FsrmFileGroup -Name "Meedia" -IncludePattern "*.mp3","*.mp4","*.mkv","*.avi","*.wav","*.flac"
@@ -104,6 +137,13 @@ New-FsrmFileScreenException -Path F:\Osakonnad\IT\Koolitusvideod -IncludeGroup "
 | Least Recently Accessed Files | Ammu kasutamata failid (arhiveerimiskandidaadid) |
 | Quota Usage | Kvootide täituvus |
 | File Screening Audit | Kes proovis keelatud faile salvestada |
+
+#### Variant A: GUI (samm-sammult)
+
+1. **Kohene aruanne:** *Storage Reports Management* → paremklikk **Generate Reports Now...** → vahekaart *Scope* → *Add...* `F:\Kasutajad` → vahekaart *Settings*: märgi **Quota Usage** ja **Large Files** → OK → **Wait for reports to be generated and then display them** → OK.
+2. **Ajastatud aruanne:** paremklikk **Schedule a New Report Task...** → *Settings*: nimi `Nädalaaruanne`, aruanded **Large Files**, **Duplicate Files**, **Files by Owner**; *Scope*: `F:\` → vahekaart *Schedule* → *Weekly*, **Monday**, kell **06:00** → OK.
+
+#### Variant B: PowerShell
 
 ```powershell
 # Kohene aruanne

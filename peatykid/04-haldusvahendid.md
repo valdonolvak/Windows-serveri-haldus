@@ -62,6 +62,23 @@ Enable-NetFirewallRule -DisplayGroup "Windows Defender Firewall Remote Managemen
 
 Windows 11-l on RSAT „Features on Demand“, mis laaditakse alla Windows Update'ist (võrguühendus vajalik):
 
+> **NB!** Allpool on sama töö kahel viisil: **A) GUI** ja **B) PowerShell**. Piisab ühest – kui teed GUI juhendi järgi, pole PowerShelli osa vaja (ja vastupidi).
+
+#### Variant A: GUI (samm-sammult)
+
+1. Logi WIN11-01-le sisse administraatori õigustega kontoga.
+2. *Settings → System → Optional features* → *Add an optional feature* → **View features**.
+3. Kirjuta otsingusse `RSAT` ja märgi:
+   - *RSAT: Active Directory Domain Services and Lightweight Directory Services Tools*
+   - *RSAT: DNS Server Tools*
+   - *RSAT: DHCP Server Tools*
+   - *RSAT: Group Policy Management Tools*
+   - *RSAT: Server Manager*
+4. *Next* → *Add* (või *Install*). Paigalduse edenemist näeb samal lehel jaotises *Recent actions*.
+5. Kontroll: *Start → All apps → Windows Tools* – seal on nt *Active Directory Users and Computers*, *DNS*, *DHCP*, *Group Policy Management*.
+
+#### Variant B: PowerShell
+
 ```powershell
 # Käivita administraatorina WIN11-01-l
 Get-WindowsCapability -Online -Name RSAT* | Select-Object Name, State

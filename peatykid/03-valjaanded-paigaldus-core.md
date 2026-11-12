@@ -63,6 +63,21 @@ Iga uue serveriga tehakse alati samad sammud ja samas järjekorras. Järjekord o
 5. **Kaughalduse lubamine** – WinRM on vaikimisi sees; vajadusel luba kaugtöölaud (RDP) ja tulemüüri reeglid (nt ICMP ping testimiseks).
 6. **Domeeni liitmine või DC-ks ülendamine** – alles siis, kui eelnevad sammud on tehtud.
 
+> **NB!** Allpool on sama töö kahel viisil: **A) GUI** ja **B) PowerShell**. Piisab ühest – kui teed GUI juhendi järgi, pole PowerShelli osa vaja (ja vastupidi).
+
+#### Variant A: GUI (samm-sammult)
+
+**DC1 (Server Manager → Local Server):**
+
+1. *Computer name* → *Change...* → nimi `DC1` → OK (taaskäivituse võib teha lõpus).
+2. *Ethernet* rida → paremklikk adapteril → *Properties* → *Internet Protocol Version 4 (TCP/IPv4)* → *Properties* → *Use the following IP address*: `192.168.10.10`, mask `255.255.255.0`, lüüs `192.168.10.1`; *Preferred DNS* `127.0.0.1` (DC1-st saab DNS-server, lõplik DNS-seadistus peatükis 5.4) → OK.
+3. *Time zone* → *Change time zone* → **(UTC+02:00) Helsinki, Kyiv, Riga, Sofia, Tallinn, Vilnius**.
+4. *Windows Defender Firewall* → *Advanced settings* → *Inbound Rules* → reegel **File and Printer Sharing (Echo Request - ICMPv4-In)** → paremklikk *Enable Rule* (ping testimiseks).
+5. Vajadusel *Remote Desktop* → *Allow remote connections to this computer*.
+6. *Updates* → paigalda uuendused → taaskäivita (*Start → Power → Restart*).
+
+**CORE1 (sconfig menüü):**
+
 GUI-serveris tehakse need **Server Manager → Local Server** vaates. Server Core'is käivitub sisselogimisel automaatselt `sconfig` menüü:
 
 ```
@@ -85,6 +100,14 @@ GUI-serveris tehakse need **Server Manager → Local Server** vaates. Server Cor
   14) Shut down server
   15) Exit to command line (PowerShell)
 ```
+
+1. Vali `2` → uus nimi `CORE1` → taaskäivitusele vasta esialgu **No**.
+2. Vali `8` → adapteri number → `1` (*Set network adapter address*) → `S` (staatiline) → IP `192.168.10.11`, mask `255.255.255.0`, lüüs `192.168.10.1`; seejärel `2` (*Set DNS servers*) → `192.168.10.10`.
+3. Vali `9` → avanevas aknas *Change time zone* → Tallinn.
+4. Vali `4` (*Remote management*) → `3` *Configure server response to ping* → luba.
+5. Vali `6` uuenduste paigaldamiseks ja lõpuks `13` (*Restart server*).
+
+#### Variant B: PowerShell
 
 Samad sammud PowerShellis (CORE1 näitel):
 
@@ -127,7 +150,24 @@ Uus ketas läbib alati samad olekud. Graafilises serveris teeb seda *Disk Manage
 
 **Proxmoxis (õpetaja teeb):** VM → *Hardware → Add → Hard Disk*: Bus/Device **SCSI** (kontroller *VirtIO SCSI single*), suurus 40 GB, *Discard* ja *IO thread* sees. VirtIO SCSI ketast saab lisada ka töötavale VM-ile.
 
-#### Variant A: PowerShell (soovitatav)
+> **NB!** Allpool on sama töö mitmel viisil: **A) GUI**, **B) PowerShell** ja **C) diskpart**. Piisab ühest – kui teed GUI juhendi järgi, pole PowerShelli ega diskparti osa vaja.
+
+#### Variant A: GUI (kaugelt DC1-st, Server Manager)
+
+1. DC1 *Server Manager* → *Manage → Add Servers* → *Active Directory* (või *DNS*, kui CORE1 pole veel domeenis) → otsi `CORE1` → lisa paremale → OK.
+2. Vasakult *File and Storage Services → Volumes → Disks*.
+3. Leia CORE1 rida, kus *Status* = **Offline**, *Partition* = **Unknown** ja maht 40 GB → paremklikk → **Bring Online** → *Yes*.
+4. Paremklikk samal kettal → **Initialize** → *Yes* (Server Manager initsialiseerib ketta GPT-na).
+5. Paremklikk samal kettal → **New Volume...** → viisard:
+   - *Server and Disk*: CORE1, ketas 1;
+   - *Size*: kogu vaba ruum;
+   - *Drive Letter*: **F**;
+   - *File System Settings*: **NTFS**, *Allocation unit size* Default, *Volume label* `Andmed` → *Create*.
+6. Kontroll: *Volumes* vaates on CORE1 all köide `F:` sildiga *Andmed*.
+
+Graafilisel serveril (nt DC1 enda teine ketas Osa II-s) sama kohalikult: `diskmgmt.msc` → uuel kettal paremklikk **Online** → **Initialize Disk** (GPT) → jaotamata alal paremklikk **New Simple Volume** → täht F, NTFS, silt *Andmed*.
+
+#### Variant B: PowerShell
 
 ```powershell
 # 1. Leia uus ketas: OperationalStatus = Offline, PartitionStyle = RAW
@@ -167,7 +207,7 @@ Update-HostStorageCache                                   # otsi kettaid uuesti
 pnputil /add-driver E:\vioscsi\2k22\amd64\*.inf /install    # E: = virtio-win CD
 ```
 
-#### Variant B: diskpart
+#### Variant C: diskpart
 
 ```text
 diskpart
@@ -183,11 +223,11 @@ DISKPART> list volume
 DISKPART> exit
 ```
 
-#### Variant C: kaugelt DC1-st
+#### Muud võimalused kaugelt DC1-st
 
 - **Server Manager** → *File and Storage Services → Volumes → Disks* → vali CORE1 ketas → paremklikk *Bring Online* → *New Volume* viisard (täht F, NTFS, silt Andmed).
 - **Disk Management** (`diskmgmt.msc`) → *Action → Connect to another computer* → CORE1. Eeldab, et mõlemas serveris on lubatud tulemüüri rühm *Remote Volume Management* ja CORE1-l käib teenus *Virtual Disk*: `Set-Service vds -StartupType Automatic; Start-Service vds`.
-- **PowerShell Remoting:** samad Variant A käsud `Invoke-Command -ComputerName CORE1 -ScriptBlock { ... }` sees.
+- **PowerShell Remoting:** samad Variant B käsud `Invoke-Command -ComputerName CORE1 -ScriptBlock { ... }` sees.
 
 **Kontrollküsimused:** miks on uus ketas Windows Serveris vaikimisi Offline? Miks valitakse andmekettale GPT ja NTFS, mitte ReFS?
 

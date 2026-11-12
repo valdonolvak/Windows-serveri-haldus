@@ -54,6 +54,24 @@ CA nime ja serveri nime ei saa pärast paigaldust muuta. Vali CA nimi läbimõel
 
 ### 18.4 CA paigaldus CORE1-le
 
+> **NB!** Allpool on sama töö kahel viisil: **A) GUI** ja **B) PowerShell**. Piisab ühest – kui teed GUI juhendi järgi, pole PowerShelli osa vaja (ja vastupidi). See kehtib kõigi peatüki 18 alajaotuste kohta. CA paigaldatakse CORE1-le, GUI-sammud tehakse DC1-st kontoga, mis kuulub rühma *Enterprise Admins*.
+
+#### Variant A: GUI (samm-sammult)
+
+1. DC1 *Server Manager → Add Roles and Features* → server **CORE1** → *Server Roles*: **Active Directory Certificate Services** → *Add Features* → *Role Services*: ainult **Certification Authority** → *Install*.
+2. Kollane lipp → **Configure Active Directory Certificate Services on the destination server** → viisard:
+   - *Credentials*: `PERENIMI\Administrator`;
+   - *Role Services*: **Certification Authority**;
+   - *Setup Type*: **Enterprise CA**; *CA Type*: **Root CA**;
+   - *Private Key*: **Create a new private key**;
+   - *Cryptography*: **RSA#Microsoft Software Key Storage Provider**, *Key length* **4096**, räsi **SHA256**;
+   - *CA Name*: *Common name* `PERENIMI-CA`;
+   - *Validity Period*: **10 Years**; *Certificate Database*: vaikimisi → *Configure* → *Close*.
+3. Haldusvahendid DC1-le: *Add Roles and Features* → server **DC1** → *Features → Remote Server Administration Tools → Role Administration Tools → Active Directory Certificate Services Tools* → **Certification Authority Management Tools** → *Install*.
+4. Kontroll: *Tools → Certification Authority* → paremklikk *Certification Authority (Local)* → *Retarget Certification Authority* → `CORE1` → `PERENIMI-CA` ees on roheline linnuke (teenus töötab). PKI tervis: `pkiview.msc`.
+
+#### Variant B: PowerShell
+
 ```powershell
 # CORE1-l, kontoga, mis on Enterprise Admins rühmas
 Install-WindowsFeature ADCS-Cert-Authority -IncludeManagementTools
@@ -104,6 +122,16 @@ $cert.Certificate | Format-List Subject, DnsNameList, Issuer, NotAfter, Thumbpri
 
 ### 18.7 HTTPS IIS-is ja WordPressis
 
+#### Variant A: GUI (samm-sammult)
+
+1. IIS Manager → *Sites* → vali **veeb** → paremal **Bindings...** → **Add...**.
+2. *Type* **https**, *IP address* *All Unassigned*, *Port* **443**, *Host name* `veeb.perenimi.local`.
+3. Märgi **Require Server Name Indication**.
+4. *SSL certificate*: vali `veeb.perenimi.local` (*View...* näitab, et väljaandja on `PERENIMI-CA`) → OK → *Close*.
+5. Kontroll: kliendi brauseris `https://veeb.perenimi.local` – lukuikoon, hoiatust pole.
+
+#### Variant B: PowerShell
+
 ```powershell
 # HTTPS sidumine SNI-ga (SslFlags 1) ja sertifikaadi sidumine
 New-WebBinding -Name veeb -Protocol https -Port 443 -HostHeader veeb.perenimi.local -SslFlags 1
@@ -112,8 +140,6 @@ $c = Get-ChildItem Cert:\LocalMachine\My | Where-Object { $_.DnsNameList.Unicode
 (Get-WebBinding -Name veeb -Protocol https).AddSslCertificate($c.Thumbprint, 'My')
 Get-WebBinding -Name veeb
 ```
-
-GUI-s: IIS Manager → *veeb → Bindings → Add*: Type `https`, Host name `veeb.perenimi.local`, *Require Server Name Indication*, SSL certificate `veeb.perenimi.local`.
 
 **HTTP → HTTPS suunamine:** lisa `web.config` reeglite algusesse (enne WordPressi reeglit):
 

@@ -57,6 +57,20 @@ Kasu: kui uus raamatupidaja tuleb tööle, lisatakse ta ainult `GG_Raamatupidami
 
 Lisamärk `$` jagamise nime lõpus teeb jagamise sirvimisel nähtamatuks (nt `Kasutajad$`), kuid see **ei ole** turvameede – ligipääsu piiravad endiselt õigused.
 
+> **NB!** Allpool on sama töö kahel viisil: **A) GUI** ja **B) PowerShell**. Piisab ühest – kui teed GUI juhendi järgi, pole PowerShelli osa vaja (ja vastupidi). CORE1 GUI-sammud tehakse DC1-st.
+
+#### Variant A: GUI (samm-sammult)
+
+1. **Failiserveri roll:** DC1 *Server Manager → Add Roles and Features* → server **CORE1** → *Server Roles → File and Storage Services → File and iSCSI Services* → märgi **File Server** → *Install*.
+2. **Andmeketas F:** vt peatükk 3.6, Variant A.
+3. **Kaustad:** DC1 File Exploreris ava `\\CORE1\F$` ja loo kaustad `Osakonnad\Raamatupidamine`, `Osakonnad\IT` ja `Yldine`.
+4. **Jagamine Osakonnad:** *Server Manager → File and Storage Services → Shares* → *TASKS → New Share...* → **SMB Share – Quick** → server CORE1, **Type a custom path** `F:\Osakonnad` → *Share name* `Osakonnad` → *Other Settings*: märgi **Enable access-based enumeration** → *Permissions* → **Customize permissions...** → vahekaart *Share*: eemalda *Everyone*, lisa *Authenticated Users* (**Change**) ja *Domain Admins* (**Full Control**) → OK → *Create*.
+5. **Jagamine Yldine:** samamoodi tee `F:\Yldine`, nimi `Yldine` (ABE pole vaja).
+6. **NTFS-õigused:** ava `\\CORE1\F$\Osakonnad` → paremklikk `Raamatupidamine` → *Properties → Security → Edit... → Add...* → `DL_Raamatupidamine_RW` → märgi **Modify**; *Add...* → `DL_Raamatupidamine_R` → jäta **Read & execute** → OK. Kaustal `IT` lisa samamoodi `DL_IT_RW` (**Modify**).
+7. Kontroll: *Security → Advanced* – veerus *Applies to* peab olema *This folder, subfolders and files*; vahekaart **Effective Access** näitab valitud kasutaja tegelikke õigusi.
+
+#### Variant B: PowerShell
+
 ```powershell
 # CORE1-l (või Invoke-Command kaudu)
 Install-WindowsFeature FS-FileServer -IncludeManagementTools

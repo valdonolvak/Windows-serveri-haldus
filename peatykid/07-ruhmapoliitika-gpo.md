@@ -59,7 +59,21 @@ Oluline: domeeni kasutajate paroolipoliitika (pikkus, keerukus, vanus) saab keht
 | `C_KohalikudAdminid` | OU Arvutid | *Computer → Preferences → Control Panel Settings → Local Users and Groups*: rühma *Administrators* lisatakse `PERENIMI\GG_IT` |
 | `C_Uuendused` | OU Arvutid | *Computer → Policies → Admin Templates → Windows Components → Windows Update*: automaatne paigaldus kell 03:00 |
 
-### 7.5 GPO-de haldus PowerShelliga
+### 7.5 GPO-de loomine ja haldus
+
+> **NB!** Allpool on sama töö kahel viisil: **A) GUI** ja **B) PowerShell**. Piisab ühest – kui teed GUI juhendi järgi, pole PowerShelli osa vaja (ja vastupidi).
+
+#### Variant A: GUI (samm-sammult)
+
+1. DC1: *Server Manager → Tools → Group Policy Management* (`gpmc.msc`) → *Forest → Domains → perenimi.local*.
+2. **Loo GPO:** paremklikk *Group Policy Objects* → **New** → *Name* `U_Piirangud` → OK.
+3. **Seade:** paremklikk `U_Piirangud` → **Edit** → *User Configuration → Policies → Administrative Templates → Control Panel* → **Prohibit access to Control Panel and PC settings** → *Enabled* → OK. Kommentaari saab lisada redaktoris: paremklikk GPO nimel puu tipus → *Properties → Comment*. Sulge redaktor.
+4. **Lingi:** paremklikk OU-l *Labor → Kasutajad* → **Link an Existing GPO...** → `U_Piirangud` → OK.
+5. **Pärimine:** vali OU *Kasutajad* → vahekaart **Group Policy Inheritance** näitab kõiki sinna mõjuvaid GPO-sid järjekorras.
+6. **Varundus:** paremklikk *Group Policy Objects* → **Back Up All...** → kaust `C:\GPO-varukoopia` → *Back Up*.
+7. **Aruanne:** vali GPO → vahekaart **Settings** (või paremklikk GPO → *Save Report...* → HTML).
+
+#### Variant B: PowerShell
 
 ```powershell
 New-GPO -Name "U_Piirangud" -Comment "Keelab juhtpaneeli tavakasutajatel"

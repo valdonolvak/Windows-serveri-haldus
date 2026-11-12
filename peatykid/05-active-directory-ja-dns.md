@@ -41,6 +41,32 @@ DC loomine on kaheastmeline: esmalt paigaldatakse roll (binaarfailid), seejärel
 
 Ülendamisel tekivad: AD andmebaas `C:\Windows\NTDS\ntds.dit`, logifailid, `SYSVOL` kaust, DNS-tsoonid (kui DNS valiti) ja vaikimisi konteinerid (`Users`, `Computers`, `Builtin`, `Domain Controllers`). Server taaskäivitub ja kohalik administraator muutub domeeni administraatoriks (`PERENIMI\Administrator`).
 
+> **NB!** Allpool on sama töö kahel viisil: **A) GUI** ja **B) PowerShell**. Piisab ühest – kui teed GUI juhendi järgi, pole PowerShelli osa vaja (ja vastupidi). CORE1-l graafilist liidest pole, seega CORE1 GUI-sammud tehakse DC1 Server Managerist (CORE1 lisatakse sinna: *Manage → Add Servers*).
+
+#### Variant A: GUI (samm-sammult)
+
+**DC1: uus mets**
+
+1. *Server Manager* → *Manage → Add Roles and Features* → *Next* → **Role-based or feature-based installation** → server **DC1**.
+2. *Server Roles*: märgi **Active Directory Domain Services** → *Add Features* → *Next* kuni lõpuni → *Install*.
+3. Kui paigaldus on lõppenud, klõpsa ülal kollasel lipul → **Promote this server to a domain controller**.
+4. *Deployment Configuration*: **Add a new forest**, *Root domain name* `perenimi.local`.
+5. *Domain Controller Options*: *Forest/Domain functional level* **Windows Server 2016**, märgitud **DNS server** ja **Global Catalog (GC)**, sisesta **DSRM-parool** (hoia alles!).
+6. *DNS Options*: hoiatus delegeerimise kohta on laboris normaalne → *Next*.
+7. *Additional Options*: NetBIOS-nimi `PERENIMI`.
+8. *Paths*: vaikimisi (`C:\Windows\NTDS`, `C:\Windows\SYSVOL`).
+9. *Review Options* (nupp *View script* näitab sama PowerShelli skripti) → *Prerequisites Check* → *Install*. Server taaskäivitub ise; logi sisse kontoga `PERENIMI\Administrator`.
+
+**CORE1: teine DC samasse domeeni (DC1-st)**
+
+1. *Add Roles and Features* → *Select destination server*: **CORE1** → *Server Roles*: **Active Directory Domain Services** → *Install*.
+2. Kollane lipp → *Promote this server to a domain controller* (CORE1 rida).
+3. **Add a domain controller to an existing domain** → *Domain* `perenimi.local` → *Change...* → `PERENIMI\Administrator` ja parool.
+4. *Domain Controller Options*: märgitud **DNS server** ja **Global Catalog**, sait *Default-First-Site-Name*, DSRM-parool.
+5. *Additional Options*: *Replicate from* **Any domain controller** (või DC1) → *Paths* vaikimisi → *Prerequisites Check* → *Install*.
+
+#### Variant B: PowerShell
+
 ```powershell
 # DC1: uus mets
 Install-WindowsFeature AD-Domain-Services -IncludeManagementTools
@@ -73,6 +99,19 @@ Lisaks tuleb DNS-is teha:
 2. **Edastajad** (*forwarders*) internetinimede jaoks, kui laboril on internetiühendus.
 3. **Vananenud kirjete puhastus** (*scavenging*) – kustutab automaatselt dünaamilised kirjed, mida pole ammu uuendatud.
 
+> **NB!** Allpool on sama töö kahel viisil: **A) GUI** ja **B) PowerShell**. Piisab ühest – kui teed GUI juhendi järgi, pole PowerShelli osa vaja (ja vastupidi).
+
+#### Variant A: GUI (samm-sammult)
+
+1. DC1: *Server Manager → Tools → DNS* (`dnsmgmt.msc`).
+2. **Pöördtsoon:** *Reverse Lookup Zones* → paremklikk **New Zone** → *Primary zone*, märgitud *Store the zone in Active Directory* → **To all DNS servers running on domain controllers in this domain** → *IPv4 Reverse Lookup Zone* → *Network ID* `192.168.10` → **Allow only secure dynamic updates** → *Finish*.
+3. **Edastajad:** paremklikk serveril *DC1* → *Properties* → vahekaart **Forwarders** → *Edit...* → `1.1.1.1` ja `9.9.9.9` → OK → OK.
+4. **A-kirje koos PTR-iga:** *Forward Lookup Zones → perenimi.local* → paremklikk **New Host (A or AAAA)** → *Name* `printer1`, *IP address* `192.168.10.50`, märgi **Create associated pointer (PTR) record** → *Add Host*.
+5. **CNAME:** paremklikk *perenimi.local* → **New Alias (CNAME)** → *Alias name* `failid`, *FQDN for target host* `core1.perenimi.local` → OK.
+6. **DC-de DNS-kliendi seaded** tabeli järgi: adapteri *Properties → IPv4 → Properties* → *Preferred* ja *Alternate DNS server* (CORE1 puhul `sconfig` → `8` → *Set DNS servers*).
+
+#### Variant B: PowerShell
+
 ```powershell
 # Pöördtsoon, replikeeritakse kogu domeeni DNS-serveritesse
 Add-DnsServerPrimaryZone -NetworkId "192.168.10.0/24" -ReplicationScope Domain -DynamicUpdate Secure
@@ -99,6 +138,19 @@ Add-DnsServerResourceRecordCName -ZoneName "perenimi.local" -Name "failid" -Host
 | Domeenilokaalne rühm (õigused) | `DL_<ressurss>_<õigus>` | `DL_Raamatupidamine_RW` |
 | GPO | `<C/U>_<eesmärk>` | `U_Draivid`, `C_Tulemüür` |
 | Arvuti | `<tüüp>-<nr>` | `WIN11-01` |
+
+> **NB!** Allpool on sama töö kahel viisil: **A) GUI** ja **B) PowerShell**. Piisab ühest – kui teed GUI juhendi järgi, pole PowerShelli osa vaja (ja vastupidi).
+
+#### Variant A: GUI (samm-sammult)
+
+1. DC1: *Server Manager → Tools → Active Directory Users and Computers* (`dsa.msc`).
+2. **OU-d:** paremklikk `perenimi.local` → *New → Organizational Unit* → `Labor` (jäta märgituks *Protect container from accidental deletion*). Seejärel paremklikk `Labor` → *New → Organizational Unit* viis korda: `Kasutajad`, `Arvutid`, `Serverid`, `Ryhmad`, `Adminid`.
+3. **Kasutaja:** paremklikk `Labor → Kasutajad` → *New → User* → *First name* `Mari`, *Last name* `Maasikas`, *User logon name* `mari.maasikas` @`perenimi.local` → *Next* → algparool kaks korda, märgi **User must change password at next logon** → *Next* → *Finish*.
+4. **Rühm:** paremklikk `Labor → Ryhmad` → *New → Group* → `GG_Raamatupidamine`, *Group scope* **Global**, *Group type* **Security** → OK.
+5. **Liikmesus:** topeltklikk rühmal → vahekaart *Members* → *Add...* → `mari.maasikas` → *Check Names* → OK → OK.
+6. **Uute arvutite vaikimisi asukoht:** sellele GUI-s lihtsat valikut pole. Erandina käivita administraatori käsureal üks käsk: `redircmp "OU=Arvutid,OU=Labor,DC=perenimi,DC=local"`. Teine võimalus on liigutada uued arvutid käsitsi: paremklikk arvutil konteineris *Computers* → *Move...* → `Labor → Arvutid`.
+
+#### Variant B: PowerShell
 
 ```powershell
 # OU-struktuur

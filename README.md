@@ -4,6 +4,8 @@
 
 **Domeeninimi = õppija perekonnanimi.** Kus materjalis on `perenimi`, kirjuta oma perekonnanimi väiketähtedega ja ilma täpitähtedeta (nt Tõnisson → `tonisson.local`, NetBIOS `TONISSON`).
 
+**GUI või PowerShell.** Teenuste paigaldus ja seadistus on kirjeldatud kahel viisil: **Variant A – GUI samm-sammult** (alati esimesena) ja **Variant B – PowerShell**. Piisab ühest: kui teed GUI juhendi järgi, pole PowerShelli osa vaja. Server Core'i (CORE1) GUI-sammud tehakse DC1-st Server Manageri ja MMC-konsoolide kaudu.
+
 ## Interaktiivsed harjutused
 
 | Simulaator | Teema |
