@@ -67,6 +67,14 @@ Nimeruum ainult suunab: klient küsib viite ja avab faili otse serverist. Andmei
 9. **Kasutajad:** *New Folder...* → `Kasutajad` → sihtmärgid `\\core1.perenimi.local\Kasutajad$` ja `\\dc1.perenimi.local\Kasutajad$` → replikatsioon nagu sammus 7 (`RG-Kasutajad`, esmane liige CORE1). Seejärel kaustal `Kasutajad` vahekaardil *Folder Targets* paremklikk DC1 sihtmärgil → **Disable Folder Target** (jääb ainult varukoopiaks).
 10. Kontroll: *Replication → RG-...* → vahekaart *Memberships*; esialgne sünkroniseerimine algab kuni 15 minuti jooksul.
 
+![Skeem · DFS Management: New Folder](joonised/14-skeem-dfs-new-folder.png)
+
+*Skeem · DFS Management: New Folder*
+
+![Skeem · DFS: Replicate Folder Wizard, Primary Member](joonised/14-skeem-dfs-primary.png)
+
+*Skeem · DFS: Replicate Folder Wizard, Primary Member*
+
 #### Variant B: PowerShell
 
 ```powershell

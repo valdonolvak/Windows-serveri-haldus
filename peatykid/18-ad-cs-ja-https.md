@@ -70,6 +70,18 @@ CA nime ja serveri nime ei saa pärast paigaldust muuta. Vali CA nimi läbimõel
 3. Haldusvahendid DC1-le: *Add Roles and Features* → server **DC1** → *Features → Remote Server Administration Tools → Role Administration Tools → Active Directory Certificate Services Tools* → **Certification Authority Management Tools** → *Install*.
 4. Kontroll: *Tools → Certification Authority* → paremklikk *Certification Authority (Local)* → *Retarget Certification Authority* → `CORE1` → `PERENIMI-CA` ees on roheline linnuke (teenus töötab). PKI tervis: `pkiview.msc`.
 
+![Skeem · AD CS Configuration: Setup Type](joonised/18-skeem-adcs-setup-type.png)
+
+*Skeem · AD CS Configuration: Setup Type*
+
+![Skeem · AD CS Configuration: Cryptography](joonised/18-skeem-adcs-kruptograafia.png)
+
+*Skeem · AD CS Configuration: Cryptography*
+
+![Skeem · AD CS Configuration: CA Name](joonised/18-skeem-adcs-ca-nimi.png)
+
+*Skeem · AD CS Configuration: CA Name*
+
 #### Variant B: PowerShell
 
 ```powershell
@@ -102,6 +114,18 @@ Vaikimisi *Web Server* malli ei muudeta, vaid tehakse sellest koopia (DC1-l `cer
 7. *Request Handling*: *Allow private key to be exported* – ainult kui sertifikaat tuleb teise serverisse kolida (muidu jäta välja).
 8. Avalda mall CA-s: `certsrv.msc` → ühenda CORE1 → *Certificate Templates* → paremklikk *New → Certificate Template to Issue* → `PERENIMI Veebiserver`. PowerShellis CORE1-l: `Add-CATemplate -Name "PERENIMIVeebiserver" -Force`.
 
+![Skeem · Sertifikaadimall: Subject Name](joonised/18-skeem-mall-subject.png)
+
+*Skeem · Sertifikaadimall: Subject Name*
+
+![Skeem · Sertifikaadimall: Security (DC1$ Enroll)](joonised/18-skeem-mall-security.png)
+
+*Skeem · Sertifikaadimall: Security (DC1$ Enroll)*
+
+![Skeem · certsrv: Certificate Template to Issue](joonised/18-skeem-mall-avalda.png)
+
+*Skeem · certsrv: Certificate Template to Issue*
+
 > **Turvamärkus:** malli puhul, kus nimi tuleb taotlusest (*Supply in the request*), võib taotleja küsida sertifikaati **mis tahes nimele**. Seetõttu anna *Enroll* õigus ainult veebiserveritele, mitte kõigile (nt *Domain Computers* või *Authenticated Users*). Liiga laialt lubatud mallid on tuntud AD rünnete (nn ESC1) allikas.
 
 ### 18.6 Sertifikaadi taotlemine DC1-l
@@ -111,6 +135,10 @@ GUI: `certlm.msc` (kohaliku arvuti sertifikaadid) → *Personal → Certificates
 - *Subject name*: Type **Common name**, Value `veeb.perenimi.local` → *Add*
 - *Alternative name*: Type **DNS**, Value `veeb.perenimi.local` → *Add*
 - *OK → Enroll*
+
+![Skeem · certlm: Certificate Properties, Subject](joonised/18-skeem-taotlus-san.png)
+
+*Skeem · certlm: Certificate Properties, Subject*
 
 PowerShellis (sama tulemus):
 

@@ -71,6 +71,10 @@ Set-FsrmSetting -ReportLocationIncident F:\FSRM\Aruanded\Intsidendid `
 4. **Tavaline kvoot:** *Create Quota...* → `F:\Osakonnad\Raamatupidamine` → **Create quota on path** → mall `Osakond 5 GB pehme` → *Create*.
 5. Kontroll: *Quotas* vaates veerud *Limit*, *% Used* ja *Quota Type* (*Hard/Soft*, automaatkvoodil *Auto Apply*).
 
+![Skeem · FSRM: Create Quota (automaatkvoot)](joonised/13-skeem-fsrm-kvoot.png)
+
+*Skeem · FSRM: Create Quota (automaatkvoot)*
+
 #### Variant B: PowerShell
 
 ```powershell
@@ -107,6 +111,10 @@ Muutujad nagu `[Source Io Owner]`, `[Quota Path]`, `[Quota Used Percent]` asenda
 2. **Aktiivne ekraan:** *File Screens* → paremklikk **Create File Screen...** → *File screen path* `F:\Osakonnad` → **Define custom file screen properties** → *Custom Properties...* → **Active screening**, märgi rühm `Meedia` → vahekaart *Event Log*: *Send warning to event log* + teade → OK → *Create* → **Save the custom file screen without creating a template** → OK.
 3. **Passiivne ekraan:** sama tee `F:\Yldine` → **Passive screening**, rühm **Executable Files** → *Event Log* teade → *Create*.
 4. **Erand:** loo kaust `\\CORE1\F$\Osakonnad\IT\Koolitusvideod` → *File Screens* → paremklikk **Create File Screen Exception...** → *Exception path* see kaust → märgi `Meedia` → OK.
+
+![Skeem · FSRM: File Screen Properties](joonised/13-skeem-fsrm-ekraan.png)
+
+*Skeem · FSRM: File Screen Properties*
 
 #### Variant B: PowerShell
 

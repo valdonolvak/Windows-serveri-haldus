@@ -122,6 +122,10 @@ expose_php = Off
 3. Tagasi serveri vaatesse → topeltklikk **FastCGI Settings** → `C:\PHP\php-cgi.exe` → *Edit...* → *Instance MaxRequests* `10000` → OK.
 4. Serveri vaates topeltklikk **Default Document** → *Add...* `index.php` → vali see → *Move Up*, kuni see on nimekirjas esimene.
 
+![Skeem · IIS: Add Module Mapping (\*.php)](joonised/17-skeem-iis-module-mapping.png)
+
+*Skeem · IIS: Add Module Mapping (\*.php)*
+
 **Variant B: PowerShell**
 
 ```powershell
@@ -158,6 +162,10 @@ WordPressi kasutaja saab õigused **ainult oma andmebaasile** (vähima õiguse p
 3. **Sait:** paremklikk *Sites* → **Add Website...** → *Site name* `veeb`, *Application pool* *Select...* → `veeb`, *Physical path* `C:\inetpub\veeb`; *Binding*: *Type* http, *Port* 80, *Host name* `veeb.perenimi.local` → OK.
 4. **Anonüümne kasutaja:** vali sait `veeb` → topeltklikk **Authentication** → *Anonymous Authentication* → *Edit...* → **Application pool identity** → OK.
 5. **NTFS-õigused:** paremklikk `C:\inetpub\veeb` → *Properties → Security → Edit... → Add...* → kirjuta `IIS AppPool\veeb` → *Check Names* → OK → jäta **Read & execute** → OK. Kaustal `C:\inetpub\veeb\wp-content` lisa samale kontole **Modify**.
+
+![Skeem · IIS: Add Website](joonised/17-skeem-iis-add-website.png)
+
+*Skeem · IIS: Add Website*
 
 #### Variant B: PowerShell
 
