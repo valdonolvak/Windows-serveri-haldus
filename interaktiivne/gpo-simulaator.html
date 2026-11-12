@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="et">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GPO rakendamise simulaator</title>
+<style>
+:root{--bg:#f7f6f3;--card:#fff;--ink:#1f1e1c;--quiet:#6b6862;--line:#dcd9d2;--acc:#2f6fd6;--acc-t:#e8f0fc;--ok:#2e7d4f;--bad:#b3261e;--warn:#9a6700}
+@media (prefers-color-scheme:dark){:root{--bg:#1b1b1a;--card:#252524;--ink:#ecebe8;--quiet:#a3a09a;--line:#3a3936;--acc:#7aa7f0;--acc-t:#24324a;--ok:#6cc08b;--bad:#f08a80;--warn:#e0b250}}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--ink)}
+header{padding:20px 24px 8px;max-width:1180px;margin:auto}
+h1{font-size:22px;margin:0 0 4px}
+header p{margin:0;color:var(--quiet);max-width:820px}
+main{max-width:1180px;margin:auto;padding:12px 24px 40px;display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:20px}
+@media (max-width:860px){main{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 18px}
+.card h2{font-size:16px;margin:0 0 10px}
+.tabs{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+.tabs button,.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:6px 12px;font:inherit;cursor:pointer}
+.tabs button.on{background:var(--acc-t);border-color:var(--acc);color:var(--ink);font-weight:600}
+.btn.primary{background:var(--acc);border-color:var(--acc);color:#fff}
+.btn:disabled{opacity:.45;cursor:default}
+.level{border-left:3px solid var(--line);padding:8px 0 8px 12px;margin-left:calc(var(--d)*18px);margin-bottom:6px}
+.level .lvname{font-weight:600}
+.level .lvsub{color:var(--quiet);font-size:13px}
+.gpo{margin-top:6px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--bg)}
+.gpo .gname{font-weight:600;font-family:ui-monospace,Consolas,monospace;font-size:13.5px}
+.gpo .gset{font-size:13px;color:var(--quiet)}
+.opts{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:6px;font-size:13.5px}
+.opts label{display:flex;align-items:center;gap:5px;cursor:pointer}
+.blk{margin-top:6px;font-size:13.5px}
+.chip{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-1px;margin-right:4px;border:1px solid rgba(0,0,0,.2)}
+.desk{border-radius:10px;height:150px;display:flex;align-items:flex-end;padding:10px;color:#fff;font-weight:600;text-shadow:0 1px 2px rgba(0,0,0,.5);transition:background .35s;border:1px solid var(--line)}
+.result-row{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--line);font-size:14px}
+.result-row:last-child{border-bottom:0}
+.result-row span:first-child{color:var(--quiet)}
+ol.steps{padding-left:22px;margin:6px 0 0}
+ol.steps li{margin:4px 0;padding:6px 8px;border-radius:6px}
+ol.steps li.cur{background:var(--acc-t)}
+ol.steps li.future{opacity:.35}
+.skip{color:var(--quiet);font-size:13.5px;margin-top:8px}
+.skip li{margin:2px 0}
+.tag{display:inline-block;font-size:11.5px;padding:1px 6px;border-radius:10px;border:1px solid var(--line);margin-left:4px;color:var(--quiet)}
+.tag.enf{border-color:var(--warn);color:var(--warn)}
+.quiz q{display:block;font-style:normal;margin-bottom:8px}
+.answers{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+.fb{margin-top:8px;padding:10px;border-radius:8px;font-size:14px}
+.fb.ok{background:color-mix(in srgb,var(--ok) 14%,transparent)}
+.fb.bad{background:color-mix(in srgb,var(--bad) 14%,transparent)}
+.legend{font-size:13px;color:var(--quiet);margin-top:10px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.small{font-size:13px;color:var(--quiet)}
+</style>
+</head>
+<body>
+<header><p style="margin:0 0 6px;font-size:14px"><a href="../" style="color:inherit">← Õppematerjali sisukord</a> · <a href="index.html" style="color:inherit">Kõik simulaatorid</a></p>
+  <h1>GPO rakendamise simulaator</h1>
+  <p>Kasutaja <b>Mari Maasikas</b> asub OU-s <code>Labor › Kasutajad</code>. Lülita linke, <i>Enforced</i>, <i>Block Inheritance</i> ja turvafiltrit ning vaata, millised GPO-d rakenduvad ja kes võidab. Reegel: <b>L → S → D → OU</b>, hilisem kirjutab üle; Enforced rakendub viimasena ja Block Inheritance ei peata seda.</p>
+</header>
+<main>
+  <section class="card">
+    <div class="tabs" id="tabs">
+      <button data-tab="sim" class="on">Seadista ise</button>
+      <button data-tab="quiz">Stsenaariumid (ülesanded)</button>
+    </div>
+    <div id="quizbox" class="quiz" hidden></div>
+    <h2>Struktuur ja lingid</h2>
+    <div id="tree"></div>
+    <div class="row" style="margin-top:10px"><button class="btn" id="reset">Taasta vaikeseis</button></div>
+  </section>
+  <section>
+    <div class="card" style="margin-bottom:16px">
+      <h2>Mari töölaud</h2>
+      <div class="desk" id="desk">Taust</div>
+      <div style="margin-top:10px" id="results"></div>
+    </div>
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <h2 style="margin:0">Rakendamise järjekord</h2>
+        <div class="row">
+          <button class="btn" id="prev">‹ Eelmine</button>
+          <button class="btn primary" id="next">Järgmine samm ›</button>
+          <button class="btn" id="all">Näita kõik</button>
+        </div>
+      </div>
+      <ol class="steps" id="steps"></ol>
+      <div class="skip" id="skipped"></div>
+      <p class="legend">Kahest GPO-st, mis seavad <i>erinevaid</i> seadeid, rakenduvad mõlemad (seaded liidetakse). Konflikti korral võidab viimasena rakendunud.</p>
+    </div>
+  </section>
+</main>
+<script>
+const COLORS={Hall:'#7d7a74',Kollane:'#c99a06',Sinine:'#2f6fd6',Roheline:'#2e8b57',Punane:'#c0392b'};
+const LEVELS=[
+ {id:'L',name:'Kohalik arvuti (WIN11-02)',sub:'Local GPO – rakendub esimesena',d:0},
+ {id:'S',name:'Sait Default-First-Site-Name',sub:'Site',d:0},
+ {id:'D',name:'Domeen perenimi.local',sub:'Domain',d:0},
+ {id:'O1',name:'OU Labor',sub:'ülem-OU',d:1},
+ {id:'O2',name:'OU Kasutajad',sub:'laps-OU, siin asub Mari',d:2,block:true}
+];
+const GPOS=[
+ {id:'g1',lv:'L',name:'Kohalik GPO',taust:'Hall',jp:null,local:true},
+ {id:'g2',lv:'S',name:'S_Tallinn',taust:'Kollane',jp:null},
+ {id:'g3',lv:'D',name:'D_Domeen',taust:'Sinine',jp:'Keelatud'},
+ {id:'g4',lv:'O1',name:'O_Labor',taust:'Roheline',jp:null},
+ {id:'g5',lv:'O2',name:'O_Kasutajad',taust:'Punane',jp:'Lubatud'}
+];
+const DEFAULT=()=>({g1:{link:true,enf:false,flt:true},g2:{link:false,enf:false,flt:true},g3:{link:true,enf:false,flt:true},g4:{link:true,enf:false,flt:true},g5:{link:true,enf:false,flt:true},block:false});
+let st=DEFAULT(), stepIdx=999;
+
+const SCEN=[
+ {q:'Vaikeseis: kõik GPO-d (v.a sait) on lingitud, midagi pole jõustatud ega blokeeritud. Mis värvi tausta Mari näeb?',set:{},why:'O_Kasutajad on Marile kõige lähemal ja rakendub viimasena, seega Punane kirjutab Sinise ja Rohelise üle.'},
+ {q:'Domeeni GPO D_Domeen lingil on Enforced. Mis värvi taust?',set:{g3:{enf:true}},why:'Jõustatud GPO rakendub pärast tavalisi GPO-sid ja võidab ka laps-OU GPO-d: Sinine.'},
+ {q:'OU Kasutajad on Block Inheritance, keegi pole Enforced. Mis värvi taust ja kas juhtpaneel on keelatud?',set:{block:true},why:'Ülemate (D_Domeen, O_Labor) GPO-d ei pärine. Rakenduvad kohalik GPO ja O_Kasutajad: Punane ja juhtpaneel Lubatud. Kohalik GPO ei ole blokeeritav, kuid O_Kasutajad kirjutab selle üle.'},
+ {q:'OU Kasutajad on Block Inheritance JA D_Domeen on Enforced. Mis värvi taust?',set:{block:true,g3:{enf:true}},why:'Block Inheritance ei peata jõustatud GPO-d. D_Domeen rakendub viimasena: Sinine.'},
+ {q:'O_Kasutajad turvafiltrisse ei kuulu Mari (Authenticated Users eemaldatud, lisatud ainult GG_IT). Mis värvi taust ja mis juhtub juhtpaneeliga?',set:{g5:{flt:false}},why:'O_Kasutajad ei rakendu Marile (gpresult näitab „Denied (Security)“). Viimasena rakendub O_Labor: Roheline. Juhtpaneel jääb D_Domeen seadest Keelatuks, sest keegi ei kirjuta seda üle.'},
+ {q:'Saidi GPO S_Tallinn on lingitud ja Enforced, D_Domeen on samuti Enforced. Kes võidab?',set:{g2:{link:true,enf:true},g3:{enf:true}},why:'Mitme jõustatud GPO korral võidab kõrgem tase (rakendub kõige viimasena). Sait on domeenist kõrgemal: Kollane. Juhtpaneel tuleb D_Domeenist: Keelatud.'}
+];
+let quizIdx=0, answered=false, mode='sim';
+
+function compute(){
+  const applied=[], enforced=[], skipped=[];
+  for(const g of GPOS){
+    const s=st[g.id];
+    if(!s.link){skipped.push([g,'link puudub või on keelatud']);continue}
+    if(!s.flt){skipped.push([g,'turvafilter: Mari ei ole filtris – Denied (Security)']);continue}
+    if(st.block && ['S','D','O1'].includes(g.lv) && !s.enf){skipped.push([g,'blokeeritud: OU Kasutajad on Block Inheritance']);continue}
+    if(s.enf && !g.local) enforced.push(g); else applied.push(g);
+  }
+  const order=[...applied, ...enforced.reverse()];
+  return {order,skipped};
+}
+
+function stateAt(order,n){
+  const r={taust:{v:'Windowsi vaikimisi',by:null},jp:{v:'Määramata (lubatud)',by:null}};
+  order.slice(0,n).forEach(g=>{ if(g.taust) r.taust={v:g.taust,by:g.name}; if(g.jp) r.jp={v:g.jp,by:g.name}; });
+  return r;
+}
+
+function renderTree(){
+  const t=document.getElementById('tree'); t.innerHTML='';
+  for(const lv of LEVELS){
+    const div=document.createElement('div'); div.className='level'; div.style.setProperty('--d',lv.d);
+    div.innerHTML=`<div class="lvname">${lv.name}</div><div class="lvsub">${lv.sub}</div>`;
+    if(lv.block){
+      const b=document.createElement('label'); b.className='blk';
+      b.innerHTML=`<input type="checkbox" ${st.block?'checked':''}> <b>Block Inheritance</b> sellel OU-l`;
+      b.querySelector('input').onchange=e=>{st.block=e.target.checked;update(true)};
+      div.appendChild(b);
+    }
+    for(const g of GPOS.filter(x=>x.lv===lv.id)){
+      const s=st[g.id], box=document.createElement('div'); box.className='gpo';
+      const sets=[g.taust?`<span class="chip" style="background:${COLORS[g.taust]}"></span>Taust: ${g.taust}`:'',g.jp?`Juhtpaneel: ${g.jp}`:''].filter(Boolean).join(' · ');
+      box.innerHTML=`<div class="gname">${g.name}${s.enf&&s.link?'<span class="tag enf">Enforced</span>':''}</div><div class="gset">${sets}</div><div class="opts"></div>`;
+      const o=box.querySelector('.opts');
+      const mk=(key,label,dis)=>{const l=document.createElement('label');l.innerHTML=`<input type="checkbox" ${s[key]?'checked':''} ${dis?'disabled':''}> ${label}`;l.querySelector('input').onchange=e=>{s[key]=e.target.checked;update(true)};o.appendChild(l)};
+      if(!g.local){mk('link','Lingitud (Link Enabled)');mk('enf','Enforced')}
+      mk('flt','Mari on turvafiltris');
+      div.appendChild(box);
+    }
+    t.appendChild(div);
+  }
+}
+
+function render(){
+  const {order,skipped}=compute();
+  const n=Math.min(stepIdx,order.length);
+  const r=stateAt(order,n);
+  const desk=document.getElementById('desk');
+  desk.style.background=COLORS[r.taust.v]||'linear-gradient(135deg,#0d5ea8,#4aa3df)';
+  desk.textContent=n<order.length?`Pärast sammu ${n} / ${order.length}`:'Lõpptulemus';
+  document.getElementById('results').innerHTML=
+   `<div class="result-row"><span>Töölaua taust</span><span><b>${r.taust.v}</b>${r.taust.by?` ← ${r.taust.by}`:''}</span></div>`+
+   `<div class="result-row"><span>Juhtpaneel</span><span><b>${r.jp.v}</b>${r.jp.by?` ← ${r.jp.by}`:''}</span></div>`;
+  const ol=document.getElementById('steps'); ol.innerHTML='';
+  order.forEach((g,i)=>{
+    const li=document.createElement('li');
+    const sets=[g.taust?`Taust = ${g.taust}`:'',g.jp?`Juhtpaneel = ${g.jp}`:''].filter(Boolean).join(', ');
+    const lvn=LEVELS.find(l=>l.id===g.lv).name;
+    li.innerHTML=`<b>${g.name}</b> <span class="small">(${lvn})</span>${st[g.id].enf&&!g.local?'<span class="tag enf">Enforced – viimasena</span>':''}<br><span class="small">${sets}</span>`;
+    if(i===n-1&&n<order.length) li.className='cur';
+    if(i>=n) li.className='future';
+    ol.appendChild(li);
+  });
+  if(!order.length) ol.innerHTML='<li>Ükski GPO ei rakendu.</li>';
+  document.getElementById('skipped').innerHTML=skipped.length?'<b>Ei rakendu:</b><ul>'+skipped.map(([g,w])=>`<li><code>${g.name}</code> – ${w}</li>`).join('')+'</ul>':'';
+  document.getElementById('prev').disabled=n<=0;
+  document.getElementById('next').disabled=n>=order.length;
+}
+
+function update(resetSteps){ if(resetSteps) stepIdx=999; renderTree(); render(); }
+
+document.getElementById('next').onclick=()=>{const {order}=compute(); if(stepIdx>order.length) stepIdx=0; stepIdx=Math.min(stepIdx+1,order.length); render()};
+document.getElementById('prev').onclick=()=>{const {order}=compute(); if(stepIdx>order.length) stepIdx=order.length; stepIdx=Math.max(stepIdx-1,0); render()};
+document.getElementById('all').onclick=()=>{stepIdx=999;render()};
+document.getElementById('reset').onclick=()=>{st=DEFAULT();update(true)};
+
+function applyScenario(i){
+  st=DEFAULT();
+  const s=SCEN[i].set;
+  for(const k in s){ if(k==='block') st.block=s.block; else Object.assign(st[k],s[k]); }
+}
+function renderQuiz(){
+  const qb=document.getElementById('quizbox');
+  const sc=SCEN[quizIdx];
+  const {order}=compute(); const r=stateAt(order,order.length);
+  qb.innerHTML=`<div class="small">Ülesanne ${quizIdx+1} / ${SCEN.length} – seadistus on vasakul paika pandud</div><q>${sc.q}</q>
+   <div class="answers">${Object.keys(COLORS).map(c=>`<button class="btn" data-c="${c}"><span class="chip" style="background:${COLORS[c]}"></span>${c}</button>`).join('')}</div>
+   <div id="fb"></div>
+   <div class="row" style="margin-top:8px"><button class="btn" id="qprev" ${quizIdx===0?'disabled':''}>‹ Eelmine ülesanne</button><button class="btn primary" id="qnext" ${quizIdx===SCEN.length-1?'disabled':''}>Järgmine ülesanne ›</button></div>`;
+  qb.querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>{
+    const ok=b.dataset.c===r.taust.v;
+    document.getElementById('fb').innerHTML=`<div class="fb ${ok?'ok':'bad'}"><b>${ok?'Õige!':'Mitte päris.'}</b> Õige vastus: ${r.taust.v}. ${sc.why}<br><span class="small">Vajuta paremal „Järgmine samm“, et rakendamist samm-sammult läbi käia.</span></div>`;
+    stepIdx=999; render();
+  });
+  qb.querySelector('#qprev').onclick=()=>{quizIdx--;startQ()};
+  qb.querySelector('#qnext').onclick=()=>{quizIdx++;startQ()};
+}
+function startQ(){ applyScenario(quizIdx); stepIdx=0; renderTree(); render(); renderQuiz(); }
+
+document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x===b));
+  mode=b.dataset.tab; const qb=document.getElementById('quizbox');
+  if(mode==='quiz'){qb.hidden=false;quizIdx=0;startQ()} else {qb.hidden=true;st=DEFAULT();update(true)}
+});
+update(true);
+</script>
+</body>
+</html>
