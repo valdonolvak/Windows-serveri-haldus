@@ -73,6 +73,10 @@ Oluline: domeeni kasutajate paroolipoliitika (pikkus, keerukus, vanus) saab keht
 6. **Varundus:** paremklikk *Group Policy Objects* → **Back Up All...** → kaust `C:\GPO-varukoopia` → *Back Up*.
 7. **Aruanne:** vali GPO → vahekaart **Settings** (või paremklikk GPO → *Save Report...* → HTML).
 
+![Skeem · GPMC: Link an Existing GPO](joonised/07-skeem-gpmc-link.png)
+
+*Skeem · GPMC: Link an Existing GPO*
+
 #### Variant B: PowerShell
 
 ```powershell

@@ -49,6 +49,10 @@ Valikuid saab seada kolmel tasandil: **serveri** (kehtib kõigile ulatustele), *
 5. **Reserveering:** *Scope → Reservations* → paremklikk **New Reservation...** → *Reservation name* `WIN11-01`, *IP address* `192.168.10.150`, *MAC address* WIN11-01 võrgukaardi MAC (Proxmoxis *VM → Hardware → Network Device*, nt `BC-24-11-...`) → *Add*.
 6. Kontroll: *Scope → Address Leases* (renditud aadressid) ja *Scope Options*.
 
+![Skeem · DHCP: New Scope Wizard, IP Address Range](joonised/06-skeem-dhcp-scope.png)
+
+*Skeem · DHCP: New Scope Wizard, IP Address Range*
+
 #### Variant B: PowerShell
 
 ```powershell

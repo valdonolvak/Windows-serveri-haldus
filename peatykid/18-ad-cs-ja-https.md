@@ -130,6 +130,10 @@ $cert.Certificate | Format-List Subject, DnsNameList, Issuer, NotAfter, Thumbpri
 4. *SSL certificate*: vali `veeb.perenimi.local` (*View...* näitab, et väljaandja on `PERENIMI-CA`) → OK → *Close*.
 5. Kontroll: kliendi brauseris `https://veeb.perenimi.local` – lukuikoon, hoiatust pole.
 
+![Skeem · IIS: Add Site Binding (https + SNI)](joonised/18-skeem-iis-binding.png)
+
+*Skeem · IIS: Add Site Binding (https + SNI)*
+
 #### Variant B: PowerShell
 
 ```powershell

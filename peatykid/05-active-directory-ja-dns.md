@@ -57,6 +57,18 @@ DC loomine on kaheastmeline: esmalt paigaldatakse roll (binaarfailid), seejärel
 8. *Paths*: vaikimisi (`C:\Windows\NTDS`, `C:\Windows\SYSVOL`).
 9. *Review Options* (nupp *View script* näitab sama PowerShelli skripti) → *Prerequisites Check* → *Install*. Server taaskäivitub ise; logi sisse kontoga `PERENIMI\Administrator`.
 
+![Skeem · Add Roles and Features: Server Roles](joonised/05-skeem-server-roles.png)
+
+*Skeem · Add Roles and Features: Server Roles*
+
+![Skeem · Server Manager: teavituste lipp → Promote](joonised/05-skeem-promote-lipp.png)
+
+*Skeem · Server Manager: teavituste lipp → Promote*
+
+![Skeem · AD DS Configuration Wizard: Add a new forest](joonised/05-skeem-new-forest.png)
+
+*Skeem · AD DS Configuration Wizard: Add a new forest*
+
 **CORE1: teine DC samasse domeeni (DC1-st)**
 
 1. *Add Roles and Features* → *Select destination server*: **CORE1** → *Server Roles*: **Active Directory Domain Services** → *Install*.
@@ -149,6 +161,10 @@ Add-DnsServerResourceRecordCName -ZoneName "perenimi.local" -Name "failid" -Host
 4. **Rühm:** paremklikk `Labor → Ryhmad` → *New → Group* → `GG_Raamatupidamine`, *Group scope* **Global**, *Group type* **Security** → OK.
 5. **Liikmesus:** topeltklikk rühmal → vahekaart *Members* → *Add...* → `mari.maasikas` → *Check Names* → OK → OK.
 6. **Uute arvutite vaikimisi asukoht:** sellele GUI-s lihtsat valikut pole. Erandina käivita administraatori käsureal üks käsk: `redircmp "OU=Arvutid,OU=Labor,DC=perenimi,DC=local"`. Teine võimalus on liigutada uued arvutid käsitsi: paremklikk arvutil konteineris *Computers* → *Move...* → `Labor → Arvutid`.
+
+![Skeem · ADUC: New Object – User](joonised/05-skeem-uus-kasutaja.png)
+
+*Skeem · ADUC: New Object – User*
 
 #### Variant B: PowerShell
 

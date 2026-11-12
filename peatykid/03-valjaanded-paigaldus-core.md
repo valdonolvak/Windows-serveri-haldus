@@ -165,6 +165,12 @@ Uus ketas läbib alati samad olekud. Graafilises serveris teeb seda *Disk Manage
    - *File System Settings*: **NTFS**, *Allocation unit size* Default, *Volume label* `Andmed` → *Create*.
 6. Kontroll: *Volumes* vaates on CORE1 all köide `F:` sildiga *Andmed*.
 
+*Skeemid GUI juhendites on lihtsustatud joonised: päris aken võib detailides erineda. Numbrid näitavad klõpsamise järjekorda.*
+
+![Skeem · Server Manager: Disks → Bring Online](joonised/03-skeem-disks-bring-online.png)
+
+*Skeem · Server Manager: Disks → Bring Online*
+
 Graafilisel serveril (nt DC1 enda teine ketas Osa II-s) sama kohalikult: `diskmgmt.msc` → uuel kettal paremklikk **Online** → **Initialize Disk** (GPT) → jaotamata alal paremklikk **New Simple Volume** → täht F, NTFS, silt *Andmed*.
 
 #### Variant B: PowerShell
