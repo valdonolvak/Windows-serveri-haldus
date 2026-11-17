@@ -17,7 +17,7 @@ Windows Server 2022 ilmus augustis 2021 LTSC väljalaskena. Selle põhitugi lõp
 
 Server Core on serveri vaikimisi paigaldusvalik: sellel puudub graafiline töölaud, Explorer ja enamik MMC tööriistu. Server hallatakse käsurealt või kaugelt. Server 2022-s ei saa paigaldusvalikut hiljem muuta – Core'ist GUI saamiseks tuleb server uuesti paigaldada.
 
-| Omadus | Desktop Experience (AD1) | Server Core (CORE1) |
+| Omadus | Desktop Experience (AD1) | Server Core (AD2) |
 | --- | --- | --- |
 | Kasutajaliides | Täielik töölaud, Server Manager, MMC | `cmd.exe` + PowerShell, `sconfig` menüü, Notepad, Task Manager, Regedit |
 | Ketta- ja mälukasutus | Suurem (\~ 32 GB+ paigaldus) | Väiksem, \~ 4–6 GB vähem |
@@ -46,7 +46,7 @@ Server Core on serveri vaikimisi paigaldusvalik: sellel puudub graafiline tööl
 2. Käivita VM ja vajuta ükskõik millist klahvi, kui ekraanile ilmub *Press any key to boot from CD or DVD*.
 3. Vali keel, kellaaja- ja valuutavorming (nt *Estonian*) ning klaviatuur (*Estonian*). Paigaldaja keel jääb inglise keeleks.
 4. Vajuta **Install now** ja sisesta tootevõti või vali *I don't have a product key* (hindamisversiooni puhul ei küsita).
-5. Vali **Windows Server 2022 Standard (Desktop Experience)** AD1 jaoks või **Windows Server 2022 Standard** (ilma sulgudeta = Server Core) CORE1 jaoks.
+5. Vali **Windows Server 2022 Standard (Desktop Experience)** AD1 jaoks või **Windows Server 2022 Standard** (ilma sulgudeta = Server Core) AD2 jaoks.
 6. Nõustu litsentsitingimustega ja vali **Custom: Install Microsoft Server Operating System only (advanced)**.
 7. Vali ketas (tühi *Unallocated Space*) ja vajuta **Next**. Paigaldaja loob ise EFI-, MSR-, Windowsi- ja taastepartitsiooni.
 8. Pärast taaskäivitust määra kohaliku `Administrator` konto parool (nõuded: vähemalt 8 märki, 3 eri tüüpi märki 4-st).
@@ -76,7 +76,7 @@ Iga uue serveriga tehakse alati samad sammud ja samas järjekorras. Järjekord o
 5. Vajadusel *Remote Desktop* → *Allow remote connections to this computer*.
 6. *Updates* → paigalda uuendused → taaskäivita (*Start → Power → Restart*).
 
-**CORE1 (sconfig menüü):**
+**AD2 (sconfig menüü):**
 
 GUI-serveris tehakse need **Server Manager → Local Server** vaates. Server Core'is käivitub sisselogimisel automaatselt `sconfig` menüü:
 
@@ -101,7 +101,7 @@ GUI-serveris tehakse need **Server Manager → Local Server** vaates. Server Cor
   15) Exit to command line (PowerShell)
 ```
 
-1. Vali `2` → uus nimi `CORE1` → taaskäivitusele vasta esialgu **No**.
+1. Vali `2` → uus nimi `AD2` → taaskäivitusele vasta esialgu **No**.
 2. Vali `8` → adapteri number → `1` (*Set network adapter address*) → `S` (staatiline) → IP `192.168.10.11`, mask `255.255.255.0`, lüüs `192.168.10.1`; seejärel `2` (*Set DNS servers*) → `192.168.10.10`.
 3. Vali `9` → avanevas aknas *Change time zone* → Tallinn.
 4. Vali `4` (*Remote management*) → `3` *Configure server response to ping* → luba.
@@ -109,11 +109,11 @@ GUI-serveris tehakse need **Server Manager → Local Server** vaates. Server Cor
 
 #### Variant B: PowerShell
 
-Samad sammud PowerShellis (CORE1 näitel):
+Samad sammud PowerShellis (AD2 näitel):
 
 ```powershell
 # 1. Arvutinimi (taaskäivitus tehakse hiljem)
-Rename-Computer -NewName CORE1
+Rename-Computer -NewName AD2
 
 # 2. Võrk: leia adapteri nimi ja määra staatiline IP
 Get-NetAdapter
@@ -131,7 +131,7 @@ Restart-Computer
 
 ### 3.6 Teise ketta initsialiseerimine Server Core'is (F:)
 
-Andmed (failiserveri kaustad, DFS, kasutajakaustad) hoitakse eraldi kettal, mitte süsteemikettal `C:`. Nii ei täida kasutajate failid süsteemiketast, andmeketast saab eraldi varundada ja laiendada ning kvoodid ja varjukoopiad kehtivad ainult andmetele. Laboris on CORE1 andmeketas ja (Osa II-s) AD1 teine andmeketas **F:**.
+Andmed (failiserveri kaustad, DFS, kasutajakaustad) hoitakse eraldi kettal, mitte süsteemikettal `C:`. Nii ei täida kasutajate failid süsteemiketast, andmeketast saab eraldi varundada ja laiendada ning kvoodid ja varjukoopiad kehtivad ainult andmetele. Laboris on AD2 andmeketas ja (Osa II-s) AD1 teine andmeketas **F:**.
 
 ![andmeketta olekud · uuest kettast F: köiteks](joonised/03-andmeketta-olekud.png)
 
@@ -154,16 +154,16 @@ Uus ketas läbib alati samad olekud. Graafilises serveris teeb seda *Disk Manage
 
 #### Variant A: GUI (kaugelt AD1-st, Server Manager)
 
-1. AD1 *Server Manager* → *Manage → Add Servers* → *Active Directory* (või *DNS*, kui CORE1 pole veel domeenis) → otsi `CORE1` → lisa paremale → OK.
+1. AD1 *Server Manager* → *Manage → Add Servers* → *Active Directory* (või *DNS*, kui AD2 pole veel domeenis) → otsi `AD2` → lisa paremale → OK.
 2. Vasakult *File and Storage Services → Volumes → Disks*.
-3. Leia CORE1 rida, kus *Status* = **Offline**, *Partition* = **Unknown** ja maht 40 GB → paremklikk → **Bring Online** → *Yes*.
+3. Leia AD2 rida, kus *Status* = **Offline**, *Partition* = **Unknown** ja maht 40 GB → paremklikk → **Bring Online** → *Yes*.
 4. Paremklikk samal kettal → **Initialize** → *Yes* (Server Manager initsialiseerib ketta GPT-na).
 5. Paremklikk samal kettal → **New Volume...** → viisard:
-   - *Server and Disk*: CORE1, ketas 1;
+   - *Server and Disk*: AD2, ketas 1;
    - *Size*: kogu vaba ruum;
    - *Drive Letter*: **F**;
    - *File System Settings*: **NTFS**, *Allocation unit size* Default, *Volume label* `Andmed` → *Create*.
-6. Kontroll: *Volumes* vaates on CORE1 all köide `F:` sildiga *Andmed*.
+6. Kontroll: *Volumes* vaates on AD2 all köide `F:` sildiga *Andmed*.
 
 *Skeemid GUI juhendites on lihtsustatud joonised: päris aken võib detailides erineda. Numbrid näitavad klõpsamise järjekorda.*
 
@@ -231,9 +231,9 @@ DISKPART> exit
 
 #### Muud võimalused kaugelt AD1-st
 
-- **Server Manager** → *File and Storage Services → Volumes → Disks* → vali CORE1 ketas → paremklikk *Bring Online* → *New Volume* viisard (täht F, NTFS, silt Andmed).
-- **Disk Management** (`diskmgmt.msc`) → *Action → Connect to another computer* → CORE1. Eeldab, et mõlemas serveris on lubatud tulemüüri rühm *Remote Volume Management* ja CORE1-l käib teenus *Virtual Disk*: `Set-Service vds -StartupType Automatic; Start-Service vds`.
-- **PowerShell Remoting:** samad Variant B käsud `Invoke-Command -ComputerName CORE1 -ScriptBlock { ... }` sees.
+- **Server Manager** → *File and Storage Services → Volumes → Disks* → vali AD2 ketas → paremklikk *Bring Online* → *New Volume* viisard (täht F, NTFS, silt Andmed).
+- **Disk Management** (`diskmgmt.msc`) → *Action → Connect to another computer* → AD2. Eeldab, et mõlemas serveris on lubatud tulemüüri rühm *Remote Volume Management* ja AD2-l käib teenus *Virtual Disk*: `Set-Service vds -StartupType Automatic; Start-Service vds`.
+- **PowerShell Remoting:** samad Variant B käsud `Invoke-Command -ComputerName AD2 -ScriptBlock { ... }` sees.
 
 **Kontrollküsimused:** miks on uus ketas Windows Serveris vaikimisi Offline? Miks valitakse andmekettale GPT ja NTFS, mitte ReFS?
 
