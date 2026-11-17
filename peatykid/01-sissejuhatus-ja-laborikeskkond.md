@@ -32,7 +32,7 @@ Laboris on viis virtuaalmasinat ühes isoleeritud virtuaalvõrgus (Proxmox VE-s 
 
 | Masin | Operatsioonisüsteem | Roll laboris | IP-aadress | vCPU / RAM / kettad |
 | --- | --- | --- | --- | --- |
-| AD1 | Windows Server 2022 Standard (Desktop Experience) | 1. domeenikontroller, DNS, WDS, haldusjaam; Osa II: DFS, IIS + WordPress | 192.168.10.10/24 (staatiline) | 2 / 4 GB / 60 GB + 40 GB `E:` (WDS) + 40 GB `F:` (DFS, Osa II) |
+| AD1 | Windows Server 2022 Standard (Desktop Experience) | 1. domeenikontroller, DNS, DHCP, failiserver; Osa II: FSRM, DFS, AD CS, IIS + WordPress | 192.168.10.10/24 (staatiline) | 2 / 4 GB / 60 GB + 40 GB `E:` (WDS) + 40 GB `F:` (DFS, Osa II) |
 | AD2 | Windows Server 2022 Standard (Server Core) | 2. domeenikontroller, DNS, DHCP, failiserver; Osa II: FSRM, DFS, AD CS | 192.168.10.11/24 (staatiline) | 2 / 2 GB / 60 GB + 40 GB `F:` (andmed) |
 | WIN11-01 | Windows 11 Pro / Enterprise | domeeni klient, RSAT-iga haldusjaam | DHCP-st | 2 / 4 GB / 64 GB |
 | WIN11-02 | Windows 11 Pro / Enterprise | domeeni klient (tavakasutaja) | DHCP-st | 2 / 4 GB / 64 GB |
