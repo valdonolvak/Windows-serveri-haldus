@@ -90,7 +90,6 @@ Install-ADDSForest -DomainName "perenimi.local" -DomainNetbiosName "PERENIMI" `
 Install-WindowsFeature -Name AD-Domain-Services, DNS -IncludeManagementTools
 Install-ADDSDomainController -DomainName "perenimi.local" -InstallDns:$true `
   -Credential (Get-Credential "PERENIMI\Administrator") `
-  -SafeModeAdministratorPassword (Read-Host -AsSecureString "Sisesta DSRM parool")
 ```
 
 `WinThreshold` tähendab Windows Server 2016 funktsionaaltaset – see on Server 2022 kõrgeim tase.
