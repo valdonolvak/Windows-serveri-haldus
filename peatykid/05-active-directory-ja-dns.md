@@ -87,10 +87,10 @@ Install-ADDSForest -DomainName "perenimi.local" -DomainNetbiosName "PERENIMI" `
   -InstallDns -SafeModeAdministratorPassword (Read-Host -AsSecureString "DSRM parool")
 
 # AD2: teine DC samasse domeeni (AD2 peab olema domeeni liidetud või saama domeeni admin tunnused)
-Install-WindowsFeature AD-Domain-Services -IncludeManagementTools
-Install-ADDSDomainController -DomainName "perenimi.local" -InstallDns `
-  -Credential (Get-Credential PERENIMI\Administrator) `
-  -SafeModeAdministratorPassword (Read-Host -AsSecureString "DSRM parool")
+Install-WindowsFeature -Name AD-Domain-Services, DNS -IncludeManagementTools
+Install-ADDSDomainController -DomainName "perenimi.local" -InstallDns:$true `
+  -Credential (Get-Credential "PERENIMI\Administrator") `
+  -SafeModeAdministratorPassword (Read-Host -AsSecureString "Sisesta DSRM parool")
 ```
 
 `WinThreshold` tähendab Windows Server 2016 funktsionaaltaset – see on Server 2022 kõrgeim tase.
