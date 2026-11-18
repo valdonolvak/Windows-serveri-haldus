@@ -21,7 +21,7 @@ Vaikekonteinerid `Users` ja `Computers` on olemas igas domeenis, kuid neile GPO-
 
 1. Klient teab oma domeeni nime (`perenimi.local`) ja DNS-serveri aadressi (DHCP valik 006).
 2. Klient küsib DNS-ilt SRV-kirjet `_ldap._tcp.dc._msdcs.perenimi.local`.
-3. DNS vastab DC-de nimede ja portidega (`dc1.perenimi.local:389`, `core1.perenimi.local:389`).
+3. DNS vastab DC-de nimede ja portidega (`dc1.perenimi.local:389`, `AD2.perenimi.local:389`).
 4. Klient küsib nende A-kirjed, saab IP-aadressid ja võtab ühendust (LDAP 389, Kerberos 88).
 5. DC vastab ja kinnitab, millises saidis klient asub; klient eelistab edaspidi oma saidi DC-d.
 
@@ -41,7 +41,7 @@ DC loomine on kaheastmeline: esmalt paigaldatakse roll (binaarfailid), seejärel
 
 Ülendamisel tekivad: AD andmebaas `C:\Windows\NTDS\ntds.dit`, logifailid, `SYSVOL` kaust, DNS-tsoonid (kui DNS valiti) ja vaikimisi konteinerid (`Users`, `Computers`, `Builtin`, `Domain Controllers`). Server taaskäivitub ja kohalik administraator muutub domeeni administraatoriks (`PERENIMI\Administrator`).
 
-> **NB!** Allpool on sama töö kahel viisil: **A) GUI** ja **B) PowerShell**. Piisab ühest – kui teed GUI juhendi järgi, pole PowerShelli osa vaja (ja vastupidi). CORE1-l graafilist liidest pole, seega CORE1 GUI-sammud tehakse DC1 Server Managerist (CORE1 lisatakse sinna: *Manage → Add Servers*).
+> **NB!** Allpool on sama töö kahel viisil: **A) GUI** ja **B) PowerShell**. Piisab ühest – kui teed GUI juhendi järgi, pole PowerShelli osa vaja (ja vastupidi). AD2-l graafilist liidest pole, seega AD2 GUI-sammud tehakse DC1 Server Managerist (AD2 lisatakse sinna: *Manage → Add Servers*).
 
 #### Variant A: GUI (samm-sammult)
 
@@ -69,10 +69,10 @@ DC loomine on kaheastmeline: esmalt paigaldatakse roll (binaarfailid), seejärel
 
 *Skeem · AD DS Configuration Wizard: Add a new forest*
 
-**CORE1: teine DC samasse domeeni (DC1-st)**
+**AD2: teine DC samasse domeeni (DC1-st)**
 
-1. *Add Roles and Features* → *Select destination server*: **CORE1** → *Server Roles*: **Active Directory Domain Services** → *Install*.
-2. Kollane lipp → *Promote this server to a domain controller* (CORE1 rida).
+1. *Add Roles and Features* → *Select destination server*: **AD2** → *Server Roles*: **Active Directory Domain Services** → *Install*.
+2. Kollane lipp → *Promote this server to a domain controller* (AD2 rida).
 3. **Add a domain controller to an existing domain** → *Domain* `perenimi.local` → *Change...* → `PERENIMI\Administrator` ja parool.
 4. *Domain Controller Options*: märgitud **DNS server** ja **Global Catalog**, sait *Default-First-Site-Name*, DSRM-parool.
 5. *Additional Options*: *Replicate from* **Any domain controller** (või DC1) → *Paths* vaikimisi → *Prerequisites Check* → *Install*.
@@ -86,7 +86,7 @@ Install-ADDSForest -DomainName "perenimi.local" -DomainNetbiosName "PERENIMI" `
   -ForestMode WinThreshold -DomainMode WinThreshold `
   -InstallDns -SafeModeAdministratorPassword (Read-Host -AsSecureString "DSRM parool")
 
-# CORE1: teine DC samasse domeeni (CORE1 peab olema domeeni liidetud või saama domeeni admin tunnused)
+# AD2: teine DC samasse domeeni (AD2 peab olema domeeni liidetud või saama domeeni admin tunnused)
 Install-WindowsFeature AD-Domain-Services -IncludeManagementTools
 Install-ADDSDomainController -DomainName "perenimi.local" -InstallDns `
   -Credential (Get-Credential PERENIMI\Administrator) `
@@ -101,8 +101,8 @@ Kahe DC korral peab iga DC kasutama DNS-ina esmalt **partnerit**, teisena iseenn
 
 | Server | Eelistatud DNS | Alternatiivne DNS |
 | --- | --- | --- |
-| DC1 | 192.168.10.11 (CORE1) | 127.0.0.1 |
-| CORE1 | 192.168.10.10 (DC1) | 127.0.0.1 |
+| DC1 | 192.168.10.11 (AD2) | 127.0.0.1 |
+| AD2 | 192.168.10.10 (DC1) | 127.0.0.1 |
 | Kliendid (DHCP valik 006) | 192.168.10.10 | 192.168.10.11 |
 
 Lisaks tuleb DNS-is teha:
@@ -119,8 +119,8 @@ Lisaks tuleb DNS-is teha:
 2. **Pöördtsoon:** *Reverse Lookup Zones* → paremklikk **New Zone** → *Primary zone*, märgitud *Store the zone in Active Directory* → **To all DNS servers running on domain controllers in this domain** → *IPv4 Reverse Lookup Zone* → *Network ID* `192.168.10` → **Allow only secure dynamic updates** → *Finish*.
 3. **Edastajad:** paremklikk serveril *DC1* → *Properties* → vahekaart **Forwarders** → *Edit...* → `1.1.1.1` ja `9.9.9.9` → OK → OK.
 4. **A-kirje koos PTR-iga:** *Forward Lookup Zones → perenimi.local* → paremklikk **New Host (A or AAAA)** → *Name* `printer1`, *IP address* `192.168.10.50`, märgi **Create associated pointer (PTR) record** → *Add Host*.
-5. **CNAME:** paremklikk *perenimi.local* → **New Alias (CNAME)** → *Alias name* `failid`, *FQDN for target host* `core1.perenimi.local` → OK.
-6. **DC-de DNS-kliendi seaded** tabeli järgi: adapteri *Properties → IPv4 → Properties* → *Preferred* ja *Alternate DNS server* (CORE1 puhul `sconfig` → `8` → *Set DNS servers*).
+5. **CNAME:** paremklikk *perenimi.local* → **New Alias (CNAME)** → *Alias name* `failid`, *FQDN for target host* `AD2.perenimi.local` → OK.
+6. **DC-de DNS-kliendi seaded** tabeli järgi: adapteri *Properties → IPv4 → Properties* → *Preferred* ja *Alternate DNS server* (AD2 puhul `sconfig` → `8` → *Set DNS servers*).
 
 #### Variant B: PowerShell
 
@@ -135,7 +135,7 @@ Set-DnsServerForwarder -IPAddress 1.1.1.1, 9.9.9.9
 Add-DnsServerResourceRecordA -ZoneName "perenimi.local" -Name "printer1" -IPv4Address 192.168.10.50 -CreatePtr
 
 # CNAME (varjunimi)
-Add-DnsServerResourceRecordCName -ZoneName "perenimi.local" -Name "failid" -HostNameAlias "core1.perenimi.local"
+Add-DnsServerResourceRecordCName -ZoneName "perenimi.local" -Name "failid" -HostNameAlias "AD2.perenimi.local"
 ```
 
 ### 5.5 Kasutajad, rühmad, arvutid ja OU-d
