@@ -2,6 +2,8 @@
 
 Iga termini juures on eestikeelne nimetus, ingliskeelne originaal (sest ekraanil ja dokumentatsioonis näed peamiselt seda), selgitus ja näide meie laborist. Soovitus: ära õpi tabelit pähe, vaid tule selle juurde tagasi, kui laboritöös mõni sõna segaseks jääb.
 
+> **Harjuta termineid:** [interaktiivne terminoloogia test](02-terminoloogia-test.html) — vali teema, vasta 25 juhuslikule küsimusele, kohene tagasiside. Google Formsi variandi ja selle generaatori leiad kaustast [`testid/`](../testid/).
+
 ### 2.1 Üldmõisted
 
 | Termin (EN) | Selgitus | Näide laboris |
