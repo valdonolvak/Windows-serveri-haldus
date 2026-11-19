@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="et">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Terminoloogia test · Windows serveri haldus (ptk 2)</title>
+<style>
+:root{
+  --bg:#0f1420; --panel:#171e2e; --panel2:#1e2740; --line:#2b3550;
+  --ink:#e7ecf5; --mut:#9aa7c2; --acc:#4f8cff; --acc2:#2d6ae0;
+  --ok:#1f9d6b; --okbg:#10231c; --bad:#d6455b; --badbg:#2a1420;
+  --chip:#243154;
+}
+@media (prefers-color-scheme: light){
+  :root{--bg:#f4f6fb;--panel:#ffffff;--panel2:#f0f3fa;--line:#dde3ef;
+  --ink:#16203a;--mut:#5b688a;--acc:#2d6ae0;--acc2:#1e55c8;
+  --ok:#157a52;--okbg:#e7f6ee;--bad:#c23046;--badbg:#fdeaee;--chip:#e9eefb;}
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font:16px/1.55 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,sans-serif;}
+.wrap{max-width:760px;margin:0 auto;padding:22px 16px 60px;}
+h1{font-size:1.4rem;margin:.2em 0 .1em}
+.sub{color:var(--mut);margin:0 0 18px;font-size:.95rem}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;
+  padding:20px;margin-bottom:16px;box-shadow:0 1px 0 rgba(0,0,0,.04)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+label{color:var(--mut);font-size:.9rem}
+select,button{font:inherit;color:var(--ink)}
+select{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:8px 10px}
+button{cursor:pointer;border:0;border-radius:10px;padding:10px 16px;font-weight:600}
+.btn{background:var(--acc);color:#fff}
+.btn:hover{background:var(--acc2)}
+.btn.sec{background:var(--chip);color:var(--ink)}
+.tabs{display:flex;gap:6px;margin-bottom:14px}
+.tab{background:var(--chip);color:var(--ink);padding:8px 14px;border-radius:999px;font-weight:600;opacity:.7}
+.tab.on{opacity:1;background:var(--acc);color:#fff}
+.meta{display:flex;justify-content:space-between;color:var(--mut);font-size:.88rem;margin-bottom:10px}
+.bar{height:6px;background:var(--line);border-radius:4px;overflow:hidden;margin-bottom:16px}
+.bar>i{display:block;height:100%;background:var(--acc);width:0;transition:width .25s}
+.catchip{display:inline-block;background:var(--chip);color:var(--mut);
+  border-radius:999px;padding:2px 10px;font-size:.78rem;margin-bottom:10px}
+.def{font-size:1.12rem;line-height:1.5;margin:6px 0 4px}
+.quo{color:var(--mut)}
+.opts{display:grid;gap:10px;margin-top:16px}
+.opt{display:block;width:100%;text-align:left;background:var(--panel2);
+  border:1px solid var(--line);border-radius:11px;padding:12px 14px;font-weight:600;
+  transition:background .12s,border-color .12s}
+.opt:hover:not(:disabled){border-color:var(--acc)}
+.opt .en{display:block;color:var(--mut);font-weight:500;font-size:.85rem;margin-top:2px}
+.opt.ok{background:var(--okbg);border-color:var(--ok)}
+.opt.bad{background:var(--badbg);border-color:var(--bad)}
+.opt:disabled{cursor:default}
+.fb{margin-top:14px;padding:12px 14px;border-radius:10px;font-size:.95rem;display:none}
+.fb.ok{display:block;background:var(--okbg);border:1px solid var(--ok)}
+.fb.bad{display:block;background:var(--badbg);border:1px solid var(--bad)}
+.fb b{color:inherit}
+.ex{color:var(--mut);font-size:.9rem;margin-top:6px}
+.foot{display:flex;justify-content:flex-end;margin-top:16px}
+.big{font-size:2.6rem;font-weight:800;margin:.1em 0}
+.pct{color:var(--mut)}
+.search{width:100%;background:var(--panel2);border:1px solid var(--line);
+  border-radius:10px;padding:10px 12px;color:var(--ink);font:inherit;margin-bottom:12px}
+.trow{border-bottom:1px solid var(--line);padding:12px 2px}
+.trow:last-child{border-bottom:0}
+.tname{font-weight:700}
+.tname .en{color:var(--mut);font-weight:500}
+.tdef{color:var(--ink);font-size:.95rem;margin-top:2px}
+.tex{color:var(--mut);font-size:.85rem;margin-top:2px}
+.hid{display:none}
+.note{color:var(--mut);font-size:.82rem;margin-top:18px;text-align:center}
+code{background:var(--chip);padding:1px 5px;border-radius:5px;font-size:.85em}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Terminoloogia test</h1>
+  <p class="sub">Windows serveri haldus · peatükk 2. Iga testikord valitakse pangast (100 terminit) juhuslikult 25 küsimust juhuslikus järjekorras.</p>
+
+  <div class="tabs">
+    <button class="tab on" id="tabTest" onclick="showTab('test')">Test</button>
+    <button class="tab" id="tabDict" onclick="showTab('dict')">Sõnastik</button>
+  </div>
+
+  <!-- TEST -->
+  <div id="paneTest">
+    <div class="card" id="startCard">
+      <div class="row" style="justify-content:space-between">
+        <div class="row">
+          <label for="cat">Teema:</label>
+          <select id="cat"></select>
+        </div>
+        <div class="row">
+          <label for="count">Küsimusi:</label>
+          <select id="count">
+            <option value="25" selected>25</option>
+            <option value="10">10</option>
+            <option value="15">15</option>
+            <option value="50">50</option>
+          </select>
+        </div>
+      </div>
+      <div class="foot"><button class="btn" onclick="startQuiz()">Alusta testi →</button></div>
+    </div>
+
+    <div class="card hid" id="quizCard">
+      <div class="meta"><span id="qpos"></span><span id="qscore"></span></div>
+      <div class="bar"><i id="qbar"></i></div>
+      <span class="catchip" id="qcat"></span>
+      <div class="def"><span class="quo">„</span><span id="qdef"></span><span class="quo">“</span></div>
+      <div class="opts" id="qopts"></div>
+      <div class="fb" id="qfb"></div>
+      <div class="foot"><button class="btn hid" id="nextBtn" onclick="nextQ()">Järgmine →</button></div>
+    </div>
+
+    <div class="card hid" id="resultCard" style="text-align:center">
+      <div class="catchip" id="rcat"></div>
+      <div class="big" id="rscore"></div>
+      <div class="pct" id="rpct"></div>
+      <div class="foot" style="justify-content:center;margin-top:18px">
+        <button class="btn" onclick="startQuiz()">Proovi uuesti (uued küsimused)</button>
+        <button class="btn sec" onclick="backStart()" style="margin-left:8px">Muuda seadeid</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- DICT -->
+  <div id="paneDict" class="hid">
+    <div class="card">
+      <input class="search" id="search" placeholder="Otsi terminit või selgitust…" oninput="renderDict()">
+      <div class="row" style="margin-bottom:8px">
+        <label for="dcat">Teema:</label>
+        <select id="dcat"></select>
+      </div>
+      <div id="dictList"></div>
+    </div>
+  </div>
+
+  <p class="note">Allikas: peatükk 2 „Põhimõisted ja terminid“. Töötab võrguühenduseta.</p>
+</div>
+
+<script>
+const TERMID = [{"id": 0, "cat": "Üldmõisted", "term": "Server", "en": "server", "def": "Arvuti või tarkvara, mis pakub teenust teistele arvutitele (klientidele). „Server“ on roll, mitte riistvara tüüp: ka virtuaalmasin võib olla server.", "ex": "DC1 pakub DNS-i ja autentimist, CORE1 pakub DHCP-d ja failijagamist."}, {"id": 1, "cat": "Üldmõisted", "term": "Klient", "en": "client", "def": "Arvuti või programm, mis kasutab serveri teenuseid.", "ex": "WIN11-01 küsib DHCP-st aadressi ja DC1-lt sisselogimise kinnitust."}, {"id": 2, "cat": "Üldmõisted", "term": "Roll", "en": "server role", "def": "Serveri põhifunktsioon, mis paigaldatakse Server Manageri või PowerShelliga (nt AD DS, DNS Server, DHCP Server, File and Storage Services, WDS).", "ex": "Install-WindowsFeature DHCP paigaldab DHCP rolli."}, {"id": 3, "cat": "Üldmõisted", "term": "Komponent", "en": "feature", "def": "Lisavõimekus, mis toetab rolle või serverit ennast, kuid ei ole iseseisev teenus (nt Windows Server Backup, RSAT, .NET Framework, Failover Clustering).", "ex": "Install-WindowsFeature Windows-Server-Backup."}, {"id": 4, "cat": "Üldmõisted", "term": "Rolliteenus", "en": "role service", "def": "Rolli alamosa, mida saab eraldi valida.", "ex": "Failiteenuste rolli all on File Server, DFS Namespaces, File Server Resource Manager."}, {"id": 5, "cat": "Üldmõisted", "term": "Väljaanne", "en": "edition", "def": "Litsentsi- ja funktsioonitase: Standard, Datacenter, Datacenter: Azure Edition, Essentials.", "ex": "Laboris kasutame Standardit."}, {"id": 6, "cat": "Üldmõisted", "term": "Paigaldusvalik", "en": "installation option", "def": "Kas serveril on graafiline töölaud (Desktop Experience) või ainult käsurida (Server Core). Valik tehakse paigaldamisel; Server 2022 puhul hiljem vahetada ei saa.", "ex": "DC1 = Desktop Experience, CORE1 = Server Core."}, {"id": 7, "cat": "Üldmõisted", "term": "LTSC", "en": "Long-Term Servicing Channel", "def": "Uuenduskanal, kus uus versioon ilmub iga 2–3 aasta tagant ja saab 5 aastat põhituge + 5 aastat laiendatud tuge. Windows Server 2022 on LTSC väljalase.", "ex": "Server 2022 → järgmine LTSC on Server 2025."}, {"id": 8, "cat": "Üldmõisted", "term": "Virtuaalmasin", "en": "virtual machine, VM", "def": "Tarkvaraliselt emuleeritud arvuti, mis jookseb hüperviisori (nt Proxmox VE (KVM/QEMU), VMware ESXi, Hyper-V) peal.", "ex": "Kõik viis labori masinat on VM-id."}, {"id": 9, "cat": "Üldmõisted", "term": "Tõmmis", "en": "image", "def": "Fail, mis sisaldab terve operatsioonisüsteemi või ketta sisu. Windowsis on tõmmisfailid tavaliselt WIM-vormingus.", "ex": "install.wim, boot.wim, ISO-tõmmisfail."}, {"id": 10, "cat": "Üldmõisted", "term": "Kaughaldus", "en": "remote management", "def": "Serveri haldamine teisest arvutist võrgu kaudu, ilma serveri konsooli taga istumata.", "ex": "DC1-st CORE1 haldamine Server Manageri või Enter-PSSession abil."}, {"id": 11, "cat": "Active Directory", "term": "Kataloogiteenus", "en": "directory service", "def": "Keskne andmebaas, kus hoitakse võrgu objekte (kasutajad, arvutid, rühmad) ja nende atribuute ning mis vastab küsimusele „kes sa oled ja mida sa tohid?“.", "ex": "Active Directory."}, {"id": 12, "cat": "Active Directory", "term": "AD DS", "en": "Active Directory Domain Services", "def": "Windows Serveri roll, mis teeb serverist domeenikontrolleri ja pakub kataloogiteenust, autentimist (Kerberos/NTLM) ja poliitikate rakendamist.", "ex": "Paigaldatakse DC1-le ja CORE1-le."}, {"id": 13, "cat": "Active Directory", "term": "Domeen", "en": "domain", "def": "Halduslik ja turvalisuse piir: ühine kasutajate andmebaas, ühised paroolireeglid, ühine nimi DNS-is.", "ex": "perenimi.local."}, {"id": 14, "cat": "Active Directory", "term": "Domeenikontroller", "en": "domain controller, DC", "def": "Server, kus jookseb AD DS ja mis hoiab domeeni andmebaasi koopiat (NTDS.dit) ning kontrollib sisselogimisi.", "ex": "DC1 ja CORE1. Kaks DC-d = ühe rikke korral domeen töötab edasi."}, {"id": 15, "cat": "Active Directory", "term": "Mets", "en": "forest", "def": "Kõige kõrgem AD struktuur: ühe või mitme domeeni kogum ühise skeemi ja globaalkataloogiga. Mets on tegelik turvapiir.", "ex": "Meie mets koosneb ühest domeenist perenimi.local."}, {"id": 16, "cat": "Active Directory", "term": "Puu", "en": "tree", "def": "Domeenid, millel on järjestikune DNS-nimeruum.", "ex": "perenimi.local + tartu.perenimi.local."}, {"id": 17, "cat": "Active Directory", "term": "Skeem", "en": "schema", "def": "Reeglid, mis kirjeldavad, milliseid objektitüüpe (klassid) ja atribuute AD-s olla saab. Üks skeem kogu metsale.", "ex": "Exchange’i paigaldus laiendab skeemi."}, {"id": 18, "cat": "Active Directory", "term": "Organisatsiooniüksus", "en": "organizational unit, OU", "def": "Konteiner objektide rühmitamiseks domeeni sees. OU-le saab linkida GPO-sid ja delegeerida haldusõigusi.", "ex": "OU=Arvutid,OU=Labor,DC=perenimi,DC=local."}, {"id": 19, "cat": "Active Directory", "term": "Konteiner", "en": "container", "def": "Vaikimisi olemasolev kaust (nt Users, Computers), millele EI saa GPO-d linkida. Seetõttu loome oma OU-d.", "ex": "Uued domeeni liidetud arvutid satuvad CN=Computers."}, {"id": 20, "cat": "Active Directory", "term": "Objekt", "en": "object", "def": "Üks kirje AD-s: kasutaja, arvuti, rühm, printer, OU, GPO. Igal objektil on unikaalne GUID ja SID.", "ex": "Kasutaja mari.maasikas."}, {"id": 21, "cat": "Active Directory", "term": "DN", "en": "distinguished name", "def": "Objekti täielik „aadress“ AD-s, kirjutatud alt üles.", "ex": "CN=Mari Maasikas,OU=Kasutajad,OU=Labor,DC=perenimi,DC=local."}, {"id": 22, "cat": "Active Directory", "term": "UPN", "en": "user principal name", "def": "Kasutaja sisselogimisnimi e-posti kujul.", "ex": "mari.maasikas@perenimi.local."}, {"id": 23, "cat": "Active Directory", "term": "sAMAccountName", "en": "", "def": "Vana (pre-Windows 2000) sisselogimisnimi kujul DOMEEN\\kasutaja, kuni 20 märki.", "ex": "PERENIMI\\mari.maasikas."}, {"id": 24, "cat": "Active Directory", "term": "SID", "en": "security identifier", "def": "Unikaalne turvaidentifikaator, mille järgi Windows õigusi tegelikult kontrollib. Kasutaja ümbernimetamine SID-i ei muuda.", "ex": "S-1-5-21-…-1105."}, {"id": 25, "cat": "Active Directory", "term": "Turvarühm", "en": "security group", "def": "Rühm, mida saab kasutada õiguste andmiseks. Erineb levirühmast (distribution group), mis on ainult e-posti jaoks.", "ex": "GG_Raamatupidamine."}, {"id": 26, "cat": "Active Directory", "term": "Rühma ulatus", "en": "group scope", "def": "Määrab, kust rühma liikmed võivad tulla ja kus rühma saab kasutada: Domain Local (õigused ressursile), Global (kasutajad oma domeenist), Universal (kogu metsas).", "ex": "Vt AGDLP peatükis 8."}, {"id": 27, "cat": "Active Directory", "term": "Replikatsioon", "en": "replication", "def": "AD muudatuste kopeerimine DC-de vahel, et kõigil oleks sama andmebaas. AD kasutab mitme ülemaga (multi-master) replikatsiooni.", "ex": "Kasutaja loomine DC1-l jõuab mõne sekundiga CORE1-le."}, {"id": 28, "cat": "Active Directory", "term": "Sait", "en": "site", "def": "AD-s kirjeldatud füüsiline asukoht (IP-alamvõrgud), mille järgi suunatakse kliendid lähima DC juurde ja ajastatakse replikatsiooni.", "ex": "Vaikimisi Default-First-Site-Name."}, {"id": 29, "cat": "Active Directory", "term": "Globaalkataloog", "en": "global catalog, GC", "def": "DC, mis hoiab osalist koopiat kõigi metsa domeenide objektidest ja on vajalik sisselogimiseks (universaalrühmad) ja otsinguks.", "ex": "Mõlemad meie DC-d on GC-d."}, {"id": 30, "cat": "Active Directory", "term": "FSMO rollid", "en": "Flexible Single Master Operations", "def": "Viis eriülesannet, mida korraga täidab ainult üks DC: Schema Master, Domain Naming Master (metsa tasandil), RID Master, PDC Emulator, Infrastructure Master (domeeni tasandil).", "ex": "Esimene DC saab kõik viis. netdom query fsmo."}, {"id": 31, "cat": "Active Directory", "term": "PDC Emulator", "en": "", "def": "FSMO roll, mis on domeeni ajaallikas, töötleb paroolimuudatusi kiiremini ja on GPO-de vaikimisi muutmiskoht.", "ex": "DC1."}, {"id": 32, "cat": "Active Directory", "term": "Kerberos", "en": "", "def": "Vaikimisi autentimisprotokoll domeenis. Kasutaja saab DC-lt „pileti“ (ticket) ja näitab seda teenustele ilma parooli uuesti saatmata. Nõuab, et kellaajad erineksid alla 5 minuti.", "ex": "Kui kliendi kell on vale, sisselogimine ebaõnnestub."}, {"id": 33, "cat": "Active Directory", "term": "Usaldussuhe", "en": "trust", "def": "Seos domeenide või metsade vahel, mis lubab ühe domeeni kasutajatel kasutada teise ressursse.", "ex": "Metsa sees on usaldussuhted automaatsed."}, {"id": 34, "cat": "Active Directory", "term": "Funktsionaaltase", "en": "functional level", "def": "Määrab, milliseid AD võimalusi saab kasutada ja milliseid vanemaid DC versioone lubatakse. Server 2022-l on kõrgeim tase Windows Server 2016.", "ex": "Paigaldusel valime 2016 taseme."}, {"id": 35, "cat": "Active Directory", "term": "DSRM", "en": "Directory Services Restore Mode", "def": "DC erirežiim AD andmebaasi taastamiseks; selle jaoks määratakse eraldi parool.", "ex": "Parool sisestatakse DC paigaldusel."}, {"id": 36, "cat": "Active Directory", "term": "Delegeerimine", "en": "delegation of control", "def": "Piiratud haldusõiguste andmine (nt „võib lähtestada paroole OU-s Kasutajad“) ilma Domain Admins rühma lisamata.", "ex": "Labor 5."}, {"id": 37, "cat": "Võrk ja nimelahendus", "term": "IP-aadress ja alamvõrgu mask", "en": "", "def": "Seadme aadress võrgus ja märge, milline osa aadressist tähistab võrku. /24 = 255.255.255.0.", "ex": "192.168.10.10/24."}, {"id": 38, "cat": "Võrk ja nimelahendus", "term": "Vaikelüüs", "en": "default gateway", "def": "Ruuter, kuhu saadetakse liiklus teistesse võrkudesse.", "ex": "192.168.10.1."}, {"id": 39, "cat": "Võrk ja nimelahendus", "term": "DNS", "en": "Domain Name System", "def": "Nimelahendus: tõlgib nimed IP-aadressideks ja vastupidi. AD ei tööta ilma DNS-ita, sest kliendid leiavad DC-d DNS-i SRV-kirjete kaudu.", "ex": "dc1.perenimi.local → 192.168.10.10."}, {"id": 40, "cat": "Võrk ja nimelahendus", "term": "Tsoon", "en": "zone", "def": "DNS-i nimeruumi osa, mille kirjeid üks server haldab. Forward lookup zone = nimi→IP, reverse lookup zone = IP→nimi.", "ex": "perenimi.local ja 10.168.192.in-addr.arpa."}, {"id": 41, "cat": "Võrk ja nimelahendus", "term": "AD-integreeritud tsoon", "en": "AD-integrated zone", "def": "DNS-tsoon, mida hoitakse AD andmebaasis ja replikeeritakse koos AD-ga; lubab turvalisi dünaamilisi uuendusi.", "ex": "Mõlemad tsoonid."}, {"id": 42, "cat": "Võrk ja nimelahendus", "term": "DNS-kirje", "en": "resource record", "def": "Üks rida tsoonis. A = nimi→IPv4, AAAA = nimi→IPv6, PTR = IP→nimi, CNAME = varjunimi, MX = meiliserver, SRV = teenuse asukoht, NS = nimeserver, SOA = tsooni põhiandmed.", "ex": "_ldap._tcp.dc._msdcs.perenimi.local (SRV)."}, {"id": 43, "cat": "Võrk ja nimelahendus", "term": "FQDN", "en": "fully qualified domain name", "def": "Arvuti täielik DNS-nimi.", "ex": "core1.perenimi.local."}, {"id": 44, "cat": "Võrk ja nimelahendus", "term": "Edastaja", "en": "forwarder", "def": "Väline DNS-server, kelle poole meie DNS pöördub nimedega, mida ta ise ei tea (nt internet).", "ex": "1.1.1.1 või kooli DNS."}, {"id": 45, "cat": "Võrk ja nimelahendus", "term": "Dünaamiline uuendus", "en": "dynamic update", "def": "Kliendid registreerivad ise oma A- ja PTR-kirjed DNS-is.", "ex": "WIN11-01 ilmub tsooni automaatselt."}, {"id": 46, "cat": "Võrk ja nimelahendus", "term": "DHCP", "en": "Dynamic Host Configuration Protocol", "def": "Protokoll, mis jagab klientidele automaatselt IP-aadressi, maski, lüüsi, DNS-serverid jm.", "ex": "CORE1 jagab aadresse."}, {"id": 47, "cat": "Võrk ja nimelahendus", "term": "Ulatus (DHCP)", "en": "scope", "def": "DHCP aadressivahemik koos seadetega ühe alamvõrgu jaoks.", "ex": "192.168.10.100–200."}, {"id": 48, "cat": "Võrk ja nimelahendus", "term": "Välistus", "en": "exclusion", "def": "Aadressid ulatuse sees, mida DHCP ei jaga.", "ex": "192.168.10.100–110 (printerid)."}, {"id": 49, "cat": "Võrk ja nimelahendus", "term": "Reserveering", "en": "reservation", "def": "Konkreetsele MAC-aadressile alati sama IP.", "ex": "WIN11-01 saab alati .150."}, {"id": 50, "cat": "Võrk ja nimelahendus", "term": "Rent", "en": "lease", "def": "Aeg, mille jooksul klient võib aadressi kasutada; poole aja möödudes püüab ta seda pikendada.", "ex": "Vaikimisi 8 päeva."}, {"id": 51, "cat": "Võrk ja nimelahendus", "term": "DHCP valikud", "en": "options", "def": "Lisaseaded: 003 ruuter, 006 DNS-serverid, 015 DNS-domeeninimi, 066/067 PXE alglaadimisserver ja -fail.", "ex": "006 = 192.168.10.10, 192.168.10.11."}, {"id": 52, "cat": "Võrk ja nimelahendus", "term": "DORA", "en": "", "def": "DHCP neljaastmeline protsess: Discover → Offer → Request → Acknowledge.", "ex": "Vt skeemi peatükis 6."}, {"id": 53, "cat": "Võrk ja nimelahendus", "term": "APIPA", "en": "", "def": "Aadress 169.254.x.x, mille Windows endale võtab, kui DHCP ei vasta. Märk, et DHCP ei tööta.", "ex": "ipconfig näitab 169.254.12.7."}, {"id": 54, "cat": "Võrk ja nimelahendus", "term": "Autoriseerimine (DHCP)", "en": "DHCP authorization", "def": "Domeenis peab DHCP-server olema AD-s autoriseeritud, muidu ta ei jaga aadresse. Kaitseb „võõraste“ DHCP-serverite eest.", "ex": "Add-DhcpServerInDC."}, {"id": 55, "cat": "Rühmapoliitika", "term": "Rühmapoliitika", "en": "Group Policy", "def": "Mehhanism, millega domeen keskselt seadistab arvuteid ja kasutajaid (turva-, töölaua-, tarkvara-, registriseaded).", "ex": "Paroolireeglid, draivide kaardistamine."}, {"id": 56, "cat": "Rühmapoliitika", "term": "GPO", "en": "Group Policy Object", "def": "Üks nimeline seadete komplekt. Koosneb kahest osast: GPC (AD-s) ja GPT (failid kaustas SYSVOL).", "ex": "GPO_Kasutajad_Toolaud."}, {"id": 57, "cat": "Rühmapoliitika", "term": "Link", "en": "GPO link", "def": "GPO sidumine saidi, domeeni või OU-ga. Ilma lingita GPO ei mõju. Ühe GPO võib linkida mitmesse kohta.", "ex": "GPO lingitud OU-le Kasutajad."}, {"id": 58, "cat": "Rühmapoliitika", "term": "Arvuti- ja kasutajakonfiguratsioon", "en": "", "def": "GPO kaks poolt: arvutiseaded rakenduvad arvuti käivitumisel, kasutajaseaded sisselogimisel. Arvutiseaded mõjuvad arvutiobjektidele, kasutajaseaded kasutajaobjektidele – olenevalt sellest, kus objekt AD-s asub.", "ex": "Klassikaline viga: kasutajaseadega GPO lingitakse arvutite OU-le."}, {"id": 59, "cat": "Rühmapoliitika", "term": "Policies vs Preferences", "en": "", "def": "Policies on jõustatud ja kasutaja ei saa neid muuta; Preferences on eelistused (nt draivid, otseteed, registrivõtmed), mida kasutaja võib muuta.", "ex": "Draivi kaardistus = Preference."}, {"id": 60, "cat": "Rühmapoliitika", "term": "LSDOU", "en": "", "def": "GPO-de rakendamise järjekord: Local → Site → Domain → OU (vanem OU → laps-OU). Hilisem võidab konflikti korral.", "ex": "Vt skeemi peatükis 7."}, {"id": 61, "cat": "Rühmapoliitika", "term": "Pärimise blokeerimine", "en": "Block Inheritance", "def": "OU võib keelata ülemate GPO-de pärimise.", "ex": "Testi-OU."}, {"id": 62, "cat": "Rühmapoliitika", "term": "Jõustamine", "en": "Enforced", "def": "Lingi omadus, mis sunnib GPO rakenduma ka siis, kui allpool on pärimine blokeeritud või vastupidine seade.", "ex": "Turvapoliitika domeeni tasemel."}, {"id": 63, "cat": "Rühmapoliitika", "term": "Turvafiltreerimine", "en": "security filtering", "def": "GPO rakendub ainult neile, kellel on GPO-l õigused Read + Apply group policy.", "ex": "GPO ainult rühmale GG_IT."}, {"id": 64, "cat": "Rühmapoliitika", "term": "WMI-filter", "en": "", "def": "GPO rakendub ainult arvutitele, mis vastavad WMI-päringule (nt OS-i versioon).", "ex": "Ainult Windows 11 arvutitele."}, {"id": 65, "cat": "Rühmapoliitika", "term": "Loopback-töötlus", "en": "loopback processing", "def": "Kasutajaseaded võetakse arvuti asukoha järgi, mitte kasutaja asukoha järgi. Kasutatakse arvutiklassides ja kioskites.", "ex": "Arvutiklassi OU."}, {"id": 66, "cat": "Rühmapoliitika", "term": "SYSVOL", "en": "", "def": "Jagatud kaust igal DC-l (C:\\Windows\\SYSVOL), kus asuvad GPO failid ja sisselogimisskriptid; replikeeritakse DFSR-iga.", "ex": "\\\\perenimi.local\\SYSVOL."}, {"id": 67, "cat": "Rühmapoliitika", "term": "gpupdate / gpresult", "en": "", "def": "Käsud poliitikate kohe rakendamiseks ja rakendunud poliitikate kontrollimiseks.", "ex": "gpupdate /force, gpresult /r."}, {"id": 68, "cat": "Failiteenused ja õigused", "term": "NTFS-õigused", "en": "", "def": "Failisüsteemi tasemel õigused (Full control, Modify, Read & execute, List, Read, Write). Kehtivad nii kohapeal kui ka võrgu kaudu.", "ex": "Kaust F:\\Osakonnad\\Raamatupidamine."}, {"id": 69, "cat": "Failiteenused ja õigused", "term": "Jagamisõigused", "en": "share permissions", "def": "Võrgujagamise õigused (Full, Change, Read). Kehtivad ainult võrgu kaudu ligipääsul.", "ex": "Jagamine \\\\core1\\Raamatupidamine."}, {"id": 70, "cat": "Failiteenused ja õigused", "term": "Efektiivne õigus", "en": "effective access", "def": "Võrgu kaudu kehtib piiravam kahest: jagamisõigus vs NTFS-õigus.", "ex": "Share = Full, NTFS = Read → tulemus Read."}, {"id": 71, "cat": "Failiteenused ja õigused", "term": "ACL / ACE", "en": "", "def": "Access Control List on objekti õiguste nimekiri; iga rida on Access Control Entry.", "ex": "icacls F:\\Osakonnad."}, {"id": 72, "cat": "Failiteenused ja õigused", "term": "Pärimine (õigused)", "en": "inheritance", "def": "Alamkaustad ja failid saavad õigused ülemkaustalt.", "ex": "Uus fail pärib kausta õigused."}, {"id": 73, "cat": "Failiteenused ja õigused", "term": "Deny", "en": "", "def": "Keelav ACE, mis üldjuhul võidab lubava. Kasuta säästlikult.", "ex": "—"}, {"id": 74, "cat": "Failiteenused ja õigused", "term": "ABE", "en": "Access-Based Enumeration", "def": "Kasutaja ei näe jagamises kaustu, kuhu tal õigust pole.", "ex": "Sisse lülitatud jagamisel Osakonnad."}, {"id": 75, "cat": "Failiteenused ja õigused", "term": "AGDLP", "en": "", "def": "Soovitatav õiguste andmise mudel: Account → Global group → Domain Local group → Permission.", "ex": "Vt peatükki 8."}, {"id": 76, "cat": "Failiteenused ja õigused", "term": "UNC-tee", "en": "", "def": "Võrguressursi aadress kujul \\\\server\\jagamine\\kaust.", "ex": "\\\\perenimi.local\\Andmed\\Kasutajad."}, {"id": 77, "cat": "Failiteenused ja õigused", "term": "DFS Namespace", "en": "", "def": "Virtuaalne kaustapuu, mis peidab tegelikud serverinimed.", "ex": "\\\\perenimi.local\\Andmed."}, {"id": 78, "cat": "Failiteenused ja õigused", "term": "FSRM", "en": "File Server Resource Manager", "def": "Failiserveri haldus: kvoodid, failitüüpide blokeerimine, aruanded.", "ex": "Kasutajakausta kvoot 100 MB (ptk 13)."}, {"id": 79, "cat": "Paigaldus ja WDS", "term": "WDS", "en": "Windows Deployment Services", "def": "Serveri roll operatsioonisüsteemide paigaldamiseks üle võrgu. Pakub PXE-alglaadimist ja tõmmiste hoidlat. Osaliselt aegunud (deprecated).", "ex": "Paigaldatakse DC1-le."}, {"id": 80, "cat": "Paigaldus ja WDS", "term": "PXE", "en": "Preboot Execution Environment", "def": "Võrgukaardi püsivara standard, mis lubab arvutil käivituda võrgust enne, kui kettal on OS.", "ex": "WDS-KLIENT käivitub PXE-ga."}, {"id": 81, "cat": "Paigaldus ja WDS", "term": "TFTP", "en": "Trivial File Transfer Protocol", "def": "Lihtne UDP-põhine failiedastus (port 69), millega PXE klient laeb alglaadimisfaili.", "ex": "wdsmgfw.efi laaditakse TFTP-ga."}, {"id": 82, "cat": "Paigaldus ja WDS", "term": "NBP", "en": "Network Boot Program", "def": "Esimene fail, mille PXE klient alla laeb ja käivitab. UEFI puhul boot\\x64\\wdsmgfw.efi.", "ex": "—"}, {"id": 83, "cat": "Paigaldus ja WDS", "term": "WinPE", "en": "Windows Preinstallation Environment", "def": "Väike Windows, mis jookseb mälus ja millest käivitatakse paigaldus või taastetööriistad.", "ex": "Kohandatud WinPE alglaadimistõmmis."}, {"id": 84, "cat": "Paigaldus ja WDS", "term": "Alglaadimistõmmis", "en": "boot image", "def": "WinPE tõmmis (boot.wim), mille PXE klient mällu laeb.", "ex": "WinPE_amd64.wim."}, {"id": 85, "cat": "Paigaldus ja WDS", "term": "Paigaldustõmmis", "en": "install image", "def": "Operatsioonisüsteem ise (install.wim), mis kettale kirjutatakse. Sisaldab mitut väljaannet (indeksit).", "ex": "Windows 11 Pro = üks indeks."}, {"id": 86, "cat": "Paigaldus ja WDS", "term": "WIM", "en": "Windows Imaging Format", "def": "Failipõhine tõmmisvorming; üks WIM-fail võib sisaldada mitut tõmmist.", "ex": "—"}, {"id": 87, "cat": "Paigaldus ja WDS", "term": "Windows ADK", "en": "Assessment and Deployment Kit", "def": "Tööriistad (DISM, WSIM, copype) paigaldusmaterjalide loomiseks; WinPE on eraldi lisandmoodul.", "ex": "Paigaldatakse DC1-le."}, {"id": 88, "cat": "Paigaldus ja WDS", "term": "Vastusfail", "en": "answer file, unattend.xml", "def": "XML-fail, mis vastab paigaldusküsimustele automaatselt. Luuakse WSIM-iga (Windows System Image Manager).", "ex": "autounattend.xml."}, {"id": 89, "cat": "Paigaldus ja WDS", "term": "Sysprep", "en": "", "def": "Tööriist, mis eemaldab Windowsi paigalduselt unikaalsed andmed (SID, arvutinimi), et sellest saaks teha üldist tõmmist.", "ex": "sysprep /generalize /oobe /shutdown."}, {"id": 90, "cat": "Paigaldus ja WDS", "term": "UEFI / Secure Boot / TPM", "en": "", "def": "Kaasaegne püsivara (asendab BIOS-i), alglaadimise allkirjakontroll ja krüptokiip. Windows 11 nõuab kõiki kolme.", "ex": "WDS-KLIENT VM-i seaded."}, {"id": 91, "cat": "Haldus", "term": "PowerShell", "en": "", "def": "Objektipõhine käsukest ja skriptikeel, Windows Serveri peamine automatiseerimisvahend. Käsud (cmdlet) on kujul Verb-Nimisõna.", "ex": "Get-Service, New-ADUser."}, {"id": 92, "cat": "Haldus", "term": "Moodul", "en": "module", "def": "Seotud käskude komplekt.", "ex": "ActiveDirectory, DhcpServer, DnsServer."}, {"id": 93, "cat": "Haldus", "term": "WinRM / PowerShell Remoting", "en": "", "def": "Kaughalduse protokoll (HTTP 5985 / HTTPS 5986), millega PowerShell käivitab käske teistes masinates. Domeenis vaikimisi lubatud.", "ex": "Invoke-Command -ComputerName CORE1."}, {"id": 94, "cat": "Haldus", "term": "sconfig", "en": "", "def": "Server Core’i tekstipõhine seadistusmenüü (nimi, IP, domeen, uuendused, kaugtöölaud). Server 2022-s PowerShelli põhine.", "ex": "CORE1 esmane seadistus."}, {"id": 95, "cat": "Haldus", "term": "RSAT", "en": "Remote Server Administration Tools", "def": "Haldustööriistad (ADUC, DNS, DHCP, GPMC jt) klientarvutile või serverile. Windows 11-s paigaldatakse Optional features alt.", "ex": "WIN11-01 haldusjaamana."}, {"id": 96, "cat": "Haldus", "term": "MMC", "en": "Microsoft Management Console", "def": "Raamistik, milles jooksevad haldustööriistad (snap-in).", "ex": "dsa.msc, dnsmgmt.msc, dhcpmgmt.msc, gpmc.msc."}, {"id": 97, "cat": "Haldus", "term": "Windows Admin Center", "en": "WAC", "def": "Brauseripõhine tasuta haldustool serverite ja klientide jaoks.", "ex": "Paigaldatakse soovi korral WIN11-01-le."}, {"id": 98, "cat": "Haldus", "term": "Event Viewer", "en": "sündmuste vaatur", "def": "Logide vaatamise tööriist: System, Application, Security ja teenuste logid.", "ex": "eventvwr.msc."}, {"id": 99, "cat": "Haldus", "term": "Teenus", "en": "service", "def": "Taustal jooksev programm, nt NTDS, DNS, DHCPServer, WDSServer.", "ex": "Get-Service DHCPServer."}];
+const CATS = ["Üldmõisted", "Active Directory", "Võrk ja nimelahendus", "Rühmapoliitika", "Failiteenused ja õigused", "Paigaldus ja WDS", "Haldus"];
+const esc = s => s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const label = t => t.term + (t.en ? ' ('+t.en+')' : '');
+function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]];}return a;}
+
+// täida teemavalikud
+for(const sel of [document.getElementById('cat'), document.getElementById('dcat')]){
+  const all=document.createElement('option'); all.value='*'; all.textContent='Kõik teemad'; sel.appendChild(all);
+  CATS.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;sel.appendChild(o);});
+}
+
+let Q=[], idx=0, score=0, answered=false;
+
+function pool(cat){ return cat==='*' ? TERMID : TERMID.filter(t=>t.cat===cat); }
+
+function startQuiz(){
+  const cat=document.getElementById('cat').value;
+  let want=parseInt(document.getElementById('count').value,10);
+  const p=pool(cat);
+  want=Math.min(want,p.length);
+  Q=shuffle(p).slice(0,want).map(t=>{
+     // 3 eksitajat: eelista sama teema termineid
+     let pads=shuffle(TERMID.filter(x=>x.id!==t.id && x.cat===t.cat));
+     if(pads.length<3) pads=pads.concat(shuffle(TERMID.filter(x=>x.id!==t.id && x.cat!==t.cat)));
+     const opts=shuffle([t].concat(pads.slice(0,3)));
+     return {t, opts};
+  });
+  idx=0; score=0;
+  document.getElementById('startCard').classList.add('hid');
+  document.getElementById('resultCard').classList.add('hid');
+  document.getElementById('quizCard').classList.remove('hid');
+  renderQ();
+}
+function renderQ(){
+  answered=false;
+  const {t,opts}=Q[idx];
+  document.getElementById('qpos').textContent='Küsimus '+(idx+1)+' / '+Q.length;
+  document.getElementById('qscore').textContent='Punkte: '+score;
+  document.getElementById('qbar').style.width=(idx/Q.length*100)+'%';
+  document.getElementById('qcat').textContent=t.cat;
+  document.getElementById('qdef').textContent=t.def;
+  const box=document.getElementById('qopts'); box.innerHTML='';
+  opts.forEach(o=>{
+    const b=document.createElement('button');
+    b.className='opt';
+    b.innerHTML=esc(o.term)+(o.en?'<span class="en">'+esc(o.en)+'</span>':'');
+    b.onclick=()=>choose(b,o,t);
+    box.appendChild(b);
+  });
+  const fb=document.getElementById('qfb'); fb.className='fb'; fb.innerHTML='';
+  document.getElementById('nextBtn').classList.add('hid');
+}
+function choose(btn,o,t){
+  if(answered) return; answered=true;
+  const correct=o.id===t.id;
+  if(correct) score++;
+  [...document.getElementById('qopts').children].forEach(b=>{
+    b.disabled=true;
+    const name=b.textContent;
+  });
+  // märgista
+  [...document.getElementById('qopts').children].forEach(b=>{
+    if(b===btn && !correct) b.classList.add('bad');
+  });
+  // leia õige nupp
+  [...document.getElementById('qopts').children].forEach((b,i)=>{
+    if(Q[idx].opts[i].id===t.id) b.classList.add('ok');
+  });
+  const fb=document.getElementById('qfb');
+  fb.className='fb '+(correct?'ok':'bad');
+  fb.innerHTML=(correct?'<b>Õige!</b> ':'<b>Vale.</b> Õige vastus: <b>'+esc(label(t))+'</b>. ')
+    + (t.ex && t.ex!=='—' ? '<div class="ex">Näide: '+esc(t.ex)+'</div>' : '');
+  document.getElementById('qscore').textContent='Punkte: '+score;
+  document.getElementById('nextBtn').classList.remove('hid');
+}
+function nextQ(){
+  idx++;
+  if(idx>=Q.length){ showResult(); return; }
+  renderQ();
+}
+function showResult(){
+  document.getElementById('quizCard').classList.add('hid');
+  const r=document.getElementById('resultCard'); r.classList.remove('hid');
+  const pct=Math.round(score/Q.length*100);
+  document.getElementById('rcat').textContent=document.getElementById('cat').selectedOptions[0].textContent;
+  document.getElementById('rscore').textContent=score+' / '+Q.length;
+  let msg = pct>=90?'Suurepärane!':pct>=70?'Tubli!':pct>=50?'Enam-vähem — korda üle.':'Tasub veel harjutada.';
+  document.getElementById('rpct').textContent=pct+'% · '+msg;
+}
+function backStart(){
+  document.getElementById('resultCard').classList.add('hid');
+  document.getElementById('quizCard').classList.add('hid');
+  document.getElementById('startCard').classList.remove('hid');
+}
+
+// Sõnastik
+function renderDict(){
+  const q=(document.getElementById('search').value||'').toLowerCase().trim();
+  const cat=document.getElementById('dcat').value;
+  const list=document.getElementById('dictList'); list.innerHTML='';
+  let n=0;
+  TERMID.filter(t=>cat==='*'||t.cat===cat).forEach(t=>{
+    const hay=(t.term+' '+t.en+' '+t.def+' '+t.ex).toLowerCase();
+    if(q && !hay.includes(q)) return;
+    n++;
+    const d=document.createElement('div'); d.className='trow';
+    d.innerHTML='<div class="tname">'+esc(t.term)+(t.en?' <span class="en">('+esc(t.en)+')</span>':'')+'</div>'
+      +'<div class="tdef">'+esc(t.def)+'</div>'
+      +(t.ex&&t.ex!=='—'?'<div class="tex">Näide: '+esc(t.ex)+'</div>':'');
+    list.appendChild(d);
+  });
+  if(n===0){const e=document.createElement('div');e.className='tex';e.textContent='Midagi ei leitud.';list.appendChild(e);}
+}
+function showTab(which){
+  document.getElementById('tabTest').classList.toggle('on',which==='test');
+  document.getElementById('tabDict').classList.toggle('on',which==='dict');
+  document.getElementById('paneTest').classList.toggle('hid',which!=='test');
+  document.getElementById('paneDict').classList.toggle('hid',which!=='dict');
+  if(which==='dict') renderDict();
+}
+document.getElementById('dcat').value='*';
+</script>
+</body>
+</html>
