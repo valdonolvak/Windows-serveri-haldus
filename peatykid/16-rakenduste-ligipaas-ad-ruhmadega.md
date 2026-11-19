@@ -200,6 +200,8 @@ gpresult /h C:\Users\Public\gp.html     # sama HTML-aruandena
 
 ### Labor 14. Rakenduste ligipääs AD rühmade järgi
 
+> **Praktiline juhend:** laborid 14 ja 14B on samm-sammult (GUI + PowerShell, testitabelid, ekraanitõmmised, hindamine ja kontrollskript) kirjas failis [Labor 14 – praktiline juhend](../Materjalid/Labor-14-rakenduste-ligipaas-praktiline-juhend.md).
+
 **Eesmärk:** anda rakendusi kasutajatele ainult AD rühmade kaudu: paigaldus, otseteed ja käivitamisõigus.
 
 **Sammud:**

@@ -40,6 +40,7 @@
 - [14. DFS – hajutatud failisüsteem](peatykid/14-dfs.md)
 - [15. Kaustade ümbersuunamine ja isiklik võrguketas](peatykid/15-kaustade-umbersuunamine-ja-vorguketas.md)
 - [16. Rakenduste ligipääs AD rühmade järgi](peatykid/16-rakenduste-ligipaas-ad-ruhmadega.md)
+  - [Labor 14 – praktiline juhend (AD1/AD2 + Windows 11)](Materjalid/Labor-14-rakenduste-ligipaas-praktiline-juhend.md)
 - [17. IIS ja WordPress](peatykid/17-iis-ja-wordpress.md)
 - [18. AD CS sertifikaadiasutus ja HTTPS](peatykid/18-ad-cs-ja-https.md)
 - [19. Kellaaja sünkroniseerimine (W32Time)](peatykid/19-kellaaja-sunkroniseerimine.md)
@@ -54,4 +55,6 @@ README.md                 sisukord (see fail)
 peatykid/                 iga peatükk eraldi .md failina
 peatykid/joonised/        skeemid PNG-failidena
 interaktiivne/            simulaatorid (HTML, avanevad GitHub Pagesi kaudu)
+Materjalid/               praktilised laborijuhendid ja lisamaterjalid
+Skriptid/                 laborite skriptid (Laoseis, kontrollskriptid)
 ```
