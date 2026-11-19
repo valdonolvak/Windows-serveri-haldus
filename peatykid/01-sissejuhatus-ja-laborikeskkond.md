@@ -30,6 +30,23 @@ Laboris on viis virtuaalmasinat ühes isoleeritud virtuaalvõrgus (Proxmox VE-s 
 
 > **Proxmoxi labor.** Virtuaalmasinad on õpetaja poolt Proxmox VE-s ette valmistatud (Windowsid paigaldatud, VirtIO draiverid ja QEMU guest agent olemas). Õppija ei pea operatsioonisüsteeme ise paigaldama; paigalduse kirjeldus (peatükk 3.4) jääb materjali taustateadmiseks ja iseseisvaks harjutamiseks.
 
+#### Proxmoxi veebiliidesesse sisselogimine
+
+Virtuaalmasinad asuvad kooli Proxmox VE serveris, kuhu pääsed veebibrauseriga:
+
+1. Ava brauseris **https://193.40.178.155:8006/**
+2. Brauser hoiatab, et ühendus **pole turvaline** (server kasutab iseallkirjastatud sertifikaati). Laboris on see ootuspärane — vali **Täpsemalt → Jätka saidile** ja lehele pääsed.
+3. Proxmox VE sisselogimisaknas täida:
+   - **User name** — sulle antud kasutajanimi
+   - **Password** — sulle antud parool
+   - **Realm** — vali **`hkhk.edu.ee`** (mitte vaikimisi „Linux PAM"; kooli kontoga sisselogimine käib just selle realmi kaudu)
+   - **Language** — võid jätta inglise keele või valida eesti keele
+4. Vajuta **Login**. Vasakul **Server View** all näed virtuaalmasinaid, millele sul on õigus.
+
+![Proxmox VE sisselogimine · realm hkhk.edu.ee](joonised/01-proxmox-login.png)
+
+*Joonis: Proxmox VE sisselogimine — vali realm `hkhk.edu.ee`, sisesta kasutajanimi ja parool*
+
 | Masin | Operatsioonisüsteem | Roll laboris | IP-aadress | vCPU / RAM / kettad |
 | --- | --- | --- | --- | --- |
 | AD1 | Windows Server 2022 Standard (Desktop Experience) | 1. domeenikontroller, DNS, DHCP, failiserver; Osa II: FSRM, DFS, AD CS, IIS + WordPress | 192.168.10.10/24 (staatiline) | 2 / 4 GB / 60 GB + 40 GB `E:` (WDS) + 40 GB `F:` (DFS, Osa II) |
