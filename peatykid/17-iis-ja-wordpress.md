@@ -8,6 +8,8 @@ IIS (*Internet Information Services*) on Windows Serveri veebiserver. Selles pea
 
 IIS ise PHP-d ei käivita: ta annab `.php` päringu FastCGI kaudu edasi `php-cgi.exe`-le, mis loeb andmed MySQL-ist ja tagastab valmis HTML-i.
 
+> **Interaktiivne simulaator:** [IIS ja WordPressi päringu teekond](https://valdonolvak.github.io/Windows-serveri-haldus/interaktiivne/iis-wordpress-simulaator.html) – vaata samm-sammult, kuidas päring IIS-is liigub, lülita sisse rikkeid (vale sidumine, puuduv käsitleja, MySQL seisab, NTFS-õigused …) ja harjuta vigade diagnoosimist.
+
 ### 17.1 Mõisted
 
 | Termin (EN) | Selgitus | Näide laboris |

@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="et">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IIS ja WordPress – päringu teekonna simulaator</title>
+<style>
+:root{--bg:#f7f6f3;--card:#fff;--ink:#1f1e1c;--quiet:#6b6862;--line:#dcd9d2;--acc:#2f6fd6;--acc-t:#e8f0fc;--ok:#2e7d4f;--ok-t:#e4f3ea;--bad:#b3261e;--bad-t:#fbe9e7;--warn:#9a6700;--warn-t:#fbf1dc;--chipink:#fff;--mono:ui-monospace,Consolas,monospace}
+@media (prefers-color-scheme:dark){:root{--bg:#1b1b1a;--card:#252524;--ink:#ecebe8;--quiet:#a3a09a;--line:#3a3936;--acc:#7aa7f0;--acc-t:#24324a;--ok:#6cc08b;--ok-t:#1f3428;--bad:#f08a80;--bad-t:#3d2220;--warn:#e0b250;--warn-t:#3a3020;--chipink:#14223a}}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--ink)}
+.wrap{max-width:1320px;margin:auto;padding:18px 20px 40px}
+h1{font-size:22px;margin:0 0 4px}
+.lead{color:var(--quiet);margin:0 0 12px;max-width:960px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.tabs button,.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:7px 12px;font:inherit;cursor:pointer}
+.tabs button.on{background:var(--acc-t);border-color:var(--acc);font-weight:600}
+.tabs button.diag{margin-left:auto}
+.btn.primary{background:var(--acc);border-color:var(--acc);color:#fff}
+.btn:disabled{opacity:.4;cursor:default}
+.controls{display:grid;grid-template-columns:auto 1fr;gap:10px 22px;align-items:start;margin-bottom:14px}
+@media (max-width:760px){.controls{grid-template-columns:1fr}}
+.users{display:flex;gap:6px;flex-wrap:wrap}
+.faults{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:14px}
+.faults label{display:flex;gap:6px;align-items:center;cursor:pointer}
+.faults label.na{opacity:.4;cursor:default}
+.lbl{font-size:12.5px;color:var(--quiet);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}
+.grid{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:16px}
+@media (max-width:1000px){.grid{grid-template-columns:1fr}}
+svg text{font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+.stepbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
+.prog{color:var(--quiet);font-size:14px;margin-left:auto}
+.stitle{font-size:17px;font-weight:600;margin:0 0 6px}
+.box{border-radius:8px;padding:9px 11px;margin-top:10px;font-size:14px}
+.box.check{background:var(--acc-t)}
+.box.ok{background:var(--ok-t)}
+.box.bad{background:var(--bad-t)}
+.box.warn{background:var(--warn-t)}
+.box b.h{display:block;margin-bottom:2px}
+.kv{font-family:var(--mono);font-size:12.5px;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;white-space:pre-wrap;word-break:break-word;margin-top:8px}
+code{font-family:var(--mono);font-size:.92em;background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:0 4px}
+.kv code{border:0;padding:0;background:none}
+.ctx{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;font-size:13.5px;margin-top:6px}
+.ctx dt{color:var(--quiet)}
+.ctx dd{margin:0;font-family:var(--mono);font-size:12.5px;word-break:break-all}
+.ctx dd.new{color:var(--acc);font-weight:600}
+h3.sec{font-size:14px;margin:16px 0 4px}
+.legend{font-size:13px;color:var(--quiet);margin-top:8px}
+/* brauser */
+.bw{border:1px solid var(--line);border-radius:9px;overflow:hidden;margin-top:6px;background:var(--card)}
+.bw .bar{display:flex;gap:6px;align-items:center;padding:6px 8px;background:var(--bg);border-bottom:1px solid var(--line);font-size:12.5px}
+.bw .dots span{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--line);margin-right:3px}
+.bw .url{flex:1;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:2px 10px;font-family:var(--mono);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.bw .pg{min-height:150px;padding:12px 14px;font-size:13.5px}
+.wp-h{border-bottom:2px solid var(--ink);padding-bottom:4px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:baseline}
+.wp-h b{font-size:16px}
+.wp-h span{font-size:12px;color:var(--quiet)}
+.wp-post{margin:6px 0}
+.wp-post b{color:var(--acc)}
+.wp-post small{color:var(--quiet);display:block}
+.err h4{margin:0 0 6px;font-size:16px}
+.iiserr{background:#555;color:#fff;margin:-12px -14px 0;padding:8px 14px;font-size:15px}
+.iisbody{padding-top:10px}
+.iisdef{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:130px;background:linear-gradient(135deg,#0d5fa8,#1b86d6);color:#fff;margin:-12px -14px;padding:16px}
+.iisdef b{font-size:22px;letter-spacing:.04em}
+.loading{color:var(--quiet);display:flex;align-items:center;gap:8px}
+.spin{width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--acc);border-radius:50%;animation:sp 1s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.imgph{height:110px;border-radius:6px;background:linear-gradient(180deg,#9fc7ef 0,#cfe4f5 45%,#5f9b5a 46%,#3e7a3b 100%)}
+.note{font-size:12.5px;color:var(--quiet);margin-top:6px}
+/* diagnoos */
+.opts{display:grid;gap:8px;margin-top:10px}
+.opts button{text-align:left;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:9px 12px;font:inherit;cursor:pointer}
+.opts button.right{background:var(--ok-t);border-color:var(--ok)}
+.opts button.wrong{background:var(--bad-t);border-color:var(--bad)}
+.score{font-size:14px;color:var(--quiet)}
+details.gl{margin:0 0 12px}
+details.gl summary{cursor:pointer;color:var(--acc);font-size:14px}
+details.gl dl{display:grid;grid-template-columns:auto 1fr;gap:3px 14px;font-size:13.5px;margin:8px 0 0}
+details.gl dt{font-weight:600}
+details.gl dd{margin:0}
+</style>
+</head>
+<body>
+<div class="wrap"><p style="margin:0 0 6px;font-size:14px"><a href="../" style="color:inherit">← Õppematerjali sisukord</a> · <a href="index.html" style="color:inherit">Kõik simulaatorid</a> · <a href="https://github.com/valdonolvak/Windows-serveri-haldus/blob/main/peatykid/17-iis-ja-wordpress.md" style="color:inherit">Peatükk 17</a></p>
+  <h1>IIS ja WordPress – päringu teekonna simulaator</h1>
+  <p class="lead">Vaata samm-sammult, mis juhtub, kui brauser avab aadressi <code>http://veeb.perenimi.local</code>: kuidas DNS, http.sys, IIS-i rakenduskogum, FastCGI, PHP, MySQL ja failisüsteem koos töötavad. IIS ise PHP-d ei käivita – ta otsustab, <b>kes</b> päringu töötleb. Lülita sisse rikkeid ja vaata, kus ahel katkeb ning mida brauser ja logi siis näitavad. Vahekaardil <b>Diagnoosi rike</b> saad ise vigu tuvastada.</p>
+
+  <details class="gl"><summary>Lühendid ja mõisted</summary>
+    <dl>
+      <dt>IIS</dt><dd><i>Internet Information Services</i> – Windows Serveri veebiserver</dd>
+      <dt>HTTP</dt><dd><i>Hypertext Transfer Protocol</i> – veebi päringu-vastuse protokoll (vaikimisi port 80)</dd>
+      <dt>DNS</dt><dd><i>Domain Name System</i> – nimelahendus: hostinimi → IP-aadress (UDP/TCP port 53)</dd>
+      <dt>TCP</dt><dd><i>Transmission Control Protocol</i> – usaldusväärne ühendus, millel HTTP liigub</dd>
+      <dt>URL</dt><dd><i>Uniform Resource Locator</i> – aadress kujul skeem://hostinimi:port/tee?päring</dd>
+      <dt>PHP</dt><dd><i>PHP: Hypertext Preprocessor</i> – programmeerimiskeel, milles WordPress on kirjutatud</dd>
+      <dt>CGI / FastCGI</dt><dd><i>Common Gateway Interface</i> – viis, kuidas veebiserver annab päringu välisele programmile; FastCGI hoiab need protsessid korduvkasutuseks käigus</dd>
+      <dt>NTS</dt><dd><i>Non Thread Safe</i> – PHP versioon, mida kasutatakse IIS + FastCGI puhul</dd>
+      <dt>WAS</dt><dd><i>Windows Process Activation Service</i> – käivitab ja peatab rakenduskogumite tööprotsesse (<code>w3wp.exe</code>)</dd>
+      <dt>NTFS</dt><dd><i>New Technology File System</i> – Windowsi failisüsteem, millel on õiguste loendid (ACL, <i>Access Control List</i>)</dd>
+      <dt>SQL</dt><dd><i>Structured Query Language</i> – andmebaasi päringukeel</dd>
+      <dt>KDC</dt><dd><i>Key Distribution Center</i> – Kerberose piletite väljastaja domeenikontrolleris</dd>
+      <dt>SPN</dt><dd><i>Service Principal Name</i> – teenuse nimi (nt <code>HTTP/veeb.perenimi.local</code>), mille järgi KDC teab, millise konto võtmega pilet krüpteerida</dd>
+      <dt>Rewrite vs redirect</dt><dd>Ümberkirjutus (<i>rewrite</i>) muudab URL-i serveri sees, brauser seda ei näe. Ümbersuunamine (<i>redirect</i>, 301/302) käsib brauseril teha uue päringu teisele aadressile.</dd>
+    </dl>
+  </details>
+
+  <div class="tabs" id="tabs"></div>
+
+  <div id="simView">
+    <div class="card controls">
+      <div id="userWrap">
+        <div class="lbl">Kasutaja</div>
+        <div class="users" id="users"></div>
+      </div>
+      <div>
+        <div class="lbl">Rikked (vali üks või mitu; hallid ei mõjuta seda stsenaariumi)</div>
+        <div class="faults" id="faults"></div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <div id="diagram"></div>
+        <div class="stepbar">
+          <button class="btn" id="reset">⟲ Algusesse</button>
+          <button class="btn" id="prev">‹ Eelmine</button>
+          <button class="btn primary" id="next">Järgmine samm ›</button>
+          <button class="btn" id="play">▶ Esita</button>
+          <span class="prog" id="prog"></span>
+        </div>
+        <p class="legend">Liikuv punkt = andmed liiguvad (protokoll noole juures). Sinine = aktiivne komponent, w3wp.exe sees on IIS-i moodulite ahel. Punane = siin ahel katkeb, kollane = hoiatus, töö jätkub.</p>
+        <h3 class="sec">Brauser (WIN11-01)</h3>
+        <div class="bw"><div class="bar"><span class="dots"><span></span><span></span><span></span></span><span class="url" id="burl"></span></div><div class="pg" id="bpage"></div></div>
+      </div>
+      <div class="card">
+        <div id="step"></div>
+        <h3 class="sec">Päringu kontekst</h3>
+        <dl class="ctx" id="ctx"></dl>
+      </div>
+    </div>
+  </div>
+
+  <div id="diagView" hidden>
+    <div class="grid">
+      <div class="card">
+        <div class="lbl">Ülesanne</div>
+        <p id="dq" style="margin:4px 0 8px"></p>
+        <div class="bw"><div class="bar"><span class="dots"><span></span><span></span><span></span></span><span class="url" id="dburl"></span></div><div class="pg" id="dbpage"></div></div>
+        <h3 class="sec">IIS-i logi (DC1)</h3>
+        <div class="kv" id="dlog"></div>
+      </div>
+      <div class="card">
+        <div style="display:flex;align-items:center;gap:10px"><div class="lbl" style="margin:0">Mis on põhjus?</div><span class="score" id="dscore" style="margin-left:auto"></span></div>
+        <div class="opts" id="dopts"></div>
+        <div id="dfb"></div>
+        <div class="stepbar"><button class="btn primary" id="dnext">Uus ülesanne ›</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ================= Rikked ================= */
+const FAULTS={
+ dns:{node:'N',lbl:'DNS-kirje „veeb“ puudub',
+   at:'DNS-server vastab <b>NXDOMAIN</b> – sellist nime pole. Brauser ei saa IP-aadressi ja päring ei jõua serverini üldse. Seetõttu pole ka IIS-i logis ühtki rida.',
+   fix:'Add-DnsServerResourceRecordA -ZoneName "perenimi.local" -Name "veeb" -IPv4Address 192.168.10.10\nResolve-DnsName veeb.perenimi.local',
+   br:{k:'chrome',t:'Seda saiti ei saa kätte',x:'Serveri veeb.perenimi.local IP-aadressi ei leitud.',c:'DNS_PROBE_FINISHED_NXDOMAIN'},
+   log:null},
+ bind:{node:'H',lbl:'Sidumise hostinimes trükiviga',
+   at:'Saidi <b>veeb</b> sidumine on <code>http:*:80:veeb.perenimi.lcoal</code> (trükiviga). Ükski hostinimega sidumine ei klapi, seega võtab päringu hostinimeta sidumine <code>*:80:</code> – see on <b>Default Web Site</b>. Brauser näeb IIS-i vaikelehte.',
+   fix:'Get-WebBinding -Name veeb\nSet-WebBinding -Name veeb -BindingInformation "*:80:veeb.perenimi.lcoal" -PropertyName HostHeader -Value "veeb.perenimi.local"',
+   br:{k:'iisdef'},
+   log:{site:'W3SVC1 (Default Web Site)',st:'200 0 0',uri:'/'}},
+ pool:{node:'H',lbl:'Rakenduskogum „veeb“ on peatatud',
+   at:'http.sys leiab õige saidi, aga kogumi <b>veeb</b> järjekord on peatatud. http.sys vastab ise <b>503 Service Unavailable</b> – päring ei jõua kunagi w3wp.exe-ni, seega pole rida saidi logis, vaid http.sys-i vealogis.',
+   fix:'Get-WebAppPoolState veeb\nStart-WebAppPool veeb\n# Miks peatus? Rakenduskogum peatub ise, kui w3wp.exe kukub 5 korda 5 minuti jooksul (Rapid-Fail Protection) – vaata System logi, allikas WAS.',
+   br:{k:'plain',t:'Service Unavailable',x:'HTTP Error 503. The service is unavailable.'},
+   log:{httperr:true}},
+ ntfs:{node:'F',lbl:'IIS AppPool\\veeb pole lugemisõigust',
+   at:'Faili lugemisel kontrollib Windows NTFS-õigusi konto <code>IIS AppPool\\veeb</code> nimel. Kaustal <code>C:\\inetpub\\veeb</code> pole sellel kontol <b>Read &amp; execute</b> õigust → <b>401.3</b> (juurdepääs keelatud ACL-i tõttu).',
+   fix:'icacls C:\\inetpub\\veeb\nicacls C:\\inetpub\\veeb /grant "IIS AppPool\\veeb:(OI)(CI)RX"',
+   br:{k:'iis',c:'401',t:'401 - Unauthorized: Access is denied due to invalid credentials.',x:'You do not have permission to view this directory or page using the credentials that you supplied.'},
+   log:{st:'401 3 5'}},
+ defdoc:{node:'W',lbl:'index.php pole vaikedokumentide hulgas',
+   at:'URL lõpeb kaustaga <code>/</code>, kuid vaikedokumentide nimekirjas pole <code>index.php</code> (ainult Default.htm, index.html …). Ükski fail ei sobi ja kaustade sirvimine (<i>Directory Browsing</i>) on keelatud → <b>403.14</b>.',
+   fix:'Get-WebConfigurationProperty -PSPath IIS:\\ -Filter /system.webServer/defaultDocument/files -Name collection | Select value\nAdd-WebConfigurationProperty -Filter /system.webServer/defaultDocument/files -PSPath IIS:\\ -Name . -Value @{value=\'index.php\'} -AtIndex 0',
+   br:{k:'iis',c:'403',t:'403 - Forbidden: Access is denied.',x:'You do not have permission to view this directory or page using the credentials that you supplied.'},
+   log:{st:'403 14 0'}},
+ handler:{node:'W',lbl:'*.php käsitleja (Handler Mapping) puudub',
+   at:'Ükski käsitleja ei vasta laiendile <code>.php</code>, nii et faili püüab teenindada StaticFile-käsitleja. Laiendil .php pole MIME-tüüpi, seega IIS keeldub → <b>404.3</b>. <br><b>Ohtlik variant:</b> kui keegi on lisanud .php jaoks MIME-tüübi, saadab IIS PHP lähtekoodi brauserisse tekstina – <code>wp-config.php</code> puhul koos andmebaasi parooliga!',
+   fix:'Get-WebHandler -PSPath IIS:\\ | Where-Object Path -eq "*.php"\nNew-WebHandler -Name "PHP-FastCGI" -Path "*.php" -Verb "*" -Modules FastCgiModule -ScriptProcessor "C:\\PHP\\php-cgi.exe" -ResourceType Either -PSPath IIS:\\',
+   br:{k:'iis',c:'404',t:'404 - File or directory not found.',x:'The resource you are looking for might have been removed, had its name changed, or is temporarily unavailable.'},
+   log:{st:'404 3 50'}},
+ vc:{node:'P',lbl:'VC++ Redistributable puudub (või vale PHP: TS/x86)',
+   at:'FastCgiModule käivitab <code>php-cgi.exe</code>, kuid protsess sureb kohe, sest DLL <code>VCRUNTIME140.dll</code> puudub (veakood <code>0xc0000135</code>). IIS vastab <b>500.0 – The FastCGI process exited unexpectedly</b>. Sama juhtub, kui on paigaldatud TS- või 32-bitine PHP.',
+   fix:'C:\\PHP\\php-cgi.exe -v    # serveris käivitades näed puuduva DLL-i teadet\nC:\\Install\\vc_redist.x64.exe /install /quiet /norestart',
+   br:{k:'iis',c:'500',t:'500 - Internal server error.',x:'There is a problem with the resource you are looking for, and it cannot be displayed.'},
+   log:{st:'500 0 0'}},
+ mysqli:{node:'P',lbl:'php.ini: extension=mysqli on kommenteeritud',
+   at:'WordPress kontrollib käivitudes (<code>wp-load.php</code>), kas PHP-s on andmebaasi laiend. <code>mysqli</code> pole laaditud → WordPress lõpetab veateatega.',
+   fix:'C:\\PHP\\php.exe -m | findstr mysqli   # tühi = laiend puudub\n# php.ini: eemalda rea "extension=mysqli" eest ";" ja kontrolli extension_dir = "C:\\PHP\\ext"\n# FastCGI protsessid loevad php.ini uuesti, kui need taaskäivituvad: iisreset või Restart-WebAppPool veeb',
+   br:{k:'wperr',t:'Your PHP installation appears to be missing the MySQL extension which is required by WordPress.'},
+   log:{st:'500 0 0'}},
+ db:{node:'M',lbl:'MySQL teenus seisab (või vale parool)',
+   at:'mysqli proovib ühenduda <code>127.0.0.1:3306</code>, aga keegi ei kuula (teenus <code>MySQL84</code> on peatatud) või lükkab MySQL sisselogimise tagasi (vale parool <code>wp-config.php</code>-s). WordPress näitab oma veateadet ja tagastab HTTP 500.',
+   fix:'Get-Service MySQL84\nStart-Service MySQL84\nTest-NetConnection 127.0.0.1 -Port 3306\n# parooli test: mysql.exe -u wp_kasutaja -p wordpress',
+   br:{k:'wperr',t:'Error establishing a database connection'},
+   log:{st:'500 0 0'}},
+ rewrite:{node:'W',lbl:'web.config (URL Rewrite reegel) puudub',
+   at:'Kausta ega faili <code>esimene-postitus</code> kettal pole ja ümberkirjutusreeglit pole, mis suunaks päringu <code>index.php</code>-le. StaticFile-käsitleja ei leia faili → <b>404.0</b>.<br>NB! Kui <code>web.config</code> on olemas, aga <b>URL Rewrite moodul</b> on paigaldamata, on tulemus hoopis <b>500.19</b> (IIS ei tunne sektsiooni &lt;rewrite&gt;) – ja seda kõigil saidi päringutel.',
+   fix:'Test-Path C:\\inetpub\\veeb\\web.config\nGet-WebGlobalModule | Where-Object Name -like "*Rewrite*"',
+   br:{k:'iis',c:'404',t:'404 - File or directory not found.',x:'The resource you are looking for might have been removed, had its name changed, or is temporarily unavailable.'},
+   log:{st:'404 0 2'}},
+ wpcontent:{node:'F',lbl:'wp-content: IIS AppPool\\veeb pole Modify õigust',
+   at:'PHP töötab konto <code>IIS AppPool\\veeb</code> nimel ja püüab luua kausta <code>wp-content\\uploads\\2026\\11</code>. Kontol on ainult lugemisõigus → kirjutamine ebaõnnestub. Tähelepanu: HTTP olek on ikkagi <b>200</b> – viga on JSON-vastuse sees, seega IIS-i logist seda ei näe!',
+   fix:'icacls C:\\inetpub\\veeb\\wp-content\nicacls C:\\inetpub\\veeb\\wp-content /grant "IIS AppPool\\veeb:(OI)(CI)M"',
+   br:{k:'wpadmin',t:'Unable to create directory wp-content/uploads/2026/11. Is its parent directory writable by the server?'},
+   log:{st:'200 0 0'}},
+ spn:{lbl:'SPN HTTP/veeb.perenimi.local puudub',warnOnly:true,
+   at:'KDC ei leia ühtki kontot SPN-iga <code>HTTP/veeb.perenimi.local</code> (viga KDC_ERR_S_PRINCIPAL_UNKNOWN), seega Kerberose piletit ei saa. <b>Negotiate langeb tagasi NTLM-ile</b> – sisselogimine töötab, aga nõrgema protokolliga ja iga ühendus tekitab lisaringe. <code>klist</code> ei näita HTTP piletit.',
+   fix:'setspn -L DC1\nsetspn -S HTTP/veeb.perenimi.local DC1\n# kliendis: klist purge, siis ava leht uuesti ja klist',
+   br:null,log:null}
+};
+
+/* ================= Komponendid ja servad ================= */
+const NODES={
+ K:{x:18,y:190,w:128,h:72,t:'WIN11-01',s:'brauser'},
+ N:{x:184,y:44,w:126,h:64,t:'DNS · KDC',s:'DC1 rollid'},
+ H:{x:184,y:194,w:126,h:64,t:'http.sys',s:'kerneli draiver · :80'},
+ W:{x:336,y:44,w:196,h:376,t:'w3wp.exe',s:'kogum veeb · IIS AppPool\\veeb'},
+ P:{x:562,y:44,w:176,h:80,t:'php-cgi.exe',s:'FastCGI · WordPressi kood'},
+ M:{x:562,y:176,w:176,h:72,t:'MySQL 8.4',s:'127.0.0.1:3306 · wordpress'},
+ F:{x:562,y:296,w:176,h:124,t:'C:\\inetpub\\veeb',s:'NTFS · saidi failid'}
+};
+const CHIPS=[['auth','Autentimine'],['authz','Autoriseerimine'],['rewrite','URL Rewrite (web.config)'],['defdoc','Vaikedokument'],['handler','Käsitleja valik'],['log','Logimine (W3SVC)']];
+const EDGES={
+ KN:'M146,206 L184,84',
+ KH:'M146,226 L184,226',
+ HW:'M310,226 L336,226',
+ WP:'M532,84 L562,84',
+ PM:'M650,124 L650,176',
+ PF:'M738,100 L750,100 L750,350 L738,350',
+ WF:'M532,404 L562,404'
+};
+
+/* ================= Sammude ehitusplokid ================= */
+const IP='192.168.10.10';
+const st={
+ url:(url,path,extra='')=>({t:'Kasutaja avab aadressi',n:['K'],
+   d:`Brauser jagab URL-i (<i>Uniform Resource Locator</i>) osadeks: skeem <code>http</code> → vaikeport <b>80</b>, hostinimi <code>veeb.perenimi.local</code>, tee <code>${path}</code>. Enne ühenduse loomist on vaja hostinimi IP-aadressiks teisendada.${extra}`,
+   s:{URL:url},b:{k:'loading'}}),
+ dns:()=>({t:'DNS-päring',n:['K','N'],e:[['KN',2,'DNS · UDP 53']],
+   d:`WIN11-01 küsib oma DNS-serverilt (DC1): mis on <code>veeb.perenimi.local</code> IPv4-aadress? Tsoonis <code>perenimi.local</code> on A-kirje <code>veeb → ${IP}</code>. Vastus jääb kliendi DNS-vahemällu.`,
+   k:'Resolve-DnsName veeb.perenimi.local\nipconfig /displaydns   # kliendi vahemälu\nipconfig /flushdns     # tühjenda pärast DNS-i parandust',
+   f:['dns'],s:{'IP-aadress':IP}}),
+ tcp:(req,extra='')=>({t:'TCP-ühendus ja HTTP-päring',n:['K','H'],e:[['KH',1,'TCP 80 · HTTP']],
+   d:`Brauser loob TCP-ühenduse (<i>Transmission Control Protocol</i>; kätlus SYN → SYN-ACK → ACK) aadressile <code>${IP}:80</code> ja saadab HTTP-päringu. Kõige olulisem rida on <code>Host:</code> – IP ja port on kõigil selle serveri saitidel samad, ainult hostinimi ütleb, millist saiti tahetakse.${extra}`,
+   kv:req}),
+ httpsys:()=>({t:'http.sys valib saidi ja rakenduskogumi',n:['H'],
+   d:`<b>http.sys</b> on Windowsi kerneli draiver, mis kuulab porte 80/443 (IIS-i asemel, kes ise porti ei ava). Ta võrdleb päringut saitide sidumistega (<i>binding</i>):<br><code>*:80:</code> → Default Web Site (hostinimeta – võtab kõik, mis mujale ei sobi)<br><code>*:80:veeb.perenimi.local</code> → sait <b>veeb</b> ✔ täpsem vaste võidab<br>Päring pannakse kogumi <b>veeb</b> järjekorda. Kui kogumil pole töötavat protsessi, käivitab WAS (<i>Windows Process Activation Service</i>) uue <code>w3wp.exe</code> (vaikimisi peatub see 20 min jõudeoleku järel).`,
+   k:'Get-WebBinding -Name veeb\nGet-WebAppPoolState veeb\nnetsh http show servicestate   # http.sys-i järjekorrad',
+   f:['bind','pool'],s:{Sait:'veeb (ID 2)',Rakenduskogum:'veeb'}}),
+ anon:(extra='')=>({t:'IIS-i moodulite ahel: anonüümne autentimine',n:['H','W'],c:'auth',e:[['HW',1,'']],
+   d:`Tööprotsessis <code>w3wp.exe</code> läbib päring moodulite ahela (<i>Integrated pipeline</i>). Esimesena autentimine: saidil on lubatud <b>anonüümne</b> autentimine ja anonüümne kasutaja = rakenduskogumi identiteet. Seega töötleb päringut konto <code>IIS AppPool\\veeb</code> – NTFS-õigusi on vaja anda ainult sellele ühele kontole.${extra}`,
+   s:{Identiteet:'IIS AppPool\\veeb'}}),
+ rewrite:(kind,path)=>{
+   const o={t:'URL Rewrite: kas URL-i on vaja ümber kirjutada?',n:['W','F'],c:'rewrite',e:[['WF',2,'kas fail/kaust on?']]};
+   const rule='&lt;match url="*" /&gt;\n&lt;add input="{REQUEST_FILENAME}" matchType="IsFile" negate="true" /&gt;\n&lt;add input="{REQUEST_FILENAME}" matchType="IsDirectory" negate="true" /&gt;\n&lt;action type="Rewrite" url="index.php" /&gt;';
+   if(kind==='dir'){o.d=`Reegel „WordPress“ failis <code>web.config</code> kirjutab URL-i ümber ainult siis, kui küsitud asja <b>pole</b> kettal failina ega kaustana. <code>/</code> on kaust → tingimus ei kehti, URL jääb muutmata.`;o.kv=rule;}
+   if(kind==='file'){o.d=`Fail <code>${path}</code> on kettal olemas → tingimus „pole fail“ ei kehti, URL jääb muutmata. Olemasolevaid faile (pildid, CSS, JS) teenindab IIS otse – nii on need kiired ja PHP-d ei koormata.`;o.kv=rule;}
+   if(kind==='perm'){o.d=`Kettal pole faili ega kausta <code>esimene-postitus</code> → mõlemad tingimused kehtivad ja reegel kirjutab URL-i ümber: <code>${path}</code> → <code>/index.php</code>. See on <b>ümberkirjutus</b>, mitte ümbersuunamine – brauseri aadressiriba ei muutu. Algne aadress jääb PHP-le alles muutujasse <code>REQUEST_URI</code>.`;o.kv=rule;o.f=['rewrite'];o.s={'Tee pärast rewrite':'/index.php'};}
+   return o;},
+ defdoc:()=>({t:'Vaikedokument',n:['W','F'],c:'defdoc',e:[['WF',2,'NTFS lugemine']],
+   d:`URL lõpeb kaustaga, seega otsib <i>DefaultDocumentModule</i> vaikedokumentide nimekirjast esimest olemasolevat faili. <code>index.php</code> on nimekirjas esimene ja leitakse: <code>C:\\inetpub\\veeb\\index.php</code>. Faili kasutamiseks kontrollib Windows NTFS-õigust: kas <code>IIS AppPool\\veeb</code>-il on <b>Read &amp; execute</b>?`,
+   k:'Get-WebConfigurationProperty -PSPath IIS:\\ -Filter /system.webServer/defaultDocument/files -Name collection | Select value',
+   f:['defdoc','ntfs'],s:{Fail:'C:\\inetpub\\veeb\\index.php'}}),
+ ntfsOnly:(file)=>({t:'Faili õiguste kontroll',n:['W','F'],e:[['WF',2,'NTFS lugemine']],
+   d:`IIS leiab faili <code>${file}</code> ja Windows kontrollib NTFS-õigust konto <code>IIS AppPool\\veeb</code> nimel. Õigus <b>Read &amp; execute</b> on pärandatud kaustalt <code>C:\\inetpub\\veeb</code>.`,
+   k:'icacls C:\\inetpub\\veeb',f:['ntfs'],s:{Fail:file}}),
+ handlerPhp:()=>({t:'Käsitleja valik: *.php → FastCGI',n:['W'],c:'handler',
+   d:`<i>Handler Mappings</i> otsustab faili laiendi järgi, kes päringu töötleb. <code>*.php</code> → <b>PHP-FastCGI</b> (moodul <i>FastCgiModule</i>, programm <code>C:\\PHP\\php-cgi.exe</code>). Kõik muu (jpg, css, js, html) → <b>StaticFile</b>, mis lihtsalt loeb faili kettalt.`,
+   k:'Get-WebHandler -PSPath IIS:\\ | Where-Object Path -eq "*.php" | Format-List Name,Path,Modules,ScriptProcessor',
+   f:['handler'],s:{Käsitleja:'PHP-FastCGI'}}),
+ fastcgi:(uri,method='GET',extra='')=>({t:'FastCGI: päring läheb php-cgi.exe-le',n:['W','P'],e:[['WP',1,'FastCGI']],
+   d:`FastCgiModule annab päringu üle <code>php-cgi.exe</code> protsessile. Protsessid hoitakse käigus ja kasutatakse korduvalt – kui ükski ei tööta, käivitatakse uus, mis loeb <code>C:\\PHP\\php.ini</code> ja laadib laiendid (mysqli, gd, intl, opcache …). Pärast 10 000 päringut (<i>Instance MaxRequests</i>) vahetatakse protsess välja. Protsess töötab sama konto nimel kui w3wp.exe; kaasa antakse serverimuutujad:${extra}`,
+   kv:`REQUEST_METHOD  = ${method}\nHTTP_HOST       = veeb.perenimi.local\nREQUEST_URI     = ${uri}\nSCRIPT_FILENAME = C:\\inetpub\\veeb\\${uri.startsWith('/wp-admin')?uri.slice(1).replace(/\//g,'\\'):'index.php'}\nREMOTE_ADDR     = 192.168.10.110`,
+   k:'C:\\PHP\\php-cgi.exe -v      # kas PHP üldse käivitub?\nGet-Process php-cgi | Select Id,StartTime   # töötavad FastCGI protsessid',
+   f:['vc'],s:{Protsess:'php-cgi.exe'}}),
+ boot:()=>({t:'WordPress käivitub',n:['P','F'],e:[['PF',2,'PHP-failide lugemine']],
+   d:`PHP täidab koodi: <code>index.php</code> → <code>wp-blog-header.php</code> → <code>wp-load.php</code> → <b><code>wp-config.php</code></b> (andmebaasi nimi, kasutaja, parool, turvavõtmed) → <code>wp-settings.php</code> laadib tuuma, pluginad ja teema. <b>OPcache</b> hoiab kompileeritud PHP-koodi mälus, nii et järgmistel päringutel faile uuesti ei kompileerita.`,
+   kv:"define( 'DB_NAME', 'wordpress' );\ndefine( 'DB_USER', 'wp_kasutaja' );\ndefine( 'DB_HOST', '127.0.0.1' );",
+   f:['mysqli']}),
+ db:(sql,extra='')=>({t:'Andmebaasi päringud',n:['P','M'],e:[['PM',2,'TCP 3306 · SQL']],
+   d:`Laiend <code>mysqli</code> ühendub aadressile <code>127.0.0.1:3306</code> kasutajana <code>wp_kasutaja</code>. MySQL kuulab ainult aadressil 127.0.0.1 (<code>bind-address</code>), seega võrgust ei pääse andmebaasile keegi otse ligi – ainult sama serveri PHP. <code>wp_kasutaja</code> näeb ainult andmebaasi <code>wordpress</code> (vähima õiguse põhimõte). SQL-päringud (<i>Structured Query Language</i>):${extra}`,
+   kv:sql,k:'Get-Service MySQL84\nnetstat -ano | findstr :3306   # peab olema 127.0.0.1:3306, mitte 0.0.0.0',
+   f:['db'],s:{Andmebaas:'wordpress @ 127.0.0.1'}}),
+ render:(what)=>({t:'Teema koostab HTML-i',n:['P','F'],e:[['PF',2,'teema failid']],
+   d:`WordPress valib päringu tüübi järgi teema malli (${what}) ja täidab selle andmebaasist saadud sisuga. Tulemus on tavaline HTML-tekst – brauser ei näe kunagi PHP-koodi, ainult selle väljundit. PHP kirjutab HTML-i FastCGI kaudu tagasi w3wp.exe-le.`}),
+ resp:(code,ctype,uri,b,extra='',php=true)=>({t:'Vastus brauserile',n:php?['K','H','W','P']:['K','H','W'],c:'log',
+   e:(php?[['WP',-1,'FastCGI väljund']]:[]).concat([['HW',-1,''],['KH',-1,'HTTP '+code.split(' ')[0]]]),
+   d:`Vastus liigub tagasi: ${php?'php-cgi.exe → ':''}w3wp.exe → http.sys → brauser. Viimasena kirjutab logimismoodul rea saidi logisse <code>C:\\inetpub\\logs\\LogFiles\\W3SVC2\\</code> (W3SVC2 = saidi ID 2).${extra}`,
+   kv:`HTTP/1.1 ${code}\nContent-Type: ${ctype}\nServer: Microsoft-IIS/10.0\n\n# logirida:\n${logLine('GET',uri,code.split(' ')[0]+' 0 0')}`,
+   s:{'HTTP olek':code},b}),
+ assets:()=>({t:'Brauser küsib lisafailid',n:['K','H','W','F'],e:[['KH',1,'HTTP'],['HW',1,''],['WF',2,'StaticFile']],c:'handler',
+   d:`HTML-is on viited CSS-, JavaScripti- ja pildifailidele. Brauser küsib need eraldi päringutega (sama TCP-ühendust kasutades). Need on päris failid kettal → URL Rewrite neid ei puuduta ja käsitleja on <b>StaticFile</b>: PHP-d ega MySQL-i ei kasutata. Lehe avamiseks tehakse seega üks PHP-päring ja kümmekond kiiret staatilist päringut.`,
+   kv:'GET /wp-content/themes/twentytwentyfive/style.css   → 200 (StaticFile)\nGET /wp-includes/js/wp-emoji-release.min.js        → 200 (StaticFile)\nGET /wp-content/uploads/2026/11/loodus.jpg           → 200 (StaticFile)'})
+};
+function logLine(m,uri,stat,user='-'){return `2026-11-19 14:05:11 ${IP} ${m} ${uri} - 80 ${user} 192.168.10.110 Mozilla/5.0+(Windows+NT+10.0) - ${stat} 15`;}
+
+/* ================= Stsenaariumid ================= */
+const SC=[
+ {id:'home',name:'1. Avaleht',url:'http://veeb.perenimi.local/',
+  faults:['dns','bind','pool','ntfs','defdoc','handler','vc','mysqli','db'],
+  steps:()=>[
+   st.url('http://veeb.perenimi.local/','/'),
+   st.dns(),
+   st.tcp('GET / HTTP/1.1\nHost: veeb.perenimi.local\nUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) …\nAccept: text/html'),
+   st.httpsys(),
+   st.anon(),
+   st.rewrite('dir','/'),
+   st.defdoc(),
+   st.handlerPhp(),
+   st.fastcgi('/'),
+   st.boot(),
+   st.db("SELECT option_name, option_value FROM wp_options WHERE autoload = 'yes';\nSELECT * FROM wp_posts WHERE post_type = 'post'\n  AND post_status = 'publish' ORDER BY post_date DESC LIMIT 10;"),
+   st.render('avalehe mall <code>home.html</code>'),
+   st.resp('200 OK','text/html; charset=UTF-8','/index.php',{k:'wphome'},' Logis on tee <code>/index.php</code>, sest vaikedokument muutis päringut serveri sees.'),
+   st.assets()
+  ]},
+ {id:'post',name:'2. Postitus (permalink)',url:'http://veeb.perenimi.local/esimene-postitus/',
+  faults:['dns','bind','pool','rewrite','ntfs','handler','vc','mysqli','db'],
+  steps:()=>[
+   st.url('http://veeb.perenimi.local/esimene-postitus/','/esimene-postitus/',' Sellist kausta serveris tegelikult <b>pole</b> – see on WordPressi „ilus“ püsilink (<i>permalink</i>, seadistus <i>Post name</i>).'),
+   st.dns(),
+   st.tcp('GET /esimene-postitus/ HTTP/1.1\nHost: veeb.perenimi.local\nAccept: text/html'),
+   st.httpsys(),
+   st.anon(),
+   st.rewrite('perm','/esimene-postitus/'),
+   st.ntfsOnly('C:\\inetpub\\veeb\\index.php'),
+   st.handlerPhp(),
+   st.fastcgi('/esimene-postitus/','GET',' (<code>REQUEST_URI</code> on endiselt algne aadress!)'),
+   st.boot(),
+   Object.assign(st.db("SELECT * FROM wp_posts WHERE post_name = 'esimene-postitus'\n  AND post_type = 'post' LIMIT 1;\nSELECT * FROM wp_comments WHERE comment_post_ID = 12 AND comment_approved = '1';",' WordPress võrdleb <code>REQUEST_URI</code>-t püsilinkide struktuuriga <code>/%postname%/</code> ja saab sealt postituse nime.'),{}),
+   st.render('üksikpostituse mall <code>single.html</code>'),
+   st.resp('200 OK','text/html; charset=UTF-8','/esimene-postitus/',{k:'wppost'},' Aadressiriba näitab endiselt <code>/esimene-postitus/</code>.'),
+   st.assets()
+  ]},
+ {id:'static',name:'3. Pilt (staatiline fail)',url:'http://veeb.perenimi.local/wp-content/uploads/2026/11/loodus.jpg',
+  faults:['dns','bind','pool','ntfs'],
+  steps:()=>[
+   st.url('http://veeb.perenimi.local/wp-content/uploads/2026/11/loodus.jpg','/wp-content/uploads/2026/11/loodus.jpg'),
+   st.dns(),
+   st.tcp('GET /wp-content/uploads/2026/11/loodus.jpg HTTP/1.1\nHost: veeb.perenimi.local\nAccept: image/avif,image/webp,image/*'),
+   st.httpsys(),
+   st.anon(),
+   st.rewrite('file','/wp-content/uploads/2026/11/loodus.jpg'),
+   {t:'Käsitleja valik: *.jpg → StaticFile',n:['W'],c:'handler',
+    d:'Laiendil <code>.jpg</code> pole PHP käsitlejat, seega teenindab faili <b>StaticFileModule</b>. MIME-tüübi (<code>image/jpeg</code>) võtab IIS laiendi järgi nimekirjast <i>MIME Types</i>. Tundmatu laiendiga faile (MIME-tüüp puudub) IIS turvalisuse mõttes ei serveeri – vastus oleks 404.3.',
+    s:{Käsitleja:'StaticFile'}},
+   st.ntfsOnly('C:\\inetpub\\veeb\\wp-content\\uploads\\2026\\11\\loodus.jpg'),
+   st.resp('200 OK','image/jpeg\nETag: "8c1f3a9e4d5bdb1:0"\nLast-Modified: Wed, 18 Nov 2026 09:12:40 GMT','/wp-content/uploads/2026/11/loodus.jpg',{k:'image'},' Vastuses on <code>ETag</code> ja <code>Last-Modified</code>: järgmisel korral küsib brauser „kas on muutunud?“ ja kui ei ole, vastab IIS lühidalt <b>304 Not Modified</b> ilma faili uuesti saatmata.',false),
+   {t:'Kokkuvõte: PHP-d ja MySQL-i ei kasutatud',n:['K','H','W','F'],
+    d:'Võrdle stsenaariumiga 1: staatilise faili jaoks ei käivitatud php-cgi.exe-d ega tehtud ühtki andmebaasipäringut. Seetõttu on pildid, CSS ja JS kiired ka siis, kui PHP on aeglane – ja <b>töötavad edasi</b> ka siis, kui MySQL seisab. Proovi: lülita sisse rike „MySQL teenus seisab“ – see stsenaarium ei muutu.'}
+  ]},
+ {id:'upload',name:'4. Pildi üleslaadimine',url:'http://veeb.perenimi.local/wp-admin/async-upload.php',
+  faults:['dns','bind','pool','handler','vc','db','wpcontent'],
+  steps:()=>[
+   st.url('http://veeb.perenimi.local/wp-admin/async-upload.php','/wp-admin/async-upload.php',' Administraator on WordPressi sisse loginud ja lohistab meediateeki pildi <code>loodus.jpg</code>.'),
+   st.dns(),
+   st.tcp('POST /wp-admin/async-upload.php HTTP/1.1\nHost: veeb.perenimi.local\nCookie: wordpress_logged_in_…=haldur%7C…\nContent-Type: multipart/form-data; boundary=----WebKitFormBoundary…\nContent-Length: 2483112',' Meetod on <b>POST</b> ja keha sisaldab faili (<code>multipart/form-data</code>).'),
+   st.httpsys(),
+   st.anon(' <br><b>NB!</b> WordPressi sisselogimine (küpsis <code>wordpress_logged_in</code>) on <b>rakenduse</b> tasand – IIS-i jaoks on ka WordPressi administraator anonüümne kasutaja. Sisselogimise kontrollib hiljem PHP.'),
+   st.rewrite('file','/wp-admin/async-upload.php'),
+   st.handlerPhp(),
+   st.fastcgi('/wp-admin/async-upload.php','POST',' (php.ini piirab faili suurust: <code>upload_max_filesize = 32M</code>, <code>post_max_size = 32M</code>)'),
+   st.db("SELECT * FROM wp_users WHERE user_login = 'haldur';   -- küpsise kontroll\nSELECT meta_value FROM wp_usermeta WHERE meta_key = 'wp_capabilities' …",' WordPress kontrollib küpsist ja seda, kas kasutajal on õigus <code>upload_files</code>.'),
+   {t:'PHP kirjutab faili kettale',n:['P','F'],e:[['PF',1,'NTFS kirjutamine']],
+    d:'PHP salvestab üleslaetud faili esmalt ajutisse kausta (<code>upload_tmp_dir</code>, vaikimisi <code>C:\\Windows\\Temp</code>), siis loob WordPress kausta <code>wp-content\\uploads\\2026\\11</code> ja liigutab faili sinna. Laiend <code>gd</code> teeb pildist pisipildid (150×150, 300×…, 1024×…). Kirjutamine toimub konto <code>IIS AppPool\\veeb</code> nimel – see vajab sellel kaustal õigust <b>Modify</b>. Kogu ülejäänud saidil on ainult lugemisõigus, nii et ründaja ei saa näiteks PHP-faile üle kirjutada.',
+    k:'icacls C:\\inetpub\\veeb\\wp-content   # peab olema IIS AppPool\\veeb:(OI)(CI)(M)',
+    f:['wpcontent'],s:{'Kirjutab':'wp-content\\uploads\\2026\\11\\'}},
+   {t:'Andmebaasi kirje manusele',n:['P','M'],e:[['PM',1,'INSERT']],
+    d:'Fail ise on kettal, andmebaasi läheb ainult selle kirjeldus: manus on WordPressis postitus tüübiga <code>attachment</code>; pisipiltide andmed lähevad tabelisse <code>wp_postmeta</code>.',
+    kv:"INSERT INTO wp_posts (post_type, post_title, guid, post_mime_type …)\n  VALUES ('attachment', 'loodus', '…/uploads/2026/11/loodus.jpg', 'image/jpeg' …);\nINSERT INTO wp_postmeta (post_id, meta_key, meta_value)\n  VALUES (27, '_wp_attachment_metadata', 'a:5:{…}');"},
+   {t:'Vastus: JSON',n:['K','H','W','P'],c:'log',e:[['WP',-1,'FastCGI väljund'],['HW',-1,''],['KH',-1,'HTTP 200']],
+    d:'Meediateek ootab vastuseks JSON-andmeid (manuse ID, URL, pisipildid) ja näitab pildi kohe nimekirjas.',
+    kv:'HTTP/1.1 200 OK\nContent-Type: application/json; charset=UTF-8\n\n{"success":true,"data":{"id":27,"url":"http://veeb.perenimi.local/wp-content/uploads/2026/11/loodus.jpg",…}}\n\n# logirida:\n'+logLine('POST','/wp-admin/async-upload.php','200 0 0'),
+    s:{'HTTP olek':'200 OK'},b:{k:'uploadok'}}
+  ]},
+ {id:'intra',name:'5. Intranet /sisene (Windowsi autentimine)',url:'http://veeb.perenimi.local/sisene/',users:true,
+  faults:['dns','bind','pool','spn'],
+  steps:(u)=>{const U=USERS[u];return [
+   st.url('http://veeb.perenimi.local/sisene/','/sisene/',` Kasutaja <b>${U.name}</b> on WIN11-01-sse domeenikontoga sisse loginud. Kaustal <code>sisene</code> on anonüümne autentimine välja lülitatud ja Windowsi autentimine sees (peatükk 16.7).`),
+   st.dns(),
+   st.tcp('GET /sisene/ HTTP/1.1\nHost: veeb.perenimi.local\nAccept: text/html',' Esimeses päringus pole veel ühtki volitust.'),
+   st.httpsys(),
+   {t:'IIS nõuab autentimist: 401 + Negotiate',n:['K','H','W'],c:'auth',e:[['HW',1,''],['HW',-1,''],['KH',-1,'401 Negotiate']],
+    d:'Kaustal <code>/sisene</code> pole anonüümne autentimine lubatud. Windowsi autentimise moodul vastab <b>401 Unauthorized</b> ja ütleb päises, milliseid meetodeid ta tunneb. <code>Negotiate</code> = proovi Kerberost, kui ei saa, siis NTLM-i. See 401 on normaalne osa protsessist – kasutaja seda ei näe.<br>Brauser saadab domeenikasutaja volitused automaatselt (parooli küsimata) ainult siis, kui sait on <b>Local Intranet</b> tsoonis – selle määrab GPO <code>U_Intranet_Tsoon</code>.',
+    kv:'HTTP/1.1 401 Unauthorized\nWWW-Authenticate: Negotiate\nWWW-Authenticate: NTLM\n\n# logirida (normaalne!):\n'+logLine('GET','/sisene/','401 2 5'),
+    s:{'HTTP olek':'401 (ootab volitusi)'}},
+   {t:'Kerberos: teenusepilet DC1 KDC-lt',n:['K','N'],e:[['KN',2,'Kerberos · 88']],
+    d:`Brauser palub kasutaja <code>${U.name}</code> nimel KDC-lt (<i>Key Distribution Center</i>) teenusepiletit teenusele <b>SPN</b> <code>HTTP/veeb.perenimi.local</code>. KDC otsib AD-st, millisel kontol see SPN on – <code>DC1$</code> (arvutikonto, sest kogum veeb esineb võrgus arvutikontona) – ja krüpteerib pileti selle konto võtmega. Piletis on PAC: kasutaja SID ja tema rühmade SID-id.`,
+    k:'setspn -L DC1     # kas HTTP/veeb.perenimi.local on nimekirjas?\nklist             # kliendis: kas on pilet HTTP/veeb.perenimi.local?',
+    w:['spn']},
+   {t:'Uus päring koos piletiga, IIS loob juurdepääsuloa',n:['K','H','W'],c:'auth',e:[['KH',1,'HTTP + Authorization'],['HW',1,'']],
+    d:`Brauser kordab päringut, nüüd päisega <code>Authorization: Negotiate …</code>. IIS (täpsemalt Windowsi autentimise moodul) dekrüpteerib pileti DC1$ võtmega – parooli ei liigu võrgus kordagi – ja loob piletis olevate SID-ide põhjal <b>juurdepääsuloa</b> (<i>access token</i>). Edasi töötleb päringut juba <b>${U.name}</b>, mitte IIS AppPool\\veeb.`,
+    kv:'GET /sisene/ HTTP/1.1\nHost: veeb.perenimi.local\nAuthorization: Negotiate YIIHrAYGKwYBBQUCoIIHoDCCB5ygMDAuBgkqhkiC9xIBAgIG…',
+    s:{Identiteet:'PERENIMI\\'+U.name,Rühmad:U.groups.join(', ')}},
+   Object.assign({t:'Autoriseerimine: URL Authorization',n:['W'],c:'authz',
+    d:`Kaust <code>sisene</code> on kaitstud <code>web.config</code>-i reegliga: kõigi lubamine eemaldatakse ja lubatakse ainult rühm <code>DL_APP_Intranet</code>. IIS vaatab juurdepääsuloast, kas see rühm on kasutaja rühmade hulgas (ka kaudselt, läbi globaalrühma).<br>${U.ok?`✔ <b>${U.name}</b> on rühma <code>DL_APP_Intranet</code> liige (läbi <code>${U.via}</code>).`:`✘ <b>${U.name}</b> rühmades (<code>${U.groups.join(', ')}</code>) pole rühma <code>DL_APP_Intranet</code>.`}`,
+    kv:'&lt;authorization&gt;\n  &lt;remove users="*" roles="" verbs="" /&gt;\n  &lt;add accessType="Allow" roles="PERENIMI\\DL_APP_Intranet" /&gt;\n&lt;/authorization&gt;',
+    k:`Get-ADPrincipalGroupMembership ${U.name} | Select Name\nGet-ADGroupMember DL_APP_Intranet -Recursive | Select SamAccountName`},
+    U.ok?{}:{deny:{at:`Autoriseerimisreegel keelab: IIS vastab <b>401.2</b> (keelatud serveri seadistuse tõttu). Brauser ei proovi uuesti, sest teine katse annaks sama tulemuse. Kasutaja autentimine õnnestus – ta <b>on</b> see, kes ta väidab olevat –, aga autoriseerimine mitte: tal pole <b>õigust</b>.`,
+      fix:'# Kui Mari peaks intranetti pääsema, lisa tema osakonna globaalrühm DL-rühma:\nAdd-ADGroupMember DL_APP_Intranet -Members GG_Raamatupidamine\n# Mari peab seejärel välja ja uuesti sisse logima (uus pilet, uued rühmad)',
+      br:{k:'iis',c:'401',t:'401 - Unauthorized: Access is denied due to invalid credentials.',x:'You do not have permission to view this directory or page using the credentials that you supplied.'},
+      logst:'401 2 5'}}),
+   {t:'Fail kasutaja nimel',n:['W','F'],c:'handler',e:[['WF',2,'NTFS lugemine']],
+    d:`Käsitleja on StaticFile (<code>index.html</code>). Tähelepanu: Windowsi autentimise korral kontrollitakse NTFS-õigust <b>kasutaja ${U.name}</b> juurdepääsuloaga, mitte IIS AppPool\\veeb-iga. Kaustal peab olema lugemisõigus ka domeenikasutajatel (nt pärandatud <code>BUILTIN\\Users</code> kaustalt <code>C:\\inetpub</code>), muidu tuleb <b>401.3</b>.`,
+    k:'icacls C:\\inetpub\\veeb\\sisene',s:{Fail:'C:\\inetpub\\veeb\\sisene\\index.html',Käsitleja:'StaticFile'}},
+   {t:'Vastus brauserile',n:['K','H','W'],c:'log',e:[['HW',-1,''],['KH',-1,'HTTP 200']],
+    d:'Logireal on nüüd näha ka kasutajanimi (väli <code>cs-username</code>) – nii saab hiljem tuvastada, kes intranetti kasutas.',
+    kv:'HTTP/1.1 200 OK\nContent-Type: text/html\n\n# logirida:\n'+logLine('GET','/sisene/','200 0 0','PERENIMI\\'+U.name),
+    s:{'HTTP olek':'200 OK'},b:{k:'intranet',u:U.name}}
+  ];}}
+];
+const USERS={
+ kati:{name:'kati.karu',ok:true,via:'GG_IT',groups:['Domain Users','GG_IT','DL_APP_Intranet','…']},
+ mari:{name:'mari.maasikas',ok:false,groups:['Domain Users','GG_Raamatupidamine','DL_Raamatupidamine_RW','DL_APP_Firefox','DL_APP_Raamat']}
+};
+
+/* ================= Olek ================= */
+let cur=0,user='kati',active=new Set(),seq=[],idx=0,timer=null,anim=null;
+
+function build(){
+ const sc=SC[cur];const steps=sc.steps(user);seq=[];
+ for(const s0 of steps){const s={...s0};
+   const hit=(s.f||[]).find(f=>active.has(f)&&sc.faults.includes(f));
+   if(hit){s.bad={id:hit,...FAULTS[hit]};seq.push(s);return;}
+   if(s.deny){s.bad={lbl:'Kasutajal pole õigust',node:'W',...s.deny,log:{st:s.deny.logst}};seq.push(s);return;}
+   const w=(s.w||[]).find(f=>active.has(f)&&sc.faults.includes(f));
+   if(w)s.warn=FAULTS[w];
+   seq.push(s);}
+}
+
+/* ================= Joonis ================= */
+function svg(){
+ const s=seq[idx]||{};const act=new Set(s.n||[]);const bad=!!s.bad;
+ let o=`<svg viewBox="0 0 760 432" width="100%" role="img" aria-label="Päringu teekonna skeem">
+ <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--quiet)"/></marker></defs>
+ <rect x="166" y="10" width="590" height="420" rx="12" fill="none" stroke="var(--line)" stroke-dasharray="5 4"/>
+ <text x="176" y="30" font-size="12.5" fill="var(--quiet)" font-weight="600">DC1 · ${IP} · Windows Server 2022</text>`;
+ const actE=new Set((s.e||[]).map(x=>x[0]));
+ for(const [id,d] of Object.entries(EDGES)){const on=actE.has(id);
+   o+=`<path id="e_${id}" d="${d}" fill="none" stroke="${on?(bad?'var(--bad)':'var(--acc)'):'var(--line)'}" stroke-width="${on?2.5:1.5}"/>`;}
+ for(const [id,n] of Object.entries(NODES)){const on=act.has(id);
+   const isBad=bad&&on&&id===(s.bad.node||(s.n||[]).slice(-1)[0]);
+   const fill=isBad?'var(--bad-t)':on?(s.warn?'var(--warn-t)':'var(--acc-t)'):'var(--card)';
+   const str=isBad?'var(--bad)':on?(s.warn?'var(--warn)':'var(--acc)'):'var(--line)';
+   o+=`<rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="9" fill="${fill}" stroke="${str}" stroke-width="${on?2:1.2}"/>
+   <text x="${n.x+n.w/2}" y="${n.y+22}" text-anchor="middle" font-size="14" font-weight="600" fill="var(--ink)">${esc(n.t)}</text>
+   <text x="${n.x+n.w/2}" y="${n.y+39}" text-anchor="middle" font-size="11" fill="var(--quiet)">${esc(n.s)}</text>`;
+   if(id==='F'){['index.php · wp-config.php','web.config','wp-content\\uploads\\  (Modify)','sisene\\index.html'].forEach((l,i)=>o+=`<text x="${n.x+12}" y="${n.y+62+i*15}" font-size="10.5" font-family="var(--mono)" fill="var(--quiet)">${esc(l)}</text>`);}
+ }
+ // moodulite ahel
+ CHIPS.forEach(([cid,lbl],i)=>{const y=104+i*50,on=s.c===cid,isBad=on&&bad;
+   o+=`<rect x="350" y="${y}" width="168" height="36" rx="7" fill="${isBad?'var(--bad)':on?'var(--acc)':'var(--bg)'}" stroke="${on?'none':'var(--line)'}"/>
+   <text x="434" y="${y+23}" text-anchor="middle" font-size="12.5" fill="${isBad?'#fff':on?'var(--chipink)':'var(--ink)'}" font-weight="${on?600:400}">${lbl}</text>`;
+   if(i<CHIPS.length-1)o+=`<line x1="434" y1="${y+36}" x2="434" y2="${y+50}" stroke="var(--line)" marker-end="url(#ar)"/>`;});
+ o+=`<text x="434" y="96" text-anchor="middle" font-size="10.5" fill="var(--quiet)">moodulite ahel (Integrated pipeline)</text>`;
+ o+=`<g id="labels"></g><circle id="dot" r="6" fill="${bad?'var(--bad)':'var(--acc)'}" opacity="0"/></svg>`;
+ document.getElementById('diagram').innerHTML=o;
+ // edge labels (vajavad mõõtmist)
+ const g=document.getElementById('labels');
+ (s.e||[]).forEach(([id,dir,l])=>{if(!l)return;const p=document.getElementById('e_'+id);const L=p.getTotalLength();const pt=p.getPointAtLength(L*(id==='PF'?0.7:0.5));
+   const t=document.createElementNS('http://www.w3.org/2000/svg','text');
+   const off={KN:[-6,-6,'end'],KH:[0,-10,'middle'],HW:[0,-10,'middle'],WP:[0,-8,'middle'],PM:[8,4,'start'],PF:[-6,0,'end'],WF:[0,22,'middle']}[id];
+   t.setAttribute('x',pt.x+off[0]);t.setAttribute('y',pt.y+off[1]);t.setAttribute('text-anchor',off[2]);t.setAttribute('font-size','11');t.setAttribute('font-weight','600');
+   t.setAttribute('fill',bad?'var(--bad)':'var(--acc)');t.textContent=l;
+   // taust
+   g.appendChild(t);const bb=t.getBBox();const r=document.createElementNS('http://www.w3.org/2000/svg','rect');
+   r.setAttribute('x',bb.x-3);r.setAttribute('y',bb.y-1);r.setAttribute('width',bb.width+6);r.setAttribute('height',bb.height+2);r.setAttribute('rx',4);r.setAttribute('fill','var(--card)');r.setAttribute('opacity','.92');
+   g.insertBefore(r,t);});
+ animate(s);
+}
+function animate(s){
+ cancelAnimationFrame(anim);const dot=document.getElementById('dot');
+ const legs=[];(s.e||[]).forEach(([id,dir])=>{if(dir===2){legs.push([id,1],[id,-1]);}else legs.push([id,dir]);});
+ if(!legs.length||matchMedia('(prefers-reduced-motion: reduce)').matches){dot.setAttribute('opacity',0);return;}
+ const dur=650;let start=null;
+ function f(ts){if(!start)start=ts;const tt=(ts-start)/dur;const li=Math.floor(tt)%(legs.length+1);
+   if(li>=legs.length){dot.setAttribute('opacity',0);}
+   else{const [id,dir]=legs[li];const p=document.getElementById('e_'+id);if(!p)return;const L=p.getTotalLength();let fr=tt-Math.floor(tt);if(dir<0)fr=1-fr;
+     const pt=p.getPointAtLength(L*fr);dot.setAttribute('cx',pt.x);dot.setAttribute('cy',pt.y);dot.setAttribute('opacity',1);}
+   anim=requestAnimationFrame(f);}
+ anim=requestAnimationFrame(f);
+}
+
+/* ================= Paneelid ================= */
+function esc(t){return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function stepPanel(){
+ const s=seq[idx];let h=`<div class="lbl">Samm ${idx+1} / ${seq.length}</div><p class="stitle">${s.t}</p><div>${s.d}</div>`;
+ if(s.kv)h+=`<div class="kv">${s.kv.includes('&lt;')?s.kv:esc(s.kv)}</div>`;
+ if(s.warn)h+=`<div class="box warn"><b class="h">⚠ Hoiatus: ${esc(s.warn.lbl)}</b>${s.warn.at}<div class="kv">${esc(s.warn.fix)}</div></div>`;
+ if(s.bad){h+=`<div class="box bad"><b class="h">✘ Ahel katkeb siin: ${esc(s.bad.lbl)}</b>${s.bad.at}</div>`;
+   h+=`<div class="box check"><b class="h">Kuidas kontrollida ja parandada</b><div class="kv">${esc(s.bad.fix)}</div></div>`;
+   const lg=logFor(s.bad,SC[cur]);h+=`<div class="box check"><b class="h">Mida näitab logi?</b><div class="kv">${lg}</div></div>`;}
+ else if(s.k)h+=`<div class="box check"><b class="h">Kuidas kontrollida (DC1 PowerShell)</b><div class="kv">${esc(s.k)}</div></div>`;
+ if(!s.bad&&idx===seq.length-1)h+=`<div class="box ok"><b class="h">✔ Päring õnnestus</b>Proovi nüüd mõnda riket või teist stsenaariumi.</div>`;
+ document.getElementById('step').innerHTML=h;
+ // kontekst
+ const ctx={};let last={};seq.slice(0,idx+1).forEach((x,i)=>{if(x.s)Object.entries(x.s).forEach(([k,v])=>{ctx[k]=v;if(i===idx)last[k]=1;});});
+ if(s.bad)ctx['HTTP olek']=statusOf(s.bad);
+ document.getElementById('ctx').innerHTML=Object.entries(ctx).map(([k,v])=>`<dt>${esc(k)}</dt><dd class="${last[k]?'new':''}">${esc(v)}</dd>`).join('')||'<dt>–</dt><dd></dd>';
+ // brauser
+ let b={k:'blank'};seq.slice(0,idx+1).forEach(x=>{if(x.b)b=x.b;});
+ if(s.bad)b=s.bad.br;
+ document.getElementById('burl').textContent=SC[cur].url;
+ document.getElementById('bpage').innerHTML=browser(b);
+ document.getElementById('prog').textContent=`${idx+1} / ${seq.length}`;
+ document.getElementById('prev').disabled=idx===0;document.getElementById('next').disabled=idx>=seq.length-1;
+}
+function statusOf(b){if(!b.log)return 'vastust pole';if(b.log.httperr)return '503 (http.sys)';const p=b.log.st.split(' ');return p[0]+(p[1]!=='0'?'.'+p[1]+' (alamkood on näha logis)':'');}
+function logFor(b,sc){
+ if(!b.log)return esc('# Saidi logis pole midagi: päring ei jõudnud serverini.\n# Kontrolli kliendist: Resolve-DnsName, Test-NetConnection veeb.perenimi.local -Port 80');
+ if(b.log.httperr)return esc('# C:\\Windows\\System32\\LogFiles\\HTTPERR\\httperr1.log\n#Fields: date time c-ip c-port s-ip s-port cs-version cs-method cs-uri sc-status s-siteid s-reason s-queuename\n2026-11-19 14:05:11 192.168.10.110 50123 '+IP+' 80 HTTP/1.1 GET / 503 2 AppOffline veeb');
+ const uri=sc.id==='home'?'/':sc.id==='post'?'/esimene-postitus/':sc.id==='static'?'/wp-content/uploads/2026/11/loodus.jpg':sc.id==='upload'?'/wp-admin/async-upload.php':'/sisene/';
+ const m=sc.id==='upload'?'POST':'GET';
+ const un=b.logst&&sc.id==='intra'?'PERENIMI\\'+USERS[user].name:'-';
+ return esc(`# C:\\inetpub\\logs\\LogFiles\\${b.log.site||'W3SVC2'}\\u_ex261119.log\n#Fields: date time s-ip cs-method cs-uri-stem cs-uri-query s-port cs-username c-ip cs(User-Agent) cs(Referer) sc-status sc-substatus sc-win32-status time-taken\n`+logLine(m,uri,b.log.st,un));
+}
+function browser(b){
+ if(!b||b.k==='blank')return '<span class="note">Tühi leht – vajuta „Järgmine samm“.</span>';
+ if(b.k==='loading')return '<div class="loading"><span class="spin"></span>Ootan vastust …</div>';
+ if(b.k==='chrome')return `<div class="err"><h4>${esc(b.t)}</h4><p style="margin:0 0 6px">${esc(b.x)}</p><code>${esc(b.c)}</code></div>`;
+ if(b.k==='plain')return `<div class="err"><h4>${esc(b.t)}</h4><hr style="border:0;border-top:1px solid var(--line)"><p style="margin:0">${esc(b.x)}</p></div>`;
+ if(b.k==='iisdef')return '<div class="iisdef"><b>Internet Information Services</b><span style="font-size:12px;opacity:.85;margin-top:6px">IIS-i vaikeleht (iisstart.htm) – Default Web Site</span></div>';
+ if(b.k==='iis')return `<div class="iiserr">Server Error</div><div class="iisbody"><h4 style="margin:0 0 6px;color:var(--bad)">${esc(b.t)}</h4><p style="margin:0">${esc(b.x)}</p><p class="note">Kliendile näitab IIS ainult üldist teadet. Täpne alamkood (nt ${b.c}.3) on näha logis või siis, kui avad lehe serveris endas (<i>Detailed errors for local requests</i>).</p></div>`;
+ if(b.k==='wperr')return `<div class="err" style="text-align:center;padding:14px 4px"><div style="font-size:22px;color:var(--quiet);font-weight:700;margin-bottom:6px">WordPress</div><h4 style="font-size:15px">${esc(b.t)}</h4></div>`;
+ if(b.k==='wpadmin')return `<div style="font-size:12px;color:var(--quiet);margin-bottom:6px">Töölaud › Meedia › Lisa uus</div><div style="border:1px dashed var(--line);border-radius:6px;padding:10px"><b>loodus.jpg</b><div style="color:var(--bad);margin-top:4px">„loodus.jpg“ has failed to upload.<br>${esc(b.t)}</div></div>`;
+ if(b.k==='uploadok')return `<div style="font-size:12px;color:var(--quiet);margin-bottom:6px">Töölaud › Meedia › Lisa uus</div><div style="display:flex;gap:10px;align-items:center"><div class="imgph" style="width:90px;height:60px"></div><div><b>loodus.jpg</b><div style="color:var(--ok)">✔ Üles laaditud · 1600×1067 · 2,4 MB</div></div></div>`;
+ if(b.k==='image')return '<div class="imgph"></div><p class="note">loodus.jpg (image/jpeg)</p>';
+ if(b.k==='intranet')return `<h4 style="margin:0 0 6px">Intranet – ainult DL_APP_Intranet</h4><p style="margin:0">Tere, ${esc(b.u)}! Siia pääsevad ainult intranetirühma liikmed.</p>`;
+ const head='<div class="wp-h"><b>Perenimi veeb</b><span>Avaleht · Uudised · Kontakt</span></div>';
+ if(b.k==='wphome')return head+'<div class="wp-post"><b>Esimene postitus</b><small>19. november 2026</small>Labori esimene postitus WordPressis, mis töötab IIS-i peal.</div><div class="wp-post"><b>Tere, maailm!</b><small>18. november 2026</small>Tere tulemast WordPressi. See on sinu esimene postitus.</div>';
+ if(b.k==='wppost')return head+'<h4 style="margin:4px 0 2px">Esimene postitus</h4><small style="color:var(--quiet)">19. november 2026 · haldur</small><p style="margin:6px 0 0">Labori esimene postitus WordPressis, mis töötab IIS-i peal. Aadressiribal on „ilus“ püsilink, aga serveris käivitati index.php.</p>';
+ return '';
+}
+
+/* ================= Juhtimine ================= */
+function renderTabs(){
+ const t=document.getElementById('tabs');
+ t.innerHTML=SC.map((s,i)=>`<button class="${i===cur&&mode==='sim'?'on':''}" data-i="${i}">${s.name}</button>`).join('')+`<button class="diag ${mode==='diag'?'on':''}" data-i="d">🔍 Diagnoosi rike</button>`;
+ t.querySelectorAll('button').forEach(b=>b.onclick=()=>{stop();if(b.dataset.i==='d'){mode='diag';newTask();}else{mode='sim';cur=+b.dataset.i;full();}renderTabs();showMode();});
+}
+function renderControls(){
+ const sc=SC[cur];
+ document.getElementById('userWrap').style.display=sc.users?'':'none';
+ document.getElementById('users').innerHTML=Object.entries(USERS).map(([k,u])=>`<button class="btn ${k===user?'primary':''}" data-u="${k}">${u.name}${u.ok?' (IT)':' (Raamatupidamine)'}</button>`).join('');
+ document.querySelectorAll('#users button').forEach(b=>b.onclick=()=>{user=b.dataset.u;full();});
+ document.getElementById('faults').innerHTML=Object.entries(FAULTS).map(([k,f])=>{const ok=sc.faults.includes(k);return `<label class="${ok?'':'na'}" title="${ok?'':'Ei mõjuta seda stsenaariumi'}"><input type="checkbox" data-f="${k}" ${active.has(k)?'checked':''} ${ok?'':'disabled'}>${esc(f.lbl)}</label>`;}).join('');
+ document.querySelectorAll('#faults input').forEach(c=>c.onchange=()=>{c.checked?active.add(c.dataset.f):active.delete(c.dataset.f);const keep=idx;build();idx=Math.min(keep,seq.length-1);draw();});
+}
+function draw(){svg();stepPanel();}
+function full(){build();idx=0;renderControls();draw();}
+function stop(){clearInterval(timer);timer=null;document.getElementById('play').textContent='▶ Esita';}
+document.getElementById('next').onclick=()=>{if(idx<seq.length-1){idx++;draw();}};
+document.getElementById('prev').onclick=()=>{if(idx>0){idx--;draw();}};
+document.getElementById('reset').onclick=()=>{stop();idx=0;draw();};
+document.getElementById('play').onclick=()=>{if(timer){stop();return;}if(idx>=seq.length-1)idx=0,draw();document.getElementById('play').textContent='⏸ Paus';
+ timer=setInterval(()=>{if(idx<seq.length-1){idx++;draw();}else stop();},3200);};
+document.addEventListener('keydown',e=>{if(mode!=='sim'||e.target.tagName==='INPUT')return;if(e.key==='ArrowRight')document.getElementById('next').click();if(e.key==='ArrowLeft')document.getElementById('prev').click();});
+
+/* ================= Diagnoos ================= */
+let mode='sim',task=null,score={ok:0,n:0},answered=false;
+function showMode(){document.getElementById('simView').hidden=mode!=='sim';document.getElementById('diagView').hidden=mode!=='diag';}
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+function newTask(){
+ const pool=Object.keys(FAULTS).filter(k=>!FAULTS[k].warnOnly);
+ let f;do{f=pool[Math.floor(Math.random()*pool.length)];}while(task&&f===task.f&&pool.length>1);
+ const scs=SC.filter(s=>s.faults.includes(f)&&s.id!=='intra');const sc=scs[Math.floor(Math.random()*scs.length)];
+ const others=shuffle(pool.filter(k=>k!==f)).slice(0,3);
+ task={f,sc,opts:shuffle([f,...others])};answered=false;
+ const F=FAULTS[f];
+ document.getElementById('dq').innerHTML=`Õppija teatab: „Avasin WIN11-01-s aadressi <code>${esc(sc.url)}</code> ja see ei tööta.“ Ülejäänud seadistus on peatüki 17 järgi korras. Vaata brauserit ja logi ning vali kõige tõenäolisem põhjus.`;
+ document.getElementById('dburl').textContent=sc.url;
+ document.getElementById('dbpage').innerHTML=browser(F.br);
+ document.getElementById('dlog').innerHTML=logFor(F,sc);
+ document.getElementById('dopts').innerHTML=task.opts.map(k=>`<button data-k="${k}">${esc(FAULTS[k].lbl)}</button>`).join('');
+ document.querySelectorAll('#dopts button').forEach(b=>b.onclick=()=>answer(b));
+ document.getElementById('dfb').innerHTML='';
+ document.getElementById('dscore').textContent=score.n?`Õigesti ${score.ok} / ${score.n}`:'';
+}
+function answer(b){
+ if(answered)return;answered=true;score.n++;const ok=b.dataset.k===task.f;if(ok)score.ok++;
+ document.querySelectorAll('#dopts button').forEach(x=>{if(x.dataset.k===task.f)x.classList.add('right');else if(x===b)x.classList.add('wrong');});
+ const F=FAULTS[task.f];
+ document.getElementById('dfb').innerHTML=`<div class="box ${ok?'ok':'bad'}"><b class="h">${ok?'✔ Õige!':'✘ Vale – õige vastus: '+esc(F.lbl)}</b>${F.at}</div><div class="box check"><b class="h">Kontroll ja parandus</b><div class="kv">${esc(F.fix)}</div></div>`;
+ document.getElementById('dscore').textContent=`Õigesti ${score.ok} / ${score.n}`;
+}
+document.getElementById('dnext').onclick=newTask;
+
+renderTabs();full();
+</script>
+</body>
+</html>
