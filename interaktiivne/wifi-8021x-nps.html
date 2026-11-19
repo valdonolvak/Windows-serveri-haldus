@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="et">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WiFi ja 802.1X: NPS ja RADIUS – interaktiivne õppeleht</title>
+<style>
+:root{--bg:#f7f6f3;--card:#fff;--ink:#1f1e1c;--quiet:#6b6862;--line:#dcd9d2;--acc:#2f6fd6;--acc-t:#e8f0fc;--ok:#2e7d4f;--ok-t:#e4f3ea;--bad:#b3261e;--bad-t:#fbe9e7;--warn:#9a6700;--warn-t:#fbf1dc;--vio:#6b4fb3;--vio-t:#efeafa;--mono:ui-monospace,Consolas,monospace}
+@media (prefers-color-scheme:dark){:root{--bg:#1b1b1a;--card:#252524;--ink:#ecebe8;--quiet:#a3a09a;--line:#3a3936;--acc:#7aa7f0;--acc-t:#24324a;--ok:#6cc08b;--ok-t:#1f3428;--bad:#f08a80;--bad-t:#3d2220;--warn:#e0b250;--warn-t:#3a3020;--vio:#b39cf0;--vio-t:#2e2640}}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--ink)}
+a{color:var(--acc)}
+.wrap{max-width:1280px;margin:auto;padding:18px 20px 40px}
+h1{font-size:22px;margin:0 0 4px}
+h2{font-size:18px;margin:0 0 8px}
+h3{font-size:15.5px;margin:14px 0 6px}
+.lead{color:var(--quiet);margin:0 0 14px;max-width:940px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:16px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+.tabs button,.btn,.chip{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:7px 12px;font:inherit;cursor:pointer}
+.tabs button.on,.chip.on{background:var(--acc-t);border-color:var(--acc);font-weight:600}
+.btn.primary{background:var(--acc);border-color:var(--acc);color:#fff}
+.btn:disabled{opacity:.4;cursor:default}
+.btn.small,.chip{padding:4px 9px;font-size:14px}
+.row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.lbl{font-size:12.5px;color:var(--quiet);text-transform:uppercase;letter-spacing:.04em;margin:0 0 4px}
+.grid{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:16px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media (max-width:980px){.grid,.grid2{grid-template-columns:1fr}}
+svg text{font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+code,.mono{font-family:var(--mono);font-size:13.5px}
+code{background:var(--acc-t);padding:1px 5px;border-radius:4px}
+pre{font-family:var(--mono);font-size:13px;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px;overflow:auto;margin:6px 0}
+.box{border-radius:8px;padding:9px 11px;margin-top:10px;font-size:14px}
+.box.info{background:var(--acc-t)}
+.box.ok{background:var(--ok-t)}
+.box.bad{background:var(--bad-t)}
+.box.warn{background:var(--warn-t)}
+.box.vio{background:var(--vio-t)}
+.box b.t{display:block;margin-bottom:2px}
+.quiet{color:var(--quiet)}
+.small{font-size:13.5px}
+.legend{font-size:13px;color:var(--quiet);margin:8px 0 0}
+.stepbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
+.prog{color:var(--quiet);font-size:14px;margin-left:auto}
+.stitle{font-size:17px;font-weight:600;margin:0 0 6px}
+ul.tight{margin:4px 0;padding-left:20px}
+ul.tight li{margin:2px 0}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+th{font-size:12.5px;color:var(--quiet);text-transform:uppercase;letter-spacing:.03em}
+.hidden{display:none!important}
+/* mõisted */
+.terms{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
+.term{border:1px solid var(--line);border-radius:8px;padding:9px 11px;background:var(--card)}
+.term h4{margin:0 0 2px;font-size:15px}
+.term .en{font-size:12.5px;color:var(--quiet);font-style:italic;margin-bottom:4px}
+.term p{margin:0;font-size:14px}
+input[type=search],select{font:inherit;padding:6px 9px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink)}
+.dev{display:flex;flex-direction:column;align-items:center;gap:4px;width:84px;font-size:12.5px;text-align:center}
+.dev .ic{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;font-size:20px;border:2px solid var(--line);background:var(--card);transition:all .4s}
+.dev.red .ic{border-color:var(--bad);background:var(--bad-t)}
+.dev.grn .ic{border-color:var(--ok);background:var(--ok-t)}
+.dev.off .ic{opacity:.35}
+.roleq{display:grid;grid-template-columns:1fr auto auto;gap:6px 10px;align-items:center;font-size:14px}
+.mark{width:22px;text-align:center;font-weight:700}
+/* poliitikad */
+.pol{border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-bottom:8px;background:var(--card);display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:start}
+.pol.off{opacity:.45}
+.pol.match{border-color:var(--ok);box-shadow:0 0 0 2px var(--ok-t)}
+.pol .nm{font-weight:600}
+.pol .det{font-size:13px;color:var(--quiet)}
+.pol .ord{font-weight:700;color:var(--quiet);width:18px}
+.form{display:grid;grid-template-columns:auto 1fr;gap:8px 12px;align-items:center;font-size:14px}
+.trace{list-style:none;padding:0;margin:6px 0 0;font-size:14px}
+.trace li{padding:4px 0 4px 26px;position:relative;border-bottom:1px dashed var(--line)}
+.trace li:before{position:absolute;left:4px;top:4px;font-weight:700}
+.trace li.y:before{content:"✓";color:var(--ok)}
+.trace li.n:before{content:"✗";color:var(--bad)}
+.trace li.w:before{content:"!";color:var(--warn)}
+.trace li.i:before{content:"→";color:var(--quiet)}
+.puz{border:1px solid var(--line);border-radius:8px;padding:9px 11px;margin-bottom:8px}
+.puz .q{font-weight:600;margin-bottom:6px}
+/* labor */
+.labsteps{list-style:none;padding:0;margin:0;font-size:14px;max-height:520px;overflow:auto}
+.labsteps li{display:flex;gap:8px;align-items:flex-start;padding:6px 8px;border-radius:7px;cursor:pointer}
+.labsteps li.on{background:var(--acc-t)}
+.labsteps li .n{font-weight:700;width:22px;flex:none}
+.labsteps li.done .n{color:var(--ok)}
+.cmd{display:grid;grid-template-columns:minmax(0,1fr);gap:0;margin:6px 0;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.cmd .l{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);border-top:1px solid var(--line)}
+.cmd .l:first-child{border-top:0}
+.cmd .l code{display:block;background:var(--bg);padding:6px 8px;border-radius:0;white-space:pre-wrap;word-break:break-word}
+.cmd .l span{padding:6px 8px;font-size:13.5px}
+@media (max-width:760px){.cmd .l{grid-template-columns:1fr}}
+.nbtag{display:inline-block;font-size:12px;font-weight:600;border-radius:5px;padding:1px 6px;background:var(--warn-t);color:var(--warn)}
+/* test */
+.qopts{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.qopt{text-align:left;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:9px 12px;font:inherit;cursor:pointer}
+.qopt:hover:not(:disabled){border-color:var(--acc)}
+.qopt.right{border-color:var(--ok);background:var(--ok-t)}
+.qopt.wrong{border-color:var(--bad);background:var(--bad-t)}
+.qopt:disabled{cursor:default}
+.pbar{height:6px;background:var(--line);border-radius:3px;overflow:hidden;margin:6px 0 12px}
+.pbar i{display:block;height:100%;background:var(--acc);transition:width .3s}
+.score{font-size:30px;font-weight:700}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<p style="margin:0 0 6px;font-size:14px"><a href="../" style="color:inherit">← Õppematerjali sisukord</a> · <a href="https://github.com/valdonolvak/Windows-serveri-haldus/blob/main/peatykid/21-wifi-8021x-nps.md" style="color:inherit">Peatükk 21</a> · <a href="index.html" style="color:inherit">Kõik simulaatorid</a></p>
+<h1>WiFi ja 802.1X: NPS ja RADIUS</h1>
+<p class="lead">Interaktiivne õppeleht peatüki 21 juurde. Vaata, kuidas sülearvuti saab WiFi-võrku oma AD kontoga, kuidas NPS (<i>Network Policy Server</i>) otsustab võrgupoliitikate järgi ja millisesse VLAN-i kasutaja satub. Labor 19 on samm-sammult animeeritud. Lõpus on enesetest.</p>
+
+<div class="tabs" id="tabs"></div>
+
+<!-- ============ 1. MÕISTED ============ -->
+<section id="t-moisted">
+ <div class="grid">
+  <div class="card">
+   <h2>Kolm rolli ja kaks protokolli</h2>
+   <p class="small quiet" style="margin:0 0 6px">Klõpsa joonisel seadmel või ühendusel.</p>
+   <div id="roleSvg"></div>
+  </div>
+  <div class="card" id="roleInfo"></div>
+ </div>
+
+ <div class="card">
+  <h2>WPA2-Personal vs WPA2-Enterprise: töötaja lahkub</h2>
+  <p class="small" style="margin:0 0 8px"><b>WPA</b> = <i>Wi-Fi Protected Access</i>. <b>Personal</b> kasutab ühist parooli (<b>PSK</b>, <i>Pre-Shared Key</i>), <b>Enterprise</b> autendib iga kasutaja tema enda AD kontoga (802.1X).</p>
+  <div class="grid2">
+   <div><div class="lbl">WPA2-Personal (ühine parool)</div><div class="row" id="psk"></div><div class="box info small" id="pskTxt">Kõik 6 seadet kasutavad sama parooli <code>Firma2026!</code></div></div>
+   <div><div class="lbl">WPA2-Enterprise (802.1X + NPS)</div><div class="row" id="ent"></div><div class="box info small" id="entTxt">Iga seade autendib oma kasutaja AD kontoga.</div></div>
+  </div>
+  <div class="stepbar"><button class="btn primary" id="leaveBtn">Mari lahkub töölt</button><button class="btn" id="leaveReset">⟲ Algusesse</button></div>
+ </div>
+
+ <div class="card">
+  <h2>Kes on kes? (harjutus)</h2>
+  <p class="small quiet" style="margin:0 0 8px">Vali igale seadmele tema roll 802.1X autentimises.</p>
+  <div class="roleq" id="roleQ"></div>
+  <div class="stepbar"><button class="btn primary" id="roleCheck">Kontrolli</button><span class="prog" id="roleRes"></span></div>
+ </div>
+
+ <div class="card">
+  <div class="row" style="justify-content:space-between"><h2 style="margin:0">Mõisted ja lühendid</h2><input type="search" id="termFilter" placeholder="Otsi mõistet…" aria-label="Otsi mõistet"></div>
+  <div class="terms" id="terms" style="margin-top:10px"></div>
+ </div>
+</section>
+
+<!-- ============ 2. ANIMATSIOON ============ -->
+<section id="t-anim" class="hidden">
+ <div class="card">
+  <div class="lbl">Stsenaarium</div>
+  <div class="row" id="scen"></div>
+  <div id="userRow" style="margin-top:10px"><div class="lbl">Kasutaja</div><div class="row" id="users"></div></div>
+  <div style="margin-top:10px"><div class="lbl" id="faultLbl">Rikked (vali üks või mitu)</div><div class="row" id="faults" style="gap:4px 16px;font-size:14px"></div></div>
+ </div>
+ <div class="grid">
+  <div class="card">
+   <div id="seq"></div>
+   <div class="stepbar">
+    <button class="btn" id="sReset">⟲ Algusesse</button>
+    <button class="btn" id="sPrev">‹ Eelmine</button>
+    <button class="btn primary" id="sNext">Järgmine samm ›</button>
+    <button class="btn" id="sPlay">▶ Esita</button>
+    <span class="prog" id="sProg"></span>
+   </div>
+   <p class="legend">Nool = sõnum (protokoll ja port sulgudes). Ristkülik elutee peal = tegevus seadme sees. Punane = siin ahel katkeb, roheline = kaitse töötas.</p>
+  </div>
+  <div class="card">
+   <div id="sStep"></div>
+   <div id="sState"></div>
+  </div>
+ </div>
+</section>
+
+<!-- ============ 3. POLIITIKAD ============ -->
+<section id="t-pol" class="hidden">
+ <p class="lead">NPS kontrollib võrgupoliitikaid <b>järjekorras</b> ja <b>esimene sobiv otsustab</b>. Muuda järjekorda, lülita poliitikaid välja ja koosta RADIUS-päring. Paremal näed, kuidas NPS otsuse teeb ja mis jõuab Security logisse.</p>
+ <div class="grid">
+  <div>
+   <div class="card">
+    <h2>Võrgupoliitikad (<code>nps.msc</code> → Policies → Network Policies)</h2>
+    <div id="polList"></div>
+    <div class="pol" style="opacity:.8"><span class="ord">–</span><div><div class="nm">Vaikimisi poliitikad</div><div class="det">Connections to Microsoft Routing and Remote Access server / Connections to other access servers → <b>Deny</b></div></div><span></span></div>
+    <div class="stepbar"><button class="btn small" id="polReset">⟲ Labori algseis</button></div>
+   </div>
+   <div class="card">
+    <h2>RADIUS-päring</h2>
+    <div class="form" id="reqForm"></div>
+   </div>
+  </div>
+  <div>
+   <div class="card">
+    <h2>NPS-i otsus</h2>
+    <ul class="trace" id="trace"></ul>
+    <div id="verdict"></div>
+   </div>
+   <div class="card">
+    <h2>Mõistatused</h2>
+    <p class="small quiet" style="margin:0 0 8px">Iga mõistatus seab poliitikad ja päringu valmis. Ennusta tulemus ja vaata seejärel paremal üleval, miks see nii läks.</p>
+    <div id="puzzles"></div>
+   </div>
+  </div>
+ </div>
+</section>
+
+<!-- ============ 4. LABOR ============ -->
+<section id="t-lab" class="hidden">
+ <p class="lead"><b>Labor 19. NPS ja WiFi 802.1X.</b> Iga sammu juures on animatsioon, mis näitab, millises masinas muutus toimub ja millised sõnumid liiguvad. Märgi sammud tehtuks, märked jäävad selle brauseri meelde. <span class="nbtag">NB!</span> Kus sammus on <b>A) GUI</b> ja <b>B) PowerShell</b>, piisab ühest.</p>
+ <div class="grid" style="grid-template-columns:minmax(0,.55fr) minmax(0,1.45fr)">
+  <div class="card"><div class="lbl">Sammud</div><ul class="labsteps" id="labList"></ul><div class="box info small" id="labProg"></div></div>
+  <div>
+   <div class="card">
+    <div id="labSvg"></div>
+    <div class="stepbar"><button class="btn" id="lPrev">‹ Eelmine</button><button class="btn" id="lReplay">↻ Näita animatsiooni uuesti</button><button class="btn primary" id="lNext">Järgmine ›</button><label class="prog" style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="lDone"> Tehtud</label></div>
+   </div>
+   <div class="card" id="labText"></div>
+  </div>
+ </div>
+</section>
+
+<!-- ============ 5. TEST ============ -->
+<section id="t-test" class="hidden">
+ <div class="card" style="max-width:860px">
+  <div id="quiz"></div>
+ </div>
+</section>
+</div>
+
+<script>
+/* ======================= ÜLDINE ======================= */
+const $=s=>document.querySelector(s);
+const NS='http://www.w3.org/2000/svg';
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const RM=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+const store={get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+function css(v){return getComputedStyle(document.documentElement).getPropertyValue(v).trim()}
+function el(tag,attrs,parent,text){const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(text!=null)e.textContent=text;if(parent)parent.appendChild(e);return e}
+function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+/* liikuv pakett: punkt + silt */
+function fly(svg,x1,y1,x2,y2,label,color,dur){
+ return new Promise(res=>{
+  if(RM){res();return}
+  const g=el('g',{},svg);
+  el('circle',{r:7,fill:color,stroke:'#fff','stroke-width':2},g);
+  if(label){const t=el('text',{y:-12,'text-anchor':'middle','font-size':12,'font-weight':600,fill:color,'paint-order':'stroke',stroke:css('--card'),'stroke-width':4},g,label)}
+  const t0=performance.now();dur=dur||900;
+  function f(t){let p=Math.min(1,(t-t0)/dur);const e=p<.5?2*p*p:1-Math.pow(-2*p+2,2)/2;g.setAttribute('transform',`translate(${x1+(x2-x1)*e},${y1+(y2-y1)*e})`);if(p<1)requestAnimationFrame(f);else{setTimeout(()=>{g.remove();res()},250)}}
+  requestAnimationFrame(f);
+ });
+}
+
+const TABS=[['moisted','1. Mõisted ja rollid'],['anim','2. Autentimine samm-sammult'],['pol','3. Võrgupoliitikate tööpink'],['lab','4. Labor 19 samm-sammult'],['test','5. Enesetest']];
+function showTab(id){
+ TABS.forEach(([k])=>{$('#t-'+k).classList.toggle('hidden',k!==id)});
+ document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.k===id));
+ if(location.hash!=='#'+id)history.replaceState(null,'','#'+id);
+ if(id==='lab')labShow(labIdx,true);
+ if(id==='anim')renderSeq(true);
+}
+TABS.forEach(([k,t])=>{const b=document.createElement('button');b.textContent=t;b.dataset.k=k;b.onclick=()=>showTab(k);$('#tabs').appendChild(b)});
+
+/* ======================= 1. MÕISTED ======================= */
+const ROLE_INFO={
+ sup:{t:'Supplicant (taotleja)',x:'Seade, kes tahab võrku pääseda ja tõendab, kes ta on: sülearvuti, telefon. Windowsis teeb seda teenus <b>WLAN AutoConfig</b> (juhtmega võrgus <b>Wired AutoConfig</b>). Supplicant räägib ainult pääsupunktiga, NPS-i ta otse ei näe.',ex:'Laboris: Mari sülearvuti. NB! Labori testis (NTRadPing) ei ole WIN11-01 supplicant, vaid mängib pääsupunkti rolli.'},
+ auth:{t:'Authenticator (autentija, „uksehoidja“)',x:'Seade, mille kaudu ühendatakse: WiFi pääsupunkt (<b>AP</b>, <i>Access Point</i>), WiFi kontroller, kommutaator või FortiGate. <b>Ise otsust ei tee</b>: pakib kliendi EAP sõnumid RADIUS-päringusse ja küsib NPS-ilt. Kuni vastus on <i>Access-Accept</i>, laseb ta kliendilt läbi ainult autentimisliiklust.',ex:'NPS-i vaatest on just see seade <b>RADIUS-klient</b>, mitte sülearvuti. Laboris: AP-Labor 192.168.10.50.'},
+ srv:{t:'Autentimisserver (NPS)',x:'RADIUS-server, mis kontrollib kasutajat AD-st ja otsustab <b>võrgupoliitikate</b> järgi: lubada või keelata ning millisesse VLAN-i panna. Windows Serveris on selleks <b>NPS</b> (<i>Network Policy Server</i>).',ex:'Laboris: NPS DC1-l (192.168.10.10). Tootmises eraldi server või kaks tõrkekindluse jaoks.'},
+ ad:{t:'Active Directory (AD DS)',x:'Kasutajate ja rühmade andmebaas. NPS kontrollib sealt parooli, kas konto on lubatud, kasutaja <i>Dial-in</i> seadet ja rühmaliikmesust (nt <code>DL_WIFI_Sisevork</code>).',ex:'Selleks peab NPS olema AD-s registreeritud (rühm <i>RAS and IAS Servers</i>).'},
+ eapol:{t:'EAPOL: EAP kohtvõrgu kaudu',x:'<b>EAP</b> (<i>Extensible Authentication Protocol</i>) on raamistik autentimismeetodite jaoks. <b>EAPOL</b> (<i>EAP over LAN</i>) kannab EAP sõnumeid kliendi ja pääsupunkti vahel otse kaadritena, enne kui kliendil on IP-aadress.',ex:'Sees liigub näiteks PEAP: TLS-tunnel ja selles MSCHAPv2.'},
+ radius:{t:'RADIUS (UDP 1812 / 1813)',x:'<b>RADIUS</b> (<i>Remote Authentication Dial-In User Service</i>) on protokoll pääsupunkti ja NPS-i vahel. UDP <b>1812</b> = autentimine, <b>1813</b> = arvestus (<i>accounting</i>). Sõnumid: <i>Access-Request</i>, <i>Access-Challenge</i>, <i>Access-Accept</i>, <i>Access-Reject</i>.',ex:'Pääsupunkt ja NPS tunnevad teineteist IP-aadressi ja <b>jagatud saladuse</b> (<i>shared secret</i>) järgi.'},
+ ldap:{t:'NPS ↔ AD',x:'NPS kontrollib kasutajat domeenikontrollerist (Kerberos/Netlogon, LDAP). Laboris on NPS ja AD samas masinas DC1, kuid loogiliselt on need eri rollid.',ex:''}
+};
+(function roleSvg(){
+ const W=640,H=230,svg=el('svg',{viewBox:`0 0 ${W} ${H}`,width:'100%',role:'img','aria-label':'802.1X rollid'});
+ $('#roleSvg').appendChild(svg);
+ const nodes=[{k:'sup',x:70,y:110,t:'Sülearvuti',s:'supplicant',i:'💻'},{k:'auth',x:240,y:110,t:'Pääsupunkt',s:'authenticator',i:'📶'},{k:'srv',x:410,y:110,t:'NPS (DC1)',s:'autentimisserver',i:'🛡️'},{k:'ad',x:570,y:110,t:'AD DS',s:'kasutajad, rühmad',i:'🗂️'}];
+ const links=[{k:'eapol',a:0,b:1,t:'EAPOL / 802.11'},{k:'radius',a:1,b:2,t:'RADIUS UDP 1812'},{k:'ldap',a:2,b:3,t:'AD päring'}];
+ const fg=css('--ink'),q=css('--quiet'),ln=css('--line'),acc=css('--acc');
+ links.forEach(l=>{const A=nodes[l.a],B=nodes[l.b];const g=el('g',{style:'cursor:pointer',tabindex:0},svg);
+  el('line',{x1:A.x+38,y1:A.y,x2:B.x-38,y2:B.y,stroke:acc,'stroke-width':3,'stroke-dasharray':l.k==='eapol'?'6 5':''},g);
+  el('rect',{x:(A.x+B.x)/2-60,y:A.y-38,width:120,height:22,rx:5,fill:css('--acc-t')},g);
+  el('text',{x:(A.x+B.x)/2,y:A.y-23,'text-anchor':'middle','font-size':12,fill:fg},g,l.t);
+  g.onclick=()=>roleShow(l.k);g.onkeydown=e=>{if(e.key==='Enter')roleShow(l.k)}});
+ nodes.forEach(n=>{const g=el('g',{style:'cursor:pointer',tabindex:0},svg);
+  el('circle',{cx:n.x,cy:n.y,r:36,fill:css('--card'),stroke:ln,'stroke-width':2},g);
+  el('text',{x:n.x,y:n.y+8,'text-anchor':'middle','font-size':26},g,n.i);
+  el('text',{x:n.x,y:n.y+58,'text-anchor':'middle','font-size':14,'font-weight':600,fill:fg},g,n.t);
+  el('text',{x:n.x,y:n.y+75,'text-anchor':'middle','font-size':12,fill:q},g,n.s);
+  g.onclick=()=>roleShow(n.k);g.onkeydown=e=>{if(e.key==='Enter')roleShow(n.k)}});
+ el('text',{x:325,y:212,'text-anchor':'middle','font-size':12,fill:q},svg,'Klient pääseb võrku alles siis, kui NPS vastab Access-Accept');
+ roleShow('auth');
+})();
+function roleShow(k){const r=ROLE_INFO[k];$('#roleInfo').innerHTML=`<div class="stitle">${r.t}</div><p style="margin:0">${r.x}</p>${r.ex?`<div class="box info">${r.ex}</div>`:''}`}
+
+/* töötaja lahkub */
+const DEVS=['Mari','Liis','Kati','Peeter','Jaan','Anu'];
+function leaveInit(){['psk','ent'].forEach(id=>{$('#'+id).innerHTML=DEVS.map(n=>`<div class="dev" data-n="${n}"><div class="ic">💻</div>${n}</div>`).join('')});
+ $('#pskTxt').innerHTML='Kõik 6 seadet kasutavad sama parooli <code>Firma2026!</code>';$('#entTxt').textContent='Iga seade autendib oma kasutaja AD kontoga.';$('#leaveBtn').disabled=false}
+leaveInit();
+$('#leaveReset').onclick=leaveInit;
+$('#leaveBtn').onclick=()=>{
+ $('#leaveBtn').disabled=true;
+ const p=[...$('#psk').children],e=[...$('#ent').children];
+ p[0].classList.add('red');e[0].classList.add('red');
+ $('#pskTxt').innerHTML='Mari teab parooli ka pärast lahkumist, sest see on tema telefonis ja peas. Parool tuleb vahetada <b>kõigis seadmetes</b>…';
+ $('#entTxt').innerHTML='Admin keelab ADUC-s Mari konto (<i>Disable Account</i>)…';
+ p.slice(1).forEach((d,i)=>setTimeout(()=>d.classList.add('red'),500+i*250));
+ setTimeout(()=>{p[0].classList.add('off');p.slice(1).forEach(d=>{d.classList.remove('red');d.classList.add('grn')});
+  $('#pskTxt').innerHTML='<b>Tulemus:</b> 5 inimest pidid parooli vahetama. Logist ei selgu, kes võrgus on, sest kõik kasutavad sama parooli.'},2200);
+ setTimeout(()=>{e[0].classList.add('off');e.slice(1).forEach(d=>d.classList.add('grn'));
+  $('#entTxt').innerHTML='<b>Tulemus:</b> Mari järgmine ühendus saab <i>Access-Reject</i> (6273, Reason Code 34: konto keelatud). Teised ei pea midagi tegema ja NPS-i logis on iga ühendus kasutajanimega.'},1200);
+};
+
+/* kes on kes */
+const RQ=[['Mari sülearvuti (WLAN AutoConfig)','sup'],['WiFi pääsupunkt AP-Labor','auth'],['NPS DC1-l','srv'],['Kommutaator, mille pordis on 802.1X sees','auth'],['FortiGate, mis küsib VPN-i kasutajat NPS-ilt','auth'],['Laboris WIN11-01, kus töötab NTRadPing','auth'],['DHCP-server, mis annab pärast ühendust IP-aadressi','none']];
+const ROPT=[['','— vali —'],['sup','Supplicant'],['auth','Authenticator = NPS-i RADIUS-klient'],['srv','Autentimisserver'],['none','Ei osale 802.1X otsuses']];
+$('#roleQ').innerHTML=RQ.map((r,i)=>`<span>${r[0]}</span><select data-i="${i}" aria-label="${esc(r[0])}">${ROPT.map(o=>`<option value="${o[0]}">${o[1]}</option>`).join('')}</select><span class="mark" id="rm${i}"></span>`).join('');
+$('#roleCheck').onclick=()=>{let ok=0;RQ.forEach((r,i)=>{const v=$(`#roleQ select[data-i="${i}"]`).value;const m=$('#rm'+i);if(v===r[1]){ok++;m.textContent='✓';m.style.color='var(--ok)'}else{m.textContent='✗';m.style.color='var(--bad)'}});
+ $('#roleRes').innerHTML=ok===RQ.length?'<b style="color:var(--ok)">Kõik õiged!</b>':`${ok}/${RQ.length} õiget. Vihje: RADIUS-klient on seade, kes <b>saadab</b> NPS-ile RADIUS-päringu.`};
+
+/* mõisted */
+const TERMS=[
+['802.1X','IEEE 802.1X – Port-Based Network Access Control','IEEE (Institute of Electrical and Electronics Engineers) standard: seade autenditakse enne, kui ta võrku pääseb. Kehtib nii WiFi kui juhtmega võrgu kohta.'],
+['WPA2/WPA3-Personal','Wi-Fi Protected Access, PSK = Pre-Shared Key','Kõigil sama parool. Sobib koju, ettevõttes mitte: ei tea, kes võrgus on, ja lahkumisel tuleb parool kõigil vahetada.'],
+['WPA2/WPA3-Enterprise','Wi-Fi Protected Access Enterprise','WiFi turve 802.1X-iga: iga kasutaja või arvuti autendib oma kontoga RADIUS-serveri kaudu.'],
+['SSID','Service Set Identifier','WiFi-võrgu nimi, laboris PERENIMI-WiFi.'],
+['Supplicant','supplicant – taotleja','Klient, kes autendib. Windowsis teenus WLAN AutoConfig.'],
+['Authenticator','authenticator – autentija','Seade, mille kaudu ühendatakse (AP, kontroller, kommutaator, FortiGate). Ei otsusta ise, küsib RADIUS-serverilt.'],
+['AP','Access Point','WiFi pääsupunkt.'],
+['NAS','Network Access Server','RADIUS-i mõistes seade, mis lubab kliendi võrku (= authenticator). Atribuut NAS-Port-Type ütleb ühenduse liigi, nt Wireless – IEEE 802.11 või Ethernet.'],
+['RADIUS','Remote Authentication Dial-In User Service','Autentimisprotokoll authenticatori ja serveri vahel. UDP 1812 = autentimine, 1813 = arvestus (accounting).'],
+['UDP','User Datagram Protocol','Ühenduseta transpordiprotokoll. RADIUS kasutab UDP-d, seepärast tulemüüri viga paistab ajalõpuna, mitte veateatena.'],
+['RADIUS-klient','RADIUS client','NPS-i vaatest seade, mis saadab RADIUS-päringuid (pääsupunkt, mitte sülearvuti). Tuvastatakse IP-aadressi ja jagatud saladuse järgi.'],
+['Jagatud saladus','shared secret','Parool, mis on sama NPS-is ja RADIUS-kliendis. Sellega allkirjastatakse sõnumid ja peidetakse PAP-parool. Peab olema pikk, juhuslik ja igal kliendil erinev.'],
+['NPS','Network Policy Server','Microsofti RADIUS-server Windows Serveris. Roll: Network Policy and Access Services (NPAS).'],
+['EAP','Extensible Authentication Protocol','Raamistik, milles saab kasutada eri autentimismeetodeid (PEAP, EAP-TLS).'],
+['EAPOL','EAP over LAN','EAP sõnumid kohtvõrgu kaadrites kliendi ja pääsupunkti vahel. Liigub enne, kui kliendil on IP-aadress.'],
+['PEAP','Protected EAP','NPS esitab serveri sertifikaadi, luuakse krüpteeritud TLS-tunnel ja selle sees autenditakse.'],
+['MSCHAPv2','Microsoft Challenge-Handshake Authentication Protocol v2','Parooliga autentimine: parool ise ei liigu, saadetakse sellest arvutatud vastus. Ilma PEAP-tunnelita on see nõrk.'],
+['PEAP-MSCHAPv2','—','Levinuim meetod: TLS-tunnel serveri sertifikaadiga, sees kasutajanimi ja parool (MSCHAPv2).'],
+['EAP-TLS','EAP Transport Layer Security','Tugevaim meetod: ka klient tõendab end sertifikaadiga (AD CS-ist), parooli ei kasutata.'],
+['TLS','Transport Layer Security','Krüpteeritud ühenduse protokoll (sama mis HTTPS-is).'],
+['PAP','Password Authentication Protocol','Parool liigub ainult jagatud saladusega peidetuna, ilma TLS-tunnelita. Laboris ainult testtööriista jaoks, tootmises mitte.'],
+['CA','Certificate Authority','Sertifikaadiasutus, laboris PERENIMI-CA CORE1-l (AD CS, Active Directory Certificate Services).'],
+['FQDN','Fully Qualified Domain Name','Täielik nimi, nt dc1.perenimi.local. Sertifikaadi nimi peab sellega klappima.'],
+['Evil twin','evil twin – kurja kaksik','Ründaja võltspääsupunkt sama SSID-ga. Kui klient ei kontrolli NPS-i sertifikaati, saab ründaja kinni MSCHAPv2 vastuse.'],
+['Ühenduse päringupoliitika','connection request policy','NPS-i reegel: kas päringut töödeldakse kohapeal või saadetakse teisele RADIUS-serverile.'],
+['Võrgupoliitika','network policy','Tingimused (rühm, NAS-Port-Type, …), piirangud (lubatud EAP-meetod) ja seaded (RADIUS-atribuudid, nt VLAN). Kontrollitakse järjekorras, esimene sobiv otsustab.'],
+['VLAN','Virtual LAN','Virtuaalne kohtvõrk. Dünaamiline VLAN: NPS saadab Tunnel-Type = VLAN, Tunnel-Medium-Type = 802, Tunnel-Pvt-Group-ID = VLAN-i number.'],
+['AGDLP','Account → Global → Domain Local → Permission','Kasutajad globaalsesse rühma (GG_IT), see domeenilokaalsesse (DL_WIFI_Sisevork), õigus/poliitika antakse DL-rühmale.'],
+['Dial-in','Network Access Permission','Kasutaja omadus ADUC-s. Peab olema „Control access through NPS Network Policy“ (vaikimisi). „Deny access“ annab Reason Code 65.'],
+['6272 / 6273','Security logi sündmused','6272 = NPS lubas ligipääsu, 6273 = NPS keelas. Sündmuses on Network Policy Name ja Reason Code.'],
+['GPO','Group Policy Object','Rühmapoliitika objekt. C_WiFi jagab arvutitele WiFi-profiili koos sertifikaadi kontrolliga.']
+];
+function renderTerms(f){f=(f||'').toLowerCase();$('#terms').innerHTML=TERMS.filter(t=>!f||t.join(' ').toLowerCase().includes(f)).map(t=>`<div class="term"><h4>${esc(t[0])}</h4><div class="en">${esc(t[1])}</div><p>${esc(t[2])}</p></div>`).join('')||'<p class="quiet">Ei leitud.</p>'}
+renderTerms();$('#termFilter').oninput=e=>renderTerms(e.target.value);
+
+/* ======================= 2. ANIMATSIOON ======================= */
+const AUSERS={
+ mari:{n:'mari.maasikas',g:'GG_Raamatupidamine',dl:'DL_WIFI_Sisevork',vlan:20},
+ liis:{n:'liis.lepp',g:'GG_Myyk',dl:'DL_WIFI_Internet',vlan:30},
+ kati:{n:'kati.karu',g:'GG_IT',dl:'DL_WIFI_Sisevork',vlan:20},
+ test:{n:'test.wifi',g:'(ainult Domain Users)',dl:null,vlan:null}
+};
+const SCENS={
+ peap:{t:'A. WiFi-ühendus (PEAP-MSCHAPv2)',user:true,
+   actors:[['K','Sülearvuti','supplicant'],['A','AP-Labor','authenticator · .50'],['N','NPS','DC1 · .10'],['D','AD DS','DC1']],
+   faults:{pw:'Vale parool',dis:'Konto keelatud',dialin:'Dial-in = Deny access',secret:'Jagatud saladus AP-s vale',fw:'Tulemüür blokeerib UDP 1812',nocert:'NPS-il pole kehtivat sertifikaati',catrust:'Klient ei usalda PERENIMI-CA-d'}},
+ pap:{t:'B. Labori test NTRadPing (PAP)',user:true,
+   actors:[['T','WIN11-01','NTRadPing · .150'],['N','NPS','DC1 · .10'],['D','AD DS','DC1']],
+   faults:{pw:'Vale parool',dis:'Konto keelatud',secret:'Saladus testtööriistas vale',fw:'Tulemüür blokeerib UDP 1812',unk:'Testitakse WIN11-02-lt (.151)',nopap:'LABOR-Test-PAP kustutatud'}},
+ evil:{t:'C. Võltspääsupunkt (evil twin)',user:false,
+   actors:[['K','Sülearvuti','supplicant'],['R','Ründaja AP','SSID PERENIMI-WiFi'],['F','Ründaja RADIUS','võlts sertifikaat']],
+   faults:{noval:'WiFi-profiil EI kontrolli serveri sertifikaati'}}
+};
+let sc='peap',su='mari',sf={},si=0,timer=null;
+
+function rejectPair(code,why,ap){return[
+ {a:'N',b:ap,lbl:'Access-Reject',t:'NPS keeldub',x:`NPS saadab <i>Access-Reject</i>. Security logis on sündmus <b>6273</b>${code?`, Reason Code <b>${code}</b>`:''}: ${why}.`,log:code?`6273 · Reason ${code}`:'6273',bad:true}]}
+
+function buildSteps(){
+ const U=AUSERS[su],F=sf,S=[];
+ if(sc==='peap'){
+  S.push({a:'K',b:'A',lbl:'802.11 Association (SSID PERENIMI-WiFi)',t:'Ühendumine pääsupunktiga',x:'Sülearvuti leiab SSID <code>PERENIMI-WiFi</code> (profiil tuli GPO-ga) ja ühendub raadio tasemel. Pääsupunkti <b>kontrollitud port on suletud</b>: läbi lastakse ainult EAPOL autentimisliiklus. IP-aadressi veel pole.',st:{port:'suletud (ainult EAPOL)'}});
+  S.push({a:'A',b:'K',lbl:'EAP-Request/Identity (EAPOL)',t:'Pääsupunkt küsib identiteeti',x:'Authenticator küsib EAPOL-i kaudu: „Kes sa oled?“'});
+  S.push({a:'K',b:'A',lbl:`EAP-Response/Identity: PERENIMI\\${U.n}`,t:'Klient ütleb oma nime',x:`Klient saadab kasutajanime <code>PERENIMI\\${U.n}</code>. Kui profiil on <i>User or Computer authentication</i> ja keegi pole sisse loginud, autendib arvuti oma kontoga (<code>host/win11-01.perenimi.local</code>).`});
+  if(F.fw){S.push({a:'A',b:'N',lbl:'RADIUS Access-Request (UDP 1812)',t:'Päring ei jõua NPS-ini',x:'Pääsupunkt saadab RADIUS-päringu, kuid tulemüür blokeerib UDP 1812. Kuna UDP-l pole ühendust, ei saa AP veateadet: ta proovib uuesti ja aegub.',fail:true,where:'<b>NPS-i logides pole midagi.</b> Kontrolli Windowsi tulemüüri (NPS-i paigaldus loob reeglid), AP-s NPS-i IP-d ja porti. <code>Get-NetFirewallRule -DisplayGroup "Network Policy Server"</code>'});return S}
+  S.push({a:'A',b:'N',lbl:'RADIUS Access-Request (UDP 1812)',t:'Pääsupunkt küsib NPS-ilt',x:'Authenticator pakib kliendi EAP sõnumi RADIUS-päringusse. Kaasas on atribuudid: <code>User-Name</code>, <code>NAS-IP-Address = 192.168.10.50</code>, <code>NAS-Port-Type = Wireless – IEEE 802.11</code>, <code>EAP-Message</code> ja <code>Message-Authenticator</code> (allkiri jagatud saladusega).',chk:['Kas NPS tunneb IP-d 192.168.10.50 RADIUS-kliendina?','Kas allkiri klapib jagatud saladusega?']});
+  if(F.secret){S.push({a:'N',b:'N',lbl:'Message-Authenticator ei klapi',t:'Vale jagatud saladus',x:'NPS leiab RADIUS-kliendi AP-Labor, kuid sõnumi allkiri ei klapi. NPS <b>viskab päringu vaikselt ära</b> ega vasta. Klient näeb lihtsalt, et ühendus ei õnnestu.',fail:true,where:'NPS-i <b>System</b> logis on hoiatus vale allkirjaga RADIUS-sõnumi kohta. Kirjuta saladus uuesti mõlemasse kohta (nps.msc → RADIUS Clients → AP-Labor ja AP haldusliides).'});return S}
+  S.push({a:'N',b:'N',lbl:'RADIUS-klient ✓ · päringupoliitika: töötle kohapeal',t:'Kliendi tuvastus ja ühenduse päringupoliitika',x:'NPS tuvastab IP ja saladuse järgi RADIUS-kliendi <b>AP-Labor</b>. Ühenduse päringupoliitika (viisardi loodud) ütleb: töötle seda serveris, ära saada edasi. NPS vaatab sobiva võrgupoliitika piirangutest, millist EAP meetodit pakkuda: <b>PEAP</b>.'});
+  if(F.nocert){S.push({a:'N',b:'N',lbl:'PEAP: serveri sertifikaat puudub',t:'NPS ei saa PEAP-i alustada',x:'PEAP vajab NPS-ile serveri sertifikaati (mall RAS and IAS Server). Kui sertifikaat puudub, on aegunud või poliitikas on valitud vale sertifikaat, ei saa TLS-tunnelit luua.',fail:true,where:'<code>certlm.msc</code> → Personal → Certificates: kas DC1-l on kehtiv sertifikaat nimega dc1.perenimi.local? Võrgupoliitika → Constraints → Authentication Methods → PEAP → Edit: õige sertifikaat. Security logis 6273 EAP/TLS veaga.'});S.push(...rejectPair(null,'EAP/TLS-i ei saanud alustada','A'));return S}
+  S.push({a:'N',b:'K',lbl:'Access-Challenge → EAP-Request: PEAP start (AP edastab)',t:'NPS pakub PEAP-i',x:'NPS vastab <i>Access-Challenge</i>-ga. AP võtab EAP sõnumi välja ja edastab selle kliendile EAPOL-iga. Sealt edasi räägivad klient ja NPS <b>läbi pääsupunkti</b>, mis ise sisu ei loe.'});
+  S.push({a:'N',b:'K',lbl:'TLS: serveri sertifikaat dc1.perenimi.local',t:'NPS näitab oma sertifikaati',x:'NPS saadab TLS-i alguse ja oma sertifikaadi: nimi <code>dc1.perenimi.local</code>, väljaandja <code>PERENIMI-CA</code>.'});
+  if(F.catrust){S.push({a:'K',b:'K',lbl:'Sertifikaadi kontroll ✗',t:'Klient ei usalda CA-d',x:'GPO WiFi-profiil ütleb: kontrolli serveri sertifikaati, usaldatud juur-CA on PERENIMI-CA. Kliendi <i>Trusted Root Certification Authorities</i> hoidlas seda pole, seega katkestab klient TLS-i. Kasutaja näeb „Can\'t connect to this network“.',fail:true,where:'Kliendis <code>certlm.msc</code> → Trusted Root Certification Authorities: kas PERENIMI-CA on olemas? Domeeniarvutid saavad AD CS juur-CA tavaliselt automaatselt (GPO värskendus: <code>gpupdate /force</code>). NPS-i logis on poolelijäänud EAP/TLS katse.'});return S}
+  S.push({a:'K',b:'K',lbl:'Sertifikaadi kontroll ✓',t:'Klient kontrollib, kas räägib õige NPS-iga',x:'Klient kontrollib: (1) sertifikaadi väljaandja on usaldatud <b>PERENIMI-CA</b>, (2) nimi on <b>dc1.perenimi.local</b> (profiilis „Connect to these servers“), (3) sertifikaat kehtib. Just see kaitseb võltspääsupunkti eest (vt stsenaarium C).'});
+  S.push({a:'K',b:'N',lbl:'TLS: võtmevahetus, Finished',t:'TLS-tunnel on valmis',x:'Klient ja NPS lepivad kokku krüpteerimisvõtmed. Edasine EAP liiklus liigub <b>krüpteeritud tunnelis</b>, mida pääsupunkt ega pealtkuulaja ei näe.',st:{tunnel:'TLS-tunnel olemas'}});
+  S.push({a:'K',b:'N',lbl:'Tunnelis: MSCHAPv2 vastus',t:'Kasutaja tõendab end parooliga',x:`Tunneli sees käib MSCHAPv2: NPS saadab väljakutse (challenge), klient arvutab parooli põhjal vastuse. <b>Parool ise ei liigu.</b> Profiilis on „Automatically use my Windows logon name and password“, seega kasutaja midagi ei sisesta.`});
+  S.push({a:'N',b:'D',lbl:'Kontrolli kasutajat (Netlogon / LDAP)',t:'NPS küsib AD-st',x:`NPS kontrollib domeenikontrollerist ${U.n} vastust (parooli), kas konto on lubatud, Dial-in seadet ja rühmaliikmesust.`,chk:['Kas parool on õige?','Kas konto on lubatud?','Dial-in = Control access through NPS Network Policy?']});
+  if(F.pw){S.push({a:'D',b:'N',lbl:'Vale parool',t:'Parool ei klapi',x:'AD ütleb, et vastus ei klapi parooliga.',fail:true,where:'Security logis 6273, Reason Code 16. Korduvad valed katsed võivad konto lukustada (Account lockout policy).'});S.push(...rejectPair(16,'vale kasutajanimi või parool','A'));return S}
+  if(F.dis){S.push({a:'D',b:'N',lbl:'Konto keelatud',t:'Konto on keelatud',x:'Parool võib olla õige, kuid konto on AD-s keelatud. See ongi Enterprise WiFi suur eelis: konto keelamisega kaob ka WiFi.',fail:true,where:'Security logis 6273, Reason Code 34. ADUC-s on konto ikoonil allanool.'});S.push(...rejectPair(34,'kasutajakonto on keelatud','A'));return S}
+  if(F.dialin){S.push({a:'D',b:'N',lbl:'Dial-in: Deny access',t:'Dial-in keelab',x:'Kasutaja omadustes (ADUC → Dial-in) on Network Access Permission = <b>Deny access</b>. See kaalub üles iga võrgupoliitika.',fail:true,where:'Security logis 6273, Reason Code 65. Lahendus: pane tagasi „Control access through NPS Network Policy“.'});S.push(...rejectPair(65,'Dial-in seade keelab ligipääsu','A'));return S}
+  S.push({a:'D',b:'N',lbl:`OK · rühmad: ${U.g}${U.dl?' → '+U.dl:''}`,t:'AD vastab',x:`Parool on õige ja konto lubatud. Rühmaliikmesus: ${U.g}${U.dl?` on rühma <b>${U.dl}</b> liige (AGDLP).`:', ühtegi WiFi rühma ei ole.'}`});
+  const pt=['1. LABOR-Test-PAP: Client Friendly Name = Test-WIN11-01? <b>Ei</b> (päring tuli AP-Labor-ilt) → järgmine'];
+  if(!U.dl){pt.push('2. WiFi-Sisevork: rühm DL_WIFI_Sisevork? <b>Ei</b> → järgmine','3. WiFi-Internet: rühm DL_WIFI_Internet? <b>Ei</b> → järgmine','Vaikimisi poliitikad → Deny');
+   S.push({a:'N',b:'N',lbl:'Võrgupoliitikad: ükski ei sobi',t:'Võrgupoliitikad järjekorras',x:'<ul class="tight"><li>'+pt.join('</li><li>')+'</li></ul>',fail:true,where:'Security logis 6273, Reason Code 48. Lisa kasutaja globaalne rühm õigesse DL_WIFI rühma. Kontrolli ka poliitikate järjekorda ja NAS-Port-Type tingimust.'});S.push(...rejectPair(48,'ükski võrgupoliitika ei sobinud','A'));return S}
+  if(U.dl==='DL_WIFI_Sisevork')pt.push('2. WiFi-Sisevork: rühm DL_WIFI_Sisevork ✓ ja NAS-Port-Type = Wireless ✓ → <b>sobib</b>');
+  else pt.push('2. WiFi-Sisevork: rühm DL_WIFI_Sisevork? <b>Ei</b> → järgmine','3. WiFi-Internet: rühm DL_WIFI_Internet ✓ ja NAS-Port-Type = Wireless ✓ → <b>sobib</b>');
+  pt.push('Piirang: meetod PEAP ✓');
+  const pn=U.vlan===20?'WiFi-Sisevork':'WiFi-Internet';
+  S.push({a:'N',b:'N',lbl:`Võrgupoliitika: ${pn} sobib`,t:'Võrgupoliitikad järjekorras',x:'NPS kontrollib poliitikaid järjekorras, esimene sobiv otsustab:<ul class="tight"><li>'+pt.join('</li><li>')+'</li></ul>'});
+  S.push({a:'N',b:'A',lbl:`Access-Accept · VLAN ${U.vlan} · võtmed`,t:'NPS lubab',x:`NPS saadab <i>Access-Accept</i> koos atribuutidega <code>Tunnel-Type = VLAN</code>, <code>Tunnel-Medium-Type = 802</code>, <code>Tunnel-Pvt-Group-ID = ${U.vlan}</code> ning krüpteerimisvõtme materjali (MS-MPPE võtmed), millest AP ja klient tuletavad WiFi-võtmed.`,log:`6272 · ${pn}`,good:true});
+  S.push({a:'A',b:'K',lbl:'EAP-Success + 4-way handshake',t:'Port avaneb',x:`AP saadab kliendile EAP-Success ja teeb WPA2 4-astmelise kätlemise (<i>4-way handshake</i>): kliendil ja AP-l on nüüd ühine krüpteerimisvõti. AP paneb kliendi <b>VLAN ${U.vlan}</b>-i ja avab pordi.`,st:{port:`avatud · VLAN ${U.vlan}`},good:true});
+  S.push({a:'K',b:'A',lbl:`DHCP Discover (VLAN ${U.vlan})`,t:'Klient saab IP-aadressi',x:`Alles nüüd küsib klient DHCP-st IP-aadressi, ja nimelt VLAN ${U.vlan} alamvõrgust. ${U.vlan===20?'Sisevõrgus näeb ta failiservereid ja domeeni.':'Internet-VLAN-is pääseb ta ainult internetti.'} Laboris seda sammu pole, sest WiFi riistvara puudub.`,good:true});
+  return S;
+ }
+ if(sc==='pap'){
+  S.push({a:'T',b:'T',lbl:'NTRadPing: server .10, port 1812, saladus, kasutaja',t:'Testtööriista seadistus',x:`WIN11-01-l täidetakse: RADIUS Server <code>192.168.10.10</code>, port <code>1812</code>, Secret Key <code>${F.secret?'Vale-Saladus':'Pikk-Juhuslik-Saladus-2'}</code>, User-Name <code>${U.n}</code>, parool, Request type: Authentication Request. NB! Siin mängib WIN11-01 <b>pääsupunkti</b> (RADIUS-kliendi) rolli.`});
+  if(F.fw){S.push({a:'T',b:'N',lbl:'Access-Request (UDP 1812)',t:'Vastust ei tule',x:'Päring jääb tulemüüri taha. NTRadPing ootab ja näitab ajalõppu (No response / timeout).',fail:true,where:'NPS-i logides pole midagi. Kontrolli DC1 tulemüüri reegleid (NPS-i grupp) ja et WIN11-01 saadab õigele IP-le ja pordile.'});return S}
+  S.push({a:'T',b:'N',lbl:`Access-Request: User-Name, User-Password (PAP)`,t:'RADIUS-päring',x:`NTRadPing saadab <i>Access-Request</i>: <code>User-Name = ${U.n}</code>, <code>User-Password</code> (PAP: peidetud ainult jagatud saladusega, TLS-tunnelit pole), lähte-IP <code>${F.unk?'192.168.10.151':'192.168.10.150'}</code>. <b>NAS-Port-Type</b> atribuuti tööriist vaikimisi ei saada.`});
+  if(F.unk){S.push({a:'N',b:'N',lbl:'Tundmatu RADIUS-klient .151',t:'NPS ei tunne saatjat',x:'192.168.10.151 (WIN11-02) ei ole RADIUS-klientide nimekirjas. NPS <b>viskab päringu ära</b> ega vasta. NTRadPing näitab ajalõppu.',fail:true,where:'Security logis pole 6272/6273. <b>System</b> logis on NPS-i hoiatus tundmatult RADIUS-kliendilt saabunud päringu kohta (sündmus 13). Lisa klient: <code>New-NpsRadiusClient</code>.'});return S}
+  S.push({a:'N',b:'N',lbl:'RADIUS-klient Test-WIN11-01 ✓ · töötle kohapeal',t:'Kliendi tuvastus',x:'IP 192.168.10.150 on RADIUS-klient <b>Test-WIN11-01</b>. Ühenduse päringupoliitika: töötle kohapeal.'+(F.secret?'<div class="box warn"><b class="t">Lõks!</b>PAP-parool peidetakse jagatud saladusega. Vale saladusega dekodeerib NPS parooli valesti, aga päringut ei viska ära.</div>':'')});
+  S.push({a:'N',b:'D',lbl:'Kontrolli kasutajat ja parooli',t:'NPS küsib AD-st',x:`NPS kontrollib ${U.n} parooli, konto olekut ja rühmi.`});
+  if(F.pw||F.secret){S.push({a:'D',b:'N',lbl:'Vale parool',t:'Parool ei klapi',x:F.secret?'Kasutaja parool on tegelikult õige, aga vale saladuse tõttu jõudis AD-sse rämps. Reason Code ütleb „vale parool“, kuigi viga on saladuses. <b>Petlik!</b>':'Parool ei klapi.',fail:true,where:'6273, Reason Code 16. '+(F.secret?'Kontrolli enne kasutaja parooli lähtestamist üle jagatud saladus NTRadPingis ja NPS-is.':'')});S.push(...rejectPair(16,'vale kasutajanimi või parool','T'));return S}
+  if(F.dis){S.push({a:'D',b:'N',lbl:'Konto keelatud',t:'Konto on keelatud',x:'Laboris samm 10: Mari konto keelati ADUC-s.',fail:true,where:'6273, Reason Code 34. Pärast testi luba konto tagasi.'});S.push(...rejectPair(34,'kasutajakonto on keelatud','T'));return S}
+  S.push({a:'D',b:'N',lbl:`OK · rühmad: ${U.g}${U.dl?' → '+U.dl:''}`,t:'AD vastab',x:`Parool õige, konto lubatud. ${U.dl?`Kasutaja on rühma <b>${U.dl}</b> liige.`:'Ühtegi WiFi rühma ei ole.'}`});
+  const pt=[];
+  if(F.nopap)pt.push('LABOR-Test-PAP: <i>kustutatud</i>');
+  else if(U.dl)pt.push('1. LABOR-Test-PAP: Client Friendly Name = Test-WIN11-01 ✓, rühm ✓ → <b>sobib</b>','Piirang: meetod PAP ✓');
+  else pt.push('1. LABOR-Test-PAP: Client Friendly Name ✓, aga rühm DL_WIFI_*? <b>Ei</b> → järgmine');
+  if(F.nopap||!U.dl){
+   pt.push('2. WiFi-Sisevork: NAS-Port-Type = Wireless? <b>Ei</b> (atribuut puudub) → järgmine','3. WiFi-Internet: NAS-Port-Type = Wireless? <b>Ei</b> → järgmine','Vaikimisi poliitikad → Deny');
+   S.push({a:'N',b:'N',lbl:'Võrgupoliitikad: ükski ei sobi',t:'Võrgupoliitikad järjekorras',x:'<ul class="tight"><li>'+pt.join('</li><li>')+'</li></ul>'+(F.nopap?'<div class="box info">Seepärast on laboris vaja eraldi PAP-poliitikat: testtööriist ei ole päris WiFi-ühendus ega kasuta PEAP-i. Proovi tööpingis, mis juhtub, kui NTRadPing saadab NAS-Port-Type = Wireless (vastus: Reason 66).</div>':''),fail:true,where:'6273, Reason Code 48.'});
+   S.push(...rejectPair(48,'ükski võrgupoliitika ei sobinud','T'));return S}
+  S.push({a:'N',b:'N',lbl:'Võrgupoliitika: LABOR-Test-PAP sobib',t:'Võrgupoliitikad järjekorras',x:'<ul class="tight"><li>'+pt.join('</li><li>')+'</li></ul>LABOR-Test-PAP on järjekorras esimene (labori samm 6).'});
+  S.push({a:'N',b:'T',lbl:`Access-Accept · Tunnel-Pvt-Group-ID = ${U.vlan}`,t:'NPS lubab',x:`<i>Access-Accept</i> koos VLAN-i atribuutidega. Security logis <b>6272</b>, Network Policy Name = LABOR-Test-PAP.`,log:'6272 · LABOR-Test-PAP',good:true});
+  S.push({a:'T',b:'T',lbl:`Vastus: Access-Accept, VLAN ${U.vlan}`,t:'Kontrollpunkt',x:`NTRadPingi aknas: <code>response: Access-Accept</code> ja atribuutide all <code>Tunnel-Pvt-Group-ID = ${U.vlan}</code>. Nii näed NPS-i otsust ilma WiFi riistvarata.`,good:true});
+  return S;
+ }
+ // evil twin
+ S.push({a:'R',b:'R',lbl:'Levitab SSID PERENIMI-WiFi (tugev signaal)',t:'Ründaja paneb üles võltsvõrgu',x:'Ründaja toob kohvikusse või parklasse pääsupunkti, millel on <b>sama SSID</b> kui ettevõttel. Tema taga on võlts RADIUS-server.'});
+ S.push({a:'K',b:'R',lbl:'802.11 Association',t:'Sülearvuti ühendub',x:'Sülearvuti tunneb SSID ära ja ühendub, sest signaal on tugevam. SSID järgi ei saa võrke eristada.'});
+ S.push({a:'R',b:'K',lbl:'EAP-Request/Identity',t:'Identiteedi küsimine',x:'Kõik näeb välja nagu päris võrgus.'});
+ S.push({a:'K',b:'R',lbl:'EAP-Response/Identity: PERENIMI\\mari.maasikas',t:'Klient ütleb nime',x:'Kasutajanimi lekib juba siin, aga parooli veel mitte.'});
+ S.push({a:'F',b:'K',lbl:'TLS: sertifikaat „dc1.perenimi.local“ (võlts)',t:'Võlts NPS näitab sertifikaati',x:'Ründaja server saadab iseallkirjastatud sertifikaadi, mille nimi võib isegi olla dc1.perenimi.local. Väljaandja ei ole aga PERENIMI-CA ja ründajal pole selle CA privaatvõtit.'});
+ if(!F.noval){S.push({a:'K',b:'K',lbl:'Sertifikaadi kontroll ✗ → katkestan',t:'Kaitse töötas',x:'GPO WiFi-profiil ütleb: <b>Verify the server\'s identity</b>, server <code>dc1.perenimi.local</code>, juur-CA <code>PERENIMI-CA</code>, <i>Don\'t ask user to authorize new servers</i>. Sertifikaat ei ole PERENIMI-CA allkirjaga, seega klient katkestab ühenduse <b>enne</b>, kui midagi paroolist tuletatut saadab.',stopok:true,where:'Seepärast seadistatakse WiFi-profiil GPO-ga (21.5), mitte kasutaja käsitsi. Kasutajal pole ka nuppu „Connect anyway“.'});return S}
+ S.push({a:'K',b:'K',lbl:'Sertifikaati ei kontrollita ⚠',t:'Kaitse puudub',x:'Profiil on tehtud käsitsi ja sertifikaadi kontroll on väljas, või kasutaja vajutas hoiatuse peale „Connect“. Klient jätkab.',warn:true});
+ S.push({a:'K',b:'F',lbl:'Tunnelis: MSCHAPv2 vastus',t:'Klient saadab parooli põhjal arvutatud vastuse',x:'TLS-tunnel on olemas, aga <b>ründajaga</b>. Ründaja näeb tunneli sisu: MSCHAPv2 väljakutset ja vastust.',bad:true});
+ S.push({a:'F',b:'F',lbl:'Salvestab challenge/response → murrab offline',t:'Ründaja saak',x:'Ründaja salvestab väljakutse ja vastuse ning proovib hiljem oma arvutis paroole läbi (sõnastikurünne). Nõrk parool leitakse kiiresti ja siis saab ründaja Mari kontoga sisse ka e-posti, VPN-i jne.',fail:true,where:'Kaitse: (1) GPO-ga profiil koos sertifikaadi kontrolliga, (2) tugevad paroolid, (3) parim: <b>EAP-TLS</b>, kus parooli üldse ei kasutata.'});
+ return S;
+}
+function initAnimControls(){
+ $('#scen').innerHTML=Object.entries(SCENS).map(([k,v])=>`<button class="chip${k===sc?' on':''}" data-k="${k}">${v.t}</button>`).join('');
+ $('#scen').querySelectorAll('button').forEach(b=>b.onclick=()=>{sc=b.dataset.k;sf={};si=0;initAnimControls();renderSeq(true)});
+ $('#userRow').classList.toggle('hidden',!SCENS[sc].user);
+ $('#users').innerHTML=Object.entries(AUSERS).map(([k,u])=>`<button class="chip${k===su?' on':''}" data-k="${k}">${u.n} <span class="quiet small">(${u.dl||'pole WiFi rühmas'})</span></button>`).join('');
+ $('#users').querySelectorAll('button').forEach(b=>b.onclick=()=>{su=b.dataset.k;si=0;initAnimControls();renderSeq(true)});
+ $('#faultLbl').textContent=sc==='evil'?'Seadistus':'Rikked (vali üks või mitu, esimene katkestab ahela)';
+ $('#faults').innerHTML=Object.entries(SCENS[sc].faults).map(([k,t])=>`<label style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" data-k="${k}"${sf[k]?' checked':''}>${t}</label>`).join('');
+ $('#faults').querySelectorAll('input').forEach(c=>c.onchange=()=>{sf[c.dataset.k]=c.checked;si=0;renderSeq(true)});
+}
+function renderSeq(animate,fromPlay){
+ if(!fromPlay)stopPlay();
+ const S=buildSteps(),A=SCENS[sc].actors;si=Math.max(0,Math.min(si,S.length-1));
+ const W=760,top=78,rowH=46,H=top+S.length*rowH+20;
+ const box=$('#seq');box.innerHTML='';
+ const svg=el('svg',{viewBox:`0 0 ${W} ${H}`,width:'100%',role:'img','aria-label':'Sõnumite jada'});box.appendChild(svg);
+ const X={};A.forEach((a,i)=>X[a[0]]=60+i*(W-120)/(A.length-1));
+ const ink=css('--ink'),q=css('--quiet'),ln=css('--line'),acc=css('--acc'),ok=css('--ok'),bad=css('--bad'),warn=css('--warn');
+ const defs=el('defs',{},svg);
+ [['ar',q],['arA',acc],['arB',bad],['arG',ok],['arW',warn]].forEach(([id,c])=>{const m=el('marker',{id,viewBox:'0 0 10 10',refX:9,refY:5,markerWidth:7,markerHeight:7,orient:'auto-start-reverse'},defs);el('path',{d:'M0,0 L10,5 L0,10 z',fill:c},m)});
+ A.forEach(a=>{const x=X[a[0]];el('rect',{x:x-62,y:8,width:124,height:46,rx:8,fill:css('--card'),stroke:ln},svg);el('text',{x,y:28,'text-anchor':'middle','font-size':14,'font-weight':600,fill:ink},svg,a[1]);el('text',{x,y:45,'text-anchor':'middle','font-size':11.5,fill:q},svg,a[2]);el('line',{x1:x,y1:54,x2:x,y2:H-8,stroke:ln,'stroke-dasharray':'4 4'},svg)});
+ let anim=null;
+ S.forEach((s,i)=>{if(i>si)return;const y=top+i*rowH+18;const cur=i===si;
+  const col=s.fail?bad:(s.stopok||s.good)?ok:s.warn?warn:s.bad?bad:cur?acc:q;
+  const mk=s.fail||s.bad?'arB':(s.stopok||s.good)?'arG':s.warn?'arW':cur?'arA':'ar';
+  const op=cur?1:.7;
+  el('text',{x:14,y:y+4,'font-size':11,fill:q},svg,i+1);
+  if(s.a===s.b){const x=X[s.a];const right=x<W*.6;
+   el('rect',{x:x-7,y:y-12,width:14,height:24,rx:3,fill:col,opacity:op},svg);
+   const t=el('text',{x:right?x+14:x-14,y:y+4,'text-anchor':right?'start':'end','font-size':12.5,fill:col,'font-weight':cur?600:400,opacity:op},svg,s.lbl);
+  }else{const x1=X[s.a],x2=X[s.b],d=x2>x1?1:-1;
+   el('line',{x1:x1+d*8,y1:y+6,x2:x2-d*10,y2:y+6,stroke:col,'stroke-width':cur?2.4:1.6,'marker-end':`url(#${mk})`,opacity:op},svg);
+   el('text',{x:(x1+x2)/2,y:y-2,'text-anchor':'middle','font-size':12.5,fill:col,'font-weight':cur?600:400,opacity:op},svg,s.lbl);
+   if(cur)anim=[x1+d*8,y+6,x2-d*10,y+6,col];
+  }
+ });
+ if(animate&&anim)fly(svg,anim[0],anim[1],anim[2],anim[3],'',anim[4],800);
+ const s=S[si];
+ const cls=s.fail?'bad':s.stopok?'ok':s.warn?'warn':s.good?'ok':'info';
+ let h=`<div class="lbl">Samm ${si+1} / ${S.length}</div><div class="stitle">${s.t}</div><div>${s.x}</div>`;
+ if(s.chk)h+=`<div class="box info"><b class="t">Mida kontrollitakse</b><ul class="tight">${s.chk.map(c=>`<li>${c}</li>`).join('')}</ul></div>`;
+ if(s.fail)h+=`<div class="box bad"><b class="t">Siin ahel katkeb</b>${s.where||''}</div>`;
+ else if(s.stopok)h+=`<div class="box ok"><b class="t">Rünnak ebaõnnestus</b>${s.where||''}</div>`;
+ else if(s.where)h+=`<div class="box ${cls}">${s.where}</div>`;
+ $('#sStep').innerHTML=h;
+ // olek
+ const st={port:sc==='pap'||sc==='evil'?null:'kinni (ühendust pole)',tunnel:null,log:'—'};
+ S.slice(0,si+1).forEach(x=>{if(x.st)Object.assign(st,x.st);if(x.log)st.log=x.log});
+ let sh='<div class="box vio small"><b class="t">Olek</b>';
+ if(st.port)sh+=`Kliendi port AP-s: <b>${st.port}</b><br>`;
+ if(st.tunnel)sh+=`${st.tunnel}<br>`;
+ if(sc!=='evil')sh+=`DC1 Security logi: <b>${st.log}</b>`;else sh+='Kliendi WiFi-profiil: '+(sf.noval?'<b>sertifikaati ei kontrolli</b>':'<b>kontrollib sertifikaati (GPO)</b>');
+ $('#sState').innerHTML=sh+'</div>';
+ $('#sProg').textContent=`${si+1} / ${S.length}`;
+ $('#sPrev').disabled=si===0;$('#sNext').disabled=si===S.length-1;
+}
+function stopPlay(){if(timer){clearInterval(timer);timer=null;$('#sPlay').textContent='▶ Esita'}}
+$('#sNext').onclick=()=>{si++;renderSeq(true)};
+$('#sPrev').onclick=()=>{si--;renderSeq(false)};
+$('#sReset').onclick=()=>{si=0;renderSeq(true)};
+$('#sPlay').onclick=()=>{if(timer){stopPlay();return}
+ if(si>=buildSteps().length-1)si=-1;
+ const tick=()=>{const n=buildSteps().length;si++;renderSeq(true,true);if(si>=n-1)stopPlay()};
+ $('#sPlay').textContent='⏸ Peata';timer=setInterval(tick,2400);tick();};
+initAnimControls();
+
+/* ======================= 3. POLIITIKATE TÖÖPINK ======================= */
+const POLS0=[
+ {id:'pap',n:'LABOR-Test-PAP',on:true,cond:{client:'Test-WIN11-01',groups:['DL_WIFI_Sisevork','DL_WIFI_Internet']},meth:['PAP'],vlan:null,note:'ainult laboris!'},
+ {id:'sis',n:'WiFi-Sisevork',on:true,cond:{groups:['DL_WIFI_Sisevork'],nas:'wireless'},meth:['PEAP'],vlan:20},
+ {id:'int',n:'WiFi-Internet',on:true,cond:{groups:['DL_WIFI_Internet'],nas:'wireless'},meth:['PEAP'],vlan:30}
+];
+const PUSERS={
+ mari:{n:'mari.maasikas',dl:'DL_WIFI_Sisevork',g:'GG_Raamatupidamine'},
+ liis:{n:'liis.lepp',dl:'DL_WIFI_Internet',g:'GG_Myyk'},
+ kati:{n:'kati.karu',dl:'DL_WIFI_Sisevork',g:'GG_IT'},
+ test:{n:'test.wifi',dl:null,g:'Domain Users'},
+ peeter:{n:'peeter.paju',dl:'DL_WIFI_Internet',g:'GG_Myyk',disabled:true}
+};
+const PCLIENTS={ap:{n:'AP-Labor',ip:'192.168.10.50',known:true},t:{n:'Test-WIN11-01',ip:'192.168.10.150',known:true},x:{n:'WIN11-02 (pole RADIUS-klient)',ip:'192.168.10.151',known:false}};
+const REQ0={user:'mari',pw:'ok',client:'t',secret:'ok',meth:'PAP',nas:'none',dialin:'nps'};
+let pols=JSON.parse(JSON.stringify(POLS0)),req=Object.assign({},REQ0);
+const FIELDS=[
+ ['client','RADIUS-klient',Object.entries(PCLIENTS).map(([k,c])=>[k,`${c.n} · ${c.ip}`])],
+ ['secret','Jagatud saladus',[['ok','õige'],['bad','vale']]],
+ ['user','Kasutaja',Object.entries(PUSERS).map(([k,u])=>[k,`${u.n} (${u.g}${u.disabled?', konto keelatud':''})`])],
+ ['pw','Parool',[['ok','õige'],['bad','vale']]],
+ ['dialin','Kasutaja Dial-in',[['nps','Control access through NPS Network Policy'],['deny','Deny access']]],
+ ['meth','Autentimismeetod',[['PEAP','PEAP-MSCHAPv2'],['PAP','PAP'],['TLS','EAP-TLS']]],
+ ['nas','NAS-Port-Type',[['wireless','Wireless – IEEE 802.11'],['ethernet','Ethernet'],['none','puudub (nt NTRadPing)']]]
+];
+function renderForm(){$('#reqForm').innerHTML=FIELDS.map(([k,l,o])=>`<label for="f-${k}">${l}</label><select id="f-${k}">${o.map(([v,t])=>`<option value="${v}"${req[k]===v?' selected':''}>${esc(t)}</option>`).join('')}</select>`).join('');
+ FIELDS.forEach(([k])=>$('#f-'+k).onchange=e=>{req[k]=e.target.value;evalRender()})}
+function polDesc(p){const c=[];if(p.cond.client)c.push(`Client Friendly Name = ${p.cond.client}`);c.push('Windows Groups = '+p.cond.groups.join(' või '));if(p.cond.nas)c.push('NAS Port Type = Wireless');
+ return `<b>Tingimused:</b> ${c.join('; ')}<br><b>Piirang:</b> ${p.meth.join(', ')}${p.meth[0]==='PEAP'?' (MSCHAPv2)':''}<br><b>Seaded:</b> ${p.vlan?'Tunnel-Pvt-Group-ID = '+p.vlan:'VLAN rühma järgi (20/30)'}${p.note?` <span class="nbtag">${p.note}</span>`:''}`}
+function renderPols(match){$('#polList').innerHTML=pols.map((p,i)=>`<div class="pol${p.on?'':' off'}${match===p.id?' match':''}"><span class="ord">${i+1}.</span><div><div class="nm">${p.n}</div><div class="det">${polDesc(p)}</div></div><div class="row" style="flex-direction:column;align-items:flex-end;gap:4px"><label class="small" style="display:flex;gap:4px;align-items:center;cursor:pointer"><input type="checkbox" data-on="${i}"${p.on?' checked':''}>lubatud</label><span class="row"><button class="btn small" data-up="${i}" aria-label="üles"${i===0?' disabled':''}>↑</button><button class="btn small" data-dn="${i}" aria-label="alla"${i===pols.length-1?' disabled':''}>↓</button></span></div></div>`).join('');
+ $('#polList').querySelectorAll('[data-on]').forEach(c=>c.onchange=()=>{pols[+c.dataset.on].on=c.checked;evalRender()});
+ $('#polList').querySelectorAll('[data-up]').forEach(b=>b.onclick=()=>{const i=+b.dataset.up;[pols[i-1],pols[i]]=[pols[i],pols[i-1]];evalRender()});
+ $('#polList').querySelectorAll('[data-dn]').forEach(b=>b.onclick=()=>{const i=+b.dataset.dn;[pols[i+1],pols[i]]=[pols[i],pols[i+1]];evalRender()});}
+function evaluate(){
+ const T=[],C=PCLIENTS[req.client],U=PUSERS[req.user];
+ const mName={PEAP:'PEAP-MSCHAPv2',PAP:'PAP',TLS:'EAP-TLS'}[req.meth];
+ T.push(['i',`Access-Request ${C.ip} → 192.168.10.10:1812, User-Name = ${U.n}, meetod ${mName}, NAS-Port-Type = ${req.nas==='none'?'puudub':req.nas==='wireless'?'Wireless':'Ethernet'}`]);
+ if(!C.known){T.push(['n',`${C.ip} pole RADIUS-klientide nimekirjas`]);return{T,kind:'drop',h:'Vastust ei tule',x:'NPS viskab päringu ära. Security logis 6272/6273 <b>pole</b>. System logis on hoiatus tundmatult kliendilt (sündmus 13). Klient näeb ajalõppu.'}}
+ T.push(['y',`RADIUS-klient tuvastatud: ${C.n}`]);
+ let pwOk=req.pw==='ok';
+ if(req.secret!=='ok'){
+  if(req.meth==='PAP'){T.push(['w','Jagatud saladus ei klapi → PAP-parool dekodeeritakse valesti (NPS seda ei märka)']);pwOk=false}
+  else{T.push(['n','Message-Authenticator ei klapi (vale jagatud saladus)']);return{T,kind:'drop',h:'Vastust ei tule',x:'NPS viskab päringu vaikselt ära. Security logis 6273 pole, System logis on hoiatus vale allkirja kohta.'}}
+ }
+ T.push(['y','Ühenduse päringupoliitika: töötle kohapeal']);
+ if(req.meth==='TLS'){T.push(['w','EAP-TLS: kliendil peab olema sertifikaat. Laboris on poliitikates lubatud ainult PEAP ja PAP.'])}
+ else{
+  if(!pwOk){T.push(['n','Parool ei klapi'+(req.secret!=='ok'?' (tegelikult on viga jagatud saladuses!)':'')]);return{T,kind:'rej',code:16,h:'Access-Reject',x:'6273, Reason Code 16: vale kasutajanimi või parool.'+(req.secret!=='ok'?' <b>Lõks:</b> põhjus on vale jagatud saladus, mitte kasutaja parool.':'')}}
+  T.push(['y','Parool õige']);
+ }
+ if(U.disabled){T.push(['n','Konto on AD-s keelatud']);return{T,kind:'rej',code:34,h:'Access-Reject',x:'6273, Reason Code 34: kasutajakonto on keelatud.'}}
+ T.push(['y',`Konto lubatud; rühmad: ${U.g}${U.dl?' → '+U.dl:''}`]);
+ let m=null;
+ pols.forEach((p,i)=>{if(m)return;if(!p.on){T.push(['i',`${i+1}. ${p.n}: välja lülitatud, jäetakse vahele`]);return}
+  const fails=[];
+  if(p.cond.client&&C.n!==p.cond.client)fails.push(`Client Friendly Name ≠ ${p.cond.client}`);
+  if(!p.cond.groups.includes(U.dl))fails.push(`pole rühmas ${p.cond.groups.join('/')}`);
+  if(p.cond.nas&&req.nas!=='wireless')fails.push('NAS-Port-Type ei ole Wireless');
+  if(fails.length)T.push(['n',`${i+1}. ${p.n}: ${fails.join('; ')} → järgmine`]);
+  else{T.push(['y',`${i+1}. ${p.n}: kõik tingimused sobivad → see poliitika otsustab`]);m=p}});
+ if(!m){T.push(['n','Vaikimisi poliitikad → Deny']);return{T,kind:'rej',code:48,h:'Access-Reject',x:'6273, Reason Code 48: ükski võrgupoliitika ei sobinud.'}}
+ if(req.dialin==='deny'){T.push(['n','Kasutaja Dial-in = Deny access kaalub poliitika üles']);return{T,kind:'rej',code:65,match:m.id,h:'Access-Reject',x:`6273, Reason Code 65: Dial-in seade keelab. (Sobiv poliitika oli ${m.n}.)`}}
+ if(!m.meth.includes(req.meth)){T.push(['n',`Piirang: poliitika lubab ${m.meth.join(', ')}, klient kasutab ${mName}`]);return{T,kind:'rej',code:66,match:m.id,h:'Access-Reject',x:`6273, Reason Code 66: autentimismeetod ei vasta poliitika <b>${m.n}</b> piirangutele. NB! NPS ei otsi edasi järgmist poliitikat: otsustab esimene, mille <i>tingimused</i> sobivad.`}}
+ T.push(['y',`Piirang: ${mName} lubatud`]);
+ const vlan=m.vlan||(U.dl==='DL_WIFI_Sisevork'?20:30);
+ return{T,kind:'acc',match:m.id,h:`Access-Accept · VLAN ${vlan}`,x:`6272, Network Policy Name = <b>${m.n}</b>. Atribuudid: Tunnel-Type = VLAN, Tunnel-Medium-Type = 802, Tunnel-Pvt-Group-ID = <b>${vlan}</b>.`,vlan}
+}
+function evalRender(){const r=evaluate();renderPols(r.match);
+ $('#trace').innerHTML=r.T.map(([c,t])=>`<li class="${c}">${t}</li>`).join('');
+ $('#verdict').innerHTML=`<div class="box ${r.kind==='acc'?'ok':r.kind==='drop'?'warn':'bad'}"><b class="t">${r.h}</b>${r.x}</div>`;return r}
+$('#polReset').onclick=()=>{pols=JSON.parse(JSON.stringify(POLS0));req=Object.assign({},REQ0);renderForm();evalRender()};
+const PUZ=[
+ {q:'Labori algseis. NTRadPing testib Mari parooliga (PAP, NAS-Port-Type puudub).',set:{},r:{},o:['Access-Accept, VLAN 20','Access-Accept, VLAN 30','Reject, Reason 48'],a:0},
+ {q:'LABOR-Test-PAP on välja lülitatud. NTRadPing saadab Mari päringu PAP-iga, aga nüüd NAS-Port-Type = Wireless.',set:{off:['pap']},r:{nas:'wireless'},o:['Access-Accept, VLAN 20','Reject, Reason 48','Reject, Reason 66'],a:2},
+ {q:'NTRadPing testib Liisi õige parooliga, aga testtööriista saladusse on trükiviga sisse jäänud.',set:{},r:{user:'liis',secret:'bad'},o:['Vastust ei tule','Reject, Reason 16','Reject, Reason 48'],a:1},
+ {q:'Päris pääsupunkt AP-Labor, kasutaja test.wifi (pole üheski WiFi rühmas), PEAP, Wireless.',set:{},r:{client:'ap',meth:'PEAP',nas:'wireless',user:'test'},o:['Access-Accept, VLAN 30','Reject, Reason 48','Reject, Reason 16'],a:1},
+ {q:'AP-Labor, Kati (GG_IT), PEAP, Wireless. LABOR-Test-PAP on järjekorras esimene.',set:{},r:{client:'ap',meth:'PEAP',nas:'wireless',user:'kati'},o:['Access-Accept, VLAN 20','Reject, Reason 66, sest PAP-poliitika on esimene','Access-Accept, VLAN 30'],a:0},
+ {q:'Õpilane käivitab NTRadPingi WIN11-02-lt (192.168.10.151).',set:{},r:{client:'x'},o:['Reject, Reason 48','Vastust ei tule, Security logis pole midagi','Reject, Reason 16'],a:1},
+ {q:'AP-Labor, Mari, PEAP, Wireless. Mari Dial-in sakis on „Deny access“.',set:{},r:{client:'ap',meth:'PEAP',nas:'wireless',dialin:'deny'},o:['Access-Accept, VLAN 20, sest poliitika lubab','Reject, Reason 65','Reject, Reason 48'],a:1},
+ {q:'Labor on läbi ja LABOR-Test-PAP kustutati (välja lülitatud). Mis vastab NTRadPing nüüd Mari testile (PAP, NAS-Port-Type puudub)?',set:{off:['pap']},r:{},o:['Access-Accept, VLAN 20','Reject, Reason 48','Reject, Reason 66'],a:1}
+];
+$('#puzzles').innerHTML=PUZ.map((p,i)=>`<div class="puz"><div class="q">${i+1}. ${p.q}</div><div class="row">${p.o.map((o,j)=>`<button class="btn small" data-p="${i}" data-o="${j}">${o}</button>`).join('')}</div><div class="small" id="pz${i}" style="margin-top:6px"></div></div>`).join('');
+$('#puzzles').querySelectorAll('button').forEach(b=>b.onclick=()=>{const i=+b.dataset.p,j=+b.dataset.o,P=PUZ[i];
+ pols=JSON.parse(JSON.stringify(POLS0));(P.set.off||[]).forEach(id=>pols.find(p=>p.id===id).on=false);
+ req=Object.assign({},REQ0,P.r);renderForm();evalRender();
+ $('#puzzles').querySelectorAll(`[data-p="${i}"]`).forEach(x=>x.classList.remove('primary'));
+ $('#pz'+i).innerHTML=j===P.a?'<b style="color:var(--ok)">✓ Õige!</b> Vaata üleval, kuidas NPS otsustas.':`<b style="color:var(--bad)">✗ Ei.</b> Õige: <b>${P.o[P.a]}</b>. Vaata üleval sammhaaval, miks.`;
+ document.querySelector('#trace').scrollIntoView({behavior:RM?'auto':'smooth',block:'center'})});
+renderForm();evalRender();
+
+/* ======================= 4. LABOR ======================= */
+const LN={core:{x:110,y:70,t:'CORE1',s:'AD CS · PERENIMI-CA'},dc:{x:380,y:120,t:'DC1',s:'192.168.10.10 · AD DS · NPS'},win:{x:660,y:70,t:'WIN11-01',s:'192.168.10.150'},ap:{x:660,y:250,t:'AP-Labor',s:'192.168.10.50 · laboris pole'},lap:{x:110,y:250,t:'Mari sülearvuti',s:'WiFi · laboris pole'}};
+const BADGES={dc:[['nps','NPS roll',1],['reg','RAS and IAS Servers',1],['cert','Sert dc1.perenimi.local',2],['grp','DL_WIFI_* rühmad',3],['rc','RADIUS-kliendid ×2',3],['pSis','WiFi-Sisevork · VLAN 20',4],['pInt','WiFi-Internet · VLAN 30',5],['pPap','LABOR-Test-PAP (1.)',6],['gpo','GPO C_WiFi',11]],core:[['tpl','Mall RAS and IAS Server',2]],win:[['rad','NTRadPing',7],['prof','WiFi-profiil (GPO)',11]]};
+const LAB=[
+ {t:'NPS-i paigaldus ja registreerimine AD-s',hi:['dc'],pk:[['dc','dc','Install NPAS'],['dc','dc','netsh nps add registeredserver']],
+  gui:['DC1 <i>Server Manager → Add Roles and Features</i> → server <b>DC1</b> → <i>Server Roles</i>: <b>Network Policy and Access Services</b> → <i>Add Features</i> → <i>Install</i>.','<i>Tools → Network Policy Server</i> → paremklikk <b>NPS (Local)</b> → <b>Register server in Active Directory</b> → OK → OK.'],
+  ps:[['# DC1-l','Kommentaar: käsud käivitatakse DC1-l administraatori PowerShellis.'],['Install-WindowsFeature NPAS -IncludeManagementTools','Paigaldab rolli <b>NPAS</b> (<i>Network Policy and Access Services</i>) koos haldusvahendiga nps.msc.'],['netsh nps add registeredserver','Registreerib NPS-i AD-s: DC1 arvutikonto lisatakse rühma <i>RAS and IAS Servers</i>. Nii tohib NPS lugeda kasutajate Dial-in omadusi.']],
+  chk:'nps.msc avaneb. <code>Get-ADGroupMember "RAS and IAS Servers"</code> näitab DC1$.'},
+ {t:'Sertifikaat NPS-ile (mall RAS and IAS Server)',hi:['core','dc'],pk:[['core','core','avalda mall'],['dc','dc','taaskäivitus'],['dc','core','sertifikaaditaotlus'],['core','dc','sertifikaat']],
+  gui:['CORE1 CA-l: <code>certsrv.msc</code> → <i>Certificate Templates → New → Certificate Template to Issue</i> → <b>RAS and IAS Server</b>. (CORE1 on Server Core, seega ava certsrv.msc DC1-st ja ühendu CORE1-ga.)','Taaskäivita <b>DC1</b>: alles siis jõuab uus rühmaliikmesus (RAS and IAS Servers) arvuti Kerberose piletisse ja mall lubab taotleda.','DC1: <code>certlm.msc</code> → <i>Personal → Certificates</i> → paremklikk → <i>All Tasks → Request New Certificate</i> → <i>Next</i> → <b>RAS and IAS Server</b> → <i>Enroll</i>.'],
+  ps:[['Restart-Computer','Taaskäivitab DC1, et rühmaliikmesus rakenduks.'],['Get-Certificate -Template RASAndIASServer -CertStoreLocation Cert:\\LocalMachine\\My','Taotleb malli <i>RAS and IAS Server</i> järgi sertifikaadi arvuti isiklikku hoidlasse. (Malli lühinimi on RASAndIASServer.)'],['Get-ChildItem Cert:\\LocalMachine\\My | fl Subject, Issuer, NotAfter','Kontroll: Subject sisaldab dc1.perenimi.local, Issuer on PERENIMI-CA.']],
+  chk:'<code>certlm.msc</code> → Personal: sertifikaat <b>dc1.perenimi.local</b>, väljaandja PERENIMI-CA.'},
+ {t:'Rühmad ja RADIUS-kliendid',hi:['dc','win','ap'],pk:[['dc','dc','New-ADGroup ×2'],['dc','dc','New-NpsRadiusClient ×2']],
+  gui:['<code>dsa.msc</code> → paremklikk <code>Labor → Ryhmad</code> → <i>New → Group</i> → <code>DL_WIFI_Sisevork</code>, <b>Domain local</b>, <b>Security</b>; korda <code>DL_WIFI_Internet</code>.','Liikmed (<i>Members → Add…</i>): <code>DL_WIFI_Sisevork</code> ← GG_IT, GG_Raamatupidamine; <code>DL_WIFI_Internet</code> ← GG_Myyk.','<code>nps.msc</code> → <i>RADIUS Clients and Servers</i> → paremklikk <b>RADIUS Clients</b> → <b>New</b>: <i>Friendly name</i> <code>AP-Labor</code>, <i>Address</i> <code>192.168.10.50</code>, <i>Shared Secret</i>: Manual (pikk, juhuslik) → OK.','Korda: <code>Test-WIN11-01</code>, <code>192.168.10.150</code>, teine saladus. Mõlemad peavad olema olekuga <i>Enabled</i>.'],
+  ps:[['$ou = "OU=Ryhmad,OU=Labor,DC=perenimi,DC=local"','Muutujasse OU tee, kuhu rühmad luuakse.'],['New-ADGroup DL_WIFI_Sisevork -GroupScope DomainLocal -Path $ou','Loob domeenilokaalse turberühma sisevõrgu WiFi jaoks.'],['New-ADGroup DL_WIFI_Internet -GroupScope DomainLocal -Path $ou','Sama Internet-VLAN-i jaoks.'],['Add-ADGroupMember DL_WIFI_Sisevork -Members GG_IT, GG_Raamatupidamine','AGDLP: globaalsed rühmad lähevad DL-rühma.'],['Add-ADGroupMember DL_WIFI_Internet -Members GG_Myyk','Müük saab ainult interneti.'],['New-NpsRadiusClient -Name "AP-Labor" -Address 192.168.10.50 -SharedSecret "Pikk-Juhuslik-Saladus-1"','Lisab pääsupunkti RADIUS-kliendiks (IP + jagatud saladus).'],['New-NpsRadiusClient -Name "Test-WIN11-01" -Address 192.168.10.150 -SharedSecret "Pikk-Juhuslik-Saladus-2"','Laboris mängib testtööriist pääsupunkti, seega ka WIN11-01 on RADIUS-klient, oma saladusega.'],['Get-NpsRadiusClient','Kontroll: mõlemad kliendid on nimekirjas.']],
+  chk:'Jagatud saladus on igal kliendil erinev. Pane need kirja, NTRadPing vajab saladust 2.'},
+ {t:'802.1X viisard → poliitika WiFi-Sisevork (VLAN 20)',hi:['dc','ap'],pk:[['dc','dc','Secure Wireless Connections'],['ap','dc','RADIUS-klient AP-Labor']],
+  gui:['<code>nps.msc</code> → <i>NPS (Local)</i> → <i>Standard Configuration</i>: <b>RADIUS server for 802.1X Wireless or Wired Connections</b> → <i>Configure 802.1X</i>.','Tüüp <b>Secure Wireless Connections</b>, nimi <code>WiFi-Sisevork</code> → <i>Next</i>.','RADIUS-kliendid: vali <b>AP-Labor</b>.','Autentimismeetod: <b>Microsoft: Protected EAP (PEAP)</b> → <i>Configure</i>: sertifikaat dc1.perenimi.local, sisemine meetod EAP-MSCHAP v2.','Rühmad: <i>Add</i> → <code>DL_WIFI_Sisevork</code>.','<i>Configure Traffic Controls</i> → <i>Configure…</i> → <i>Standard</i>: Tunnel-Type = <b>Virtual LANs (VLAN)</b>, Tunnel-Medium-Type = <b>802 (includes all 802 media plus Ethernet canonical format)</b>, Tunnel-Pvt-Group-ID = <b>20</b> → Finish.'],
+  ps:null,
+  chk:'<i>Policies → Connection Request Policies</i> ja <i>Network Policies</i> all on mõlemas WiFi-Sisevork. Network policy → Conditions: Windows Groups + NAS Port Type = Wireless – IEEE 802.11.'},
+ {t:'Kopeeri poliitika → WiFi-Internet (VLAN 30)',hi:['dc'],pk:[['dc','dc','Duplicate Policy']],
+  gui:['<i>Network Policies</i> → paremklikk <b>WiFi-Sisevork</b> → <b>Duplicate Policy</b>.','Koopia omadused: nimi <code>WiFi-Internet</code>, märgi <b>Policy enabled</b>.','<i>Conditions</i>: Windows Groups → asenda <code>DL_WIFI_Internet</code>-iga.','<i>Settings → RADIUS Attributes → Standard</i>: Tunnel-Pvt-Group-ID = <b>30</b>.'],
+  ps:null,chk:'Duplikaat on vaikimisi välja lülitatud: kontrolli, et WiFi-Internet on <i>Enabled</i>.'},
+ {t:'Laboripoliitika LABOR-Test-PAP järjekorras esimeseks',hi:['dc','win'],pk:[['dc','dc','New Network Policy'],['dc','dc','Move Up → 1']],
+  gui:['<i>Network Policies</i> → paremklikk → <b>New</b>: nimi <code>LABOR-Test-PAP</code>, tüüp Unspecified.','<i>Conditions</i>: <b>Client Friendly Name</b> = <code>Test-WIN11-01</code> ja <b>Windows Groups</b> = DL_WIFI_Sisevork või DL_WIFI_Internet.','<i>Access Permission</i>: Access granted.','<i>Authentication Methods</i>: eemalda EAP-d ja MS-CHAP, märgi ainult <b>Unencrypted authentication (PAP, SPAP)</b>. Viisard küsib selle kohta hoiatust: vasta No (abiteemat ei ava).','<i>Settings</i>: VLAN-i atribuudid nagu poliitikas 1 või 2.','Paremklikk → <b>Move Up</b>, kuni <i>Processing Order</i> = 1.'],
+  ps:null,chk:'Network Policies nimekirjas on järjekord: 1 LABOR-Test-PAP, 2 WiFi-Sisevork, 3 WiFi-Internet. Proovi sama tööpingis (vahekaart 3).'},
+ {t:'Test: Mari → Access-Accept, VLAN 20',hi:['win','dc'],pk:[['win','dc','Access-Request mari.maasikas'],['dc','dc','AD + poliitikad'],['dc','win','Access-Accept · VLAN 20']],
+  gui:['WIN11-01-l käivita <b>NTRadPing</b>: RADIUS Server <code>192.168.10.10</code>, port <code>1812</code>, Secret Key <code>Pikk-Juhuslik-Saladus-2</code>.','User-Name <code>mari.maasikas</code>, Password Mari parool, Request type <i>Authentication Request</i> → <b>Send</b>.','Vastuses: <code>Access-Accept</code>, atribuut <code>Tunnel-Pvt-Group-ID = 20</code>.'],
+  ps:null,chk:'DC1 Event Viewer → <i>Custom Views → Server Roles → Network Policy and Access Services</i>: sündmus <b>6272</b>, Network Policy Name = LABOR-Test-PAP. Vaata sama vahekaardil 2, stsenaarium B.'},
+ {t:'Test: Liis → Access-Accept, VLAN 30',hi:['win','dc'],pk:[['win','dc','Access-Request liis.lepp'],['dc','win','Access-Accept · VLAN 30']],
+  gui:['NTRadPingis User-Name <code>liis.lepp</code> ja tema parool → Send.','Vastus: <code>Access-Accept</code>, <code>Tunnel-Pvt-Group-ID = 30</code>.'],ps:null,chk:'Sama poliitika, aga erinev VLAN, sest Liis on DL_WIFI_Internet rühmas.'},
+ {t:'Test: vale parool ja rühmata kasutaja → Access-Reject',hi:['win','dc'],pk:[['win','dc','vale parool'],['dc','win','Reject · 16'],['win','dc','test.wifi'],['dc','win','Reject · 48']],
+  gui:['Proovi Mari kasutajat vale parooliga → <code>Access-Reject</code>.','Loo ADUC-s testkasutaja (nt <code>test.wifi</code>), keda pole üheski WiFi rühmas, ja proovi teda → <code>Access-Reject</code>.','Leia DC1 Security logist sündmused <b>6273</b> ja nende <b>Reason Code</b>.'],
+  ps:[['Get-WinEvent -FilterHashtable @{LogName="Security"; Id=6272,6273} -MaxEvents 10 | fl TimeCreated, Id, Message','Näitab 10 viimast NPS-i otsust koos kogu sõnumiga (Network Policy Name, Reason Code).']],
+  chk:'Vale parool → Reason Code 16. Rühmata kasutaja → Reason Code 48 (ükski poliitika ei sobinud). Kui 6272/6273 sündmusi pole üldse: <code>auditpol /get /subcategory:"Network Policy Server"</code>.'},
+ {t:'Keela Mari konto → Access-Reject',hi:['dc','win'],pk:[['dc','dc','Disable-ADAccount'],['win','dc','Access-Request mari'],['dc','win','Reject · 34'],['dc','dc','Enable-ADAccount']],
+  gui:['ADUC: paremklikk Mari Maasikas → <b>Disable Account</b>.','Testi uuesti NTRadPingiga → <code>Access-Reject</code>.','Luba konto tagasi: paremklikk → <b>Enable Account</b>.'],
+  ps:[['Disable-ADAccount mari.maasikas','Keelab konto.'],['Enable-ADAccount mari.maasikas','Lubab konto pärast testi tagasi.']],
+  chk:'6273, Reason Code 34 (konto keelatud). Nii kaob WiFi kohe, kui töötaja konto keelatakse.'},
+ {t:'GPO C_WiFi: WiFi-profiil arvutitele',hi:['dc','win','lap'],pk:[['dc','dc','GPO C_WiFi'],['dc','win','GPO (SYSVOL)'],['dc','lap','GPO (SYSVOL)']],
+  gui:['<code>gpmc.msc</code> → OU <b>Arvutid</b> → <i>Create a GPO … and Link it here</i> → <code>C_WiFi</code> → Edit.','<i>Computer → Policies → Windows Settings → Security Settings → Wireless Network (IEEE 802.11) Policies</i> → <i>Create A New Wireless Network Policy for Windows Vista and Later Releases</i> → <i>Add → Infrastructure</i>.','<i>Connection</i>: SSID <code>PERENIMI-WiFi</code>, <i>Connect automatically</i>.','<i>Security</i>: <b>WPA2-Enterprise</b>, <b>AES</b>, <b>Microsoft: Protected EAP (PEAP)</b>, <i>Authentication mode</i>: <b>User or Computer authentication</b>.','<i>Properties</i>: <b>Verify the server\'s identity by validating the certificate</b>, <i>Connect to these servers</i>: <code>dc1.perenimi.local</code>, <i>Trusted Root CA</i>: <code>PERENIMI-CA</code>, <i>Notifications</i>: Don\'t ask user to authorize new servers. Sisemine meetod EAP-MSCHAP v2 → <i>Automatically use my Windows logon name and password</i>.','WIN11-01: <code>gpupdate /force</code>, siis <code>gpresult /h C:\\gp.html</code>.'],
+  ps:[['gpupdate /force','Värskendab rühmapoliitikat kohe.'],['gpresult /h C:\\gp.html','Raport: Computer Details → Applied GPOs peab sisaldama C_WiFi.'],['netsh wlan show profiles','WiFi-kaardiga arvutis näitab profiili PERENIMI-WiFi (Group policy profiles). Ilma WiFi-kaardita profiil ei aktiveeru.']],
+  chk:'gpresult näitab C_WiFi rakendatuna. Sertifikaadi kontrolli tähtsust näed vahekaardil 2, stsenaarium C.'},
+ {t:'Lõpetuseks: kustuta või keela LABOR-Test-PAP',hi:['dc'],pk:[['dc','dc','Delete LABOR-Test-PAP']],
+  gui:['<code>nps.msc</code> → <i>Network Policies</i> → paremklikk <b>LABOR-Test-PAP</b> → <b>Disable</b> või <b>Delete</b>.','Soovi korral eemalda ka RADIUS-klient Test-WIN11-01.'],
+  ps:[['Remove-NpsRadiusClient -Name "Test-WIN11-01"','Eemaldab testkliendi, et WIN11-01 ei saaks enam RADIUS-päringuid teha.']],
+  chk:'PAP saadab parooli ilma TLS-tunnelita, seega <b>tootmises seda ei kasutata</b>. Kontrollpunkt: kõik testid andsid õige tulemuse ja Security logis olid vastavad 6272/6273 sündmused.'}
+];
+let labIdx=0,labDone=store.get('wifi8021x-lab',{});
+function labList(){$('#labList').innerHTML=LAB.map((s,i)=>`<li class="${i===labIdx?'on':''}${labDone[i]?' done':''}" data-i="${i}"><span class="n">${labDone[i]?'✓':i+1+'.'}</span><span>${s.t}</span></li>`).join('');
+ $('#labList').querySelectorAll('li').forEach(li=>li.onclick=()=>labShow(+li.dataset.i,true));
+ const d=Object.values(labDone).filter(Boolean).length;$('#labProg').innerHTML=`Tehtud <b>${d} / ${LAB.length}</b> sammu.`}
+let labRun=0;
+function labShow(i,animate){labIdx=i;const s=LAB[i];labList();
+ const W=780,H=320,box=$('#labSvg');box.innerHTML='';const svg=el('svg',{viewBox:`0 0 ${W} ${H}`,width:'100%',role:'img','aria-label':'Labori topoloogia'});box.appendChild(svg);
+ const ink=css('--ink'),q=css('--quiet'),ln=css('--line'),acc=css('--acc'),ok=css('--ok'),bad=css('--bad'),vio=css('--vio');
+ const P=(k)=>LN[k];
+ [['core','dc'],['dc','win'],['dc','ap'],['ap','lap']].forEach(([a,b])=>el('line',{x1:P(a).x,y1:P(a).y,x2:P(b).x,y2:P(b).y,stroke:ln,'stroke-width':2,'stroke-dasharray':(a==='ap'||b==='ap')?'6 5':''},svg));
+ el('text',{x:385,y:300,'text-anchor':'middle','font-size':12,fill:q},svg,'Laborivõrk 192.168.10.0/24 · katkendjoon = laboris riistvara pole');
+ Object.entries(LN).forEach(([k,n])=>{const on=s.hi.includes(k);const dashed=k==='ap'||k==='lap';
+  el('rect',{x:n.x-80,y:n.y-26,width:160,height:52,rx:9,fill:on?css('--acc-t'):css('--card'),stroke:on?acc:ln,'stroke-width':on?2.2:1.2,'stroke-dasharray':dashed?'5 4':''},svg);
+  el('text',{x:n.x,y:n.y-4,'text-anchor':'middle','font-size':14,'font-weight':600,fill:ink},svg,n.t);
+  el('text',{x:n.x,y:n.y+13,'text-anchor':'middle','font-size':11,fill:q},svg,n.s);
+  const bl=(BADGES[k]||[]).filter(b=>b[2]<=i+1);
+  bl.forEach((b,j)=>{let removed=b[0]==='pPap'&&i===11;const isNew=b[2]===i+1;
+   const bx=k==='dc'?n.x+(j%2?6:-156):n.x-75,by=k==='dc'?n.y+34+Math.floor(j/2)*20:(k==='core'?n.y+32+j*20:n.y+32+j*20);
+   const g=el('g',{},svg);
+   el('rect',{x:bx,y:by,width:150,height:17,rx:4,fill:removed?css('--bad-t'):isNew?css('--ok-t'):css('--vio-t'),stroke:removed?bad:isNew?ok:'none'},g);
+   el('text',{x:bx+75,y:by+12.5,'text-anchor':'middle','font-size':10.5,fill:removed?bad:isNew?ok:vio,'text-decoration':removed?'line-through':''},g,b[1]);
+   if(isNew&&animate&&!RM){g.style.opacity=0;g.style.transition='opacity .6s';setTimeout(()=>g.style.opacity=1,300+(s.pk.length*1000))}});
+ });
+ // tekst
+ let h=`<div class="lbl">Samm ${i+1} / ${LAB.length}</div><div class="stitle">${s.t}</div>`;
+ if(s.gui){h+=`<h3>${s.ps?'A) GUI (samm-sammult)':'GUI (samm-sammult)'}</h3><ol class="tight">${s.gui.map(g=>`<li>${g}</li>`).join('')}</ol>`}
+ if(s.ps){h+=`<h3>${s.gui?'B) PowerShell':'PowerShell'} <span class="quiet small">– iga rida eraldi lahti seletatud</span></h3><div class="cmd">${s.ps.map(([c,e])=>`<div class="l"><code>${esc(c)}</code><span>${e}</span></div>`).join('')}</div>`}
+ h+=`<div class="box ok"><b class="t">Kontroll</b>${s.chk}</div>`;
+ $('#labText').innerHTML=h;
+ $('#lDone').checked=!!labDone[i];$('#lPrev').disabled=i===0;$('#lNext').disabled=i===LAB.length-1;
+ if(animate){const run=++labRun;(async()=>{for(const [a,b,lbl] of s.pk){if(run!==labRun)return;const A=P(a),B=P(b);
+   const col=/Reject/.test(lbl)?bad:/Accept/.test(lbl)?ok:acc;
+   if(a===b){await fly(svg,A.x,A.y-40,A.x,A.y-40,lbl,col,900)}else await fly(svg,A.x,A.y,B.x,B.y,lbl,col,1100)}})()}
+}
+$('#lPrev').onclick=()=>labShow(labIdx-1,true);$('#lNext').onclick=()=>labShow(labIdx+1,true);$('#lReplay').onclick=()=>labShow(labIdx,true);
+$('#lDone').onchange=e=>{labDone[labIdx]=e.target.checked;store.set('wifi8021x-lab',labDone);labList()};
+
+/* ======================= 5. ENESETEST ======================= */
+const QS=[
+ ['Mis on WPA2-Personal (PSK) peamine puudus ettevõtte WiFi-s?',['Kõik kasutavad sama parooli: töötaja lahkumisel tuleb see kõigil vahetada ja pole teada, kes võrgus on','See ei krüpteeri liiklust üldse','See töötab ainult 2,4 GHz sagedusel','See vajab RADIUS-serverit'],'PSK (Pre-Shared Key) on ühine parool. Enterprise (802.1X) autendib iga kasutaja tema enda AD kontoga.'],
+ ['Töötaja konto keelatakse AD-s. Mis juhtub tema WiFi ligipääsuga WPA2-Enterprise võrgus?',['Järgmine autentimine lükatakse tagasi (6273, Reason Code 34)','Mitte midagi, kuni WiFi parool vahetatakse','Pääsupunkt tuleb taaskäivitada','Kasutaja satub automaatselt külalis-VLAN-i'],'NPS kontrollib iga ühenduse ajal AD-st konto olekut. Keelatud konto annab Reason Code 34.'],
+ ['Mida kirjeldab standard IEEE 802.1X?',['Pordipõhist võrgu ligipääsu kontrolli: seade autenditakse enne, kui ta võrku pääseb','WiFi raadiosagedusi ja kanaleid','VLAN-ide märgistamist kaadrites','IP-aadresside jagamist'],'802.1X = Port-Based Network Access Control. VLAN-i märgistus on 802.1Q.'],
+ ['Kes on 802.1X-is supplicant?',['Klient, kes autendib (Windowsis WLAN AutoConfig teenus)','WiFi pääsupunkt','NPS-server','Domeenikontroller'],'Supplicant on seade, mis tahab võrku pääseda.'],
+ ['Kes on NPS-i vaatest RADIUS-klient?',['Seade, mis saadab NPS-ile RADIUS-päringuid, nt pääsupunkt','Sülearvuti, mis WiFi-ga ühendub','Iga domeeni liige','AD-kasutaja'],'Sülearvuti räägib ainult pääsupunktiga (EAPOL). RADIUS-päringu teeb authenticator, seega on see NPS-i jaoks RADIUS-klient.'],
+ ['Milliseid porte RADIUS kasutab?',['UDP 1812 (autentimine) ja UDP 1813 (arvestus)','TCP 389 ja 636','UDP 67 ja 68','TCP 443'],'389/636 on LDAP, 67/68 DHCP, 443 HTTPS.'],
+ ['Mille järgi tuvastab NPS RADIUS-kliendi?',['IP-aadressi ja jagatud saladuse järgi','MAC-aadressi järgi','Arvuti nime järgi AD-s','Kasutaja sertifikaadi järgi'],'RADIUS-klient lisatakse nps.msc-s (või New-NpsRadiusClient) IP-aadressi ja jagatud saladusega.'],
+ ['Milline RADIUS-sõnum kannab VLAN-i atribuute pääsupunktile?',['Access-Accept','Access-Request','Access-Challenge','Accounting-Request'],'Lubamise korral saadab NPS Access-Accept koos Tunnel-Type, Tunnel-Medium-Type ja Tunnel-Pvt-Group-ID atribuutidega.'],
+ ['Mis on EAPOL?',['EAP kohtvõrgu kaudu: EAP sõnumid kliendi ja pääsupunkti vahel','RADIUS-i krüpteeritud versioon','NPS-i logifaili formaat','WiFi krüpteerimisalgoritm'],'EAPOL = EAP over LAN. See liigub enne, kui kliendil on IP-aadress.'],
+ ['Mis toimub PEAP-MSCHAPv2 autentimisel?',['NPS esitab serveri sertifikaadi, luuakse TLS-tunnel ja selles kontrollitakse kasutajanime ja parooli','Klient esitab sertifikaadi ja parooli ei kasutata','Parool saadetakse avatekstina pääsupunktile','Kasutaja sisestab ühise WiFi parooli'],'PEAP = Protected EAP. Teine variant (kliendi sertifikaat, parooli pole) on EAP-TLS.'],
+ ['Mis eristab EAP-TLS-i PEAP-MSCHAPv2-st?',['Ka klient tõendab end sertifikaadiga ja parooli ei kasutata','EAP-TLS ei vaja serveri sertifikaati','EAP-TLS töötab ainult juhtmega võrgus','EAP-TLS kasutab PAP-i'],'EAP-TLS on tugevaim: kasutaja- või arvutisertifikaat AD CS-ist, parooli pole võimalik kinni püüda.'],
+ ['Miks peab WiFi-profiil kontrollima NPS-i serveri sertifikaati?',['Muidu saab ründaja teha sama SSID-ga võltsvõrgu (evil twin) ja püüda kinni kasutajate parooliräsid','Muidu ei saa klient IP-aadressi','Sertifikaat määrab kliendi VLAN-i','Muidu ei tööta WPA2 krüpteerimine'],'Kontroll tagab, et klient räägib päris NPS-iga (väljaandja PERENIMI-CA, nimi dc1.perenimi.local).'],
+ ['Miks seadistatakse WiFi-profiil GPO-ga, mitte iga kasutaja käsitsi?',['Nii on sertifikaadi kontroll, serveri nimi ja usaldatud CA kõigil õigesti ja kasutaja ei saa „Connect anyway“ vajutada','GPO on ainus viis SSID-d varjata','Käsitsi loodud profiil ei toeta WPA2-te','GPO muudab ühenduse kiiremaks'],'GPO C_WiFi seab sertifikaadi kontrolli ja „Don\'t ask user to authorize new servers“.'],
+ ['Mida teeb käsk netsh nps add registeredserver?',['Registreerib NPS-i AD-s: serveri arvutikonto lisatakse rühma RAS and IAS Servers','Paigaldab NPS-i rolli','Lisab uue RADIUS-kliendi','Taotleb NPS-ile sertifikaadi'],'Rühma liikmena tohib NPS lugeda kasutajate Dial-in omadusi. Rolli paigaldab Install-WindowsFeature NPAS.'],
+ ['Miks tuleb DC1 pärast NPS-i registreerimist taaskäivitada enne sertifikaadi taotlemist?',['Uus rühmaliikmesus (RAS and IAS Servers) jõuab arvuti juurdepääsulubasse alles taaskäivitusel ja mall lubab taotleda just sellel rühmal','NPS-i teenus ei käivitu muidu','Sertifikaadid kustutatakse muidu','Taaskäivitus pole vajalik, see on lihtsalt soovitus'],'Rühmaliikmesus on Kerberose piletis. Arvuti saab uue pileti käivitamisel.'],
+ ['Kuidas NPS võrgupoliitikaid kontrollib?',['Järjekorras: esimene poliitika, mille tingimused sobivad, otsustab','Kõiki korraga ja kõige leebem võidab','Kõiki korraga ja kõige rangem võidab','Juhuslikus järjekorras'],'Seepärast on järjekord oluline (Processing Order).'],
+ ['Mis on võrgupoliitikas „piirang“ (constraint), mitte „tingimus“?',['Lubatud autentimismeetod, nt PEAP','Windows Groups = DL_WIFI_Sisevork','NAS Port Type = Wireless','Client Friendly Name'],'Tingimused valivad poliitika. Piirangud kontrollitakse pärast valikut: kui need ei sobi, keelatakse (nt Reason 66).'],
+ ['Milline RADIUS-atribuut kannab VLAN-i numbrit?',['Tunnel-Pvt-Group-ID','Tunnel-Type','Tunnel-Medium-Type','NAS-Port-Type'],'Tunnel-Type = VLAN ja Tunnel-Medium-Type = 802 ütlevad, et tegemist on VLAN-iga, number on Tunnel-Pvt-Group-ID-s.'],
+ ['Mida tähendab DC1 Security logis sündmus 6272?',['NPS lubas kasutajale ligipääsu','NPS keelas ligipääsu','RADIUS-klient on tundmatu','NPS-i teenus käivitus'],'6272 = lubatud, 6273 = keelatud.'],
+ ['Sündmus 6273, Reason Code 48. Mis on põhjus?',['Ükski võrgupoliitika ei sobinud (rühm, NAS Port Type, järjekord)','Vale parool','Konto on keelatud','Vale autentimismeetod'],'16 = vale parool, 34 = konto keelatud, 66 = meetod ei vasta piirangutele.'],
+ ['Sündmus 6273, Reason Code 66. Mis on põhjus?',['Kliendi autentimismeetod ei vasta sobiva poliitika piirangutele (nt PAP vs PEAP)','Kasutaja pole üheski rühmas','Jagatud saladus on vale','Tulemüür blokeerib UDP 1812'],'Poliitika tingimused sobisid, aga lubatud meetod oli teine.'],
+ ['NPS ei logi testi ajal midagi. Mis on kõige tõenäolisem põhjus?',['Päring ei jõua NPS-ini või saatja pole RADIUS-klient (tulemüür UDP 1812, vale IP)','Kasutaja parool on vale','Kasutaja pole WiFi rühmas','Sertifikaat on aegunud'],'Parooli ja rühma vead annavad 6273. Kui midagi pole, ei jõudnud päring kohale või visati enne töötlemist ära.'],
+ ['Miks on LABOR-Test-PAP poliitika lubatud ainult laboris?',['PAP saadab parooli ilma TLS-tunnelita, seda vajab ainult lihtne testtööriist','PAP ei toeta VLAN-e','PAP töötab ainult Linuxis','PAP on aeglane'],'Laboris pole WiFi riistvara, seega testib NTRadPing PAP-iga. Labori lõpus poliitika kustutatakse või keelatakse.'],
+ ['Miks lisatakse NPS-i poliitikas tingimuseks DL_WIFI_Sisevork, mitte otse GG_IT?',['AGDLP: kasutajad globaalsetesse rühmadesse, need domeenilokaalsesse rühma, õigus/poliitika DL-rühmale','Globaalseid rühmi ei saa NPS-is kasutada','DL-rühmad on kiiremad','GG_IT-l pole parooli'],'Nii saab WiFi õigust anda uuele osakonnale, lisades selle GG-rühma DL_WIFI rühma ja poliitikat muutmata.'],
+ ['Milline peab olema kasutaja Dial-in sakis Network Access Permission, et otsustaks võrgupoliitika?',['Control access through NPS Network Policy (vaikimisi)','Allow access','Deny access','Callback'],'„Deny access“ keelab alati (Reason 65). „Allow access“ kaalub poliitika õigusseade üle. Vaikimisi otsustab poliitika.']
+];
+let qOrder,qi,qAns;
+function quizStart(){qOrder=shuffle(QS.map((q,i)=>i)).map(i=>({i,opts:shuffle(QS[i][1].map((t,j)=>({t,ok:j===0})))}));qi=0;qAns=[];quizShow()}
+function quizShow(){
+ if(qi>=qOrder.length){quizEnd();return}
+ const Q=qOrder[qi],q=QS[Q.i];
+ $('#quiz').innerHTML=`<div class="row" style="justify-content:space-between"><div class="lbl">Küsimus ${qi+1} / ${qOrder.length}</div><div class="small quiet">Õigeid: ${qAns.filter(a=>a).length}</div></div><div class="pbar"><i style="width:${qi/qOrder.length*100}%"></i></div><div class="stitle">${esc(q[0])}</div><div class="qopts">${Q.opts.map((o,j)=>`<button class="qopt" data-j="${j}">${String.fromCharCode(65+j)}. ${esc(o.t)}</button>`).join('')}</div><div id="qfb"></div>`;
+ $('#quiz').querySelectorAll('.qopt').forEach(b=>b.onclick=()=>{const j=+b.dataset.j,ok=Q.opts[j].ok;qAns.push(ok);
+  $('#quiz').querySelectorAll('.qopt').forEach((x,k)=>{x.disabled=true;if(Q.opts[k].ok)x.classList.add('right');else if(k===j)x.classList.add('wrong')});
+  $('#qfb').innerHTML=`<div class="box ${ok?'ok':'bad'}"><b class="t">${ok?'Õige!':'Vale.'}</b>${esc(q[2])}</div><div class="stepbar"><button class="btn primary" id="qNext">${qi+1<qOrder.length?'Järgmine küsimus ›':'Vaata tulemust ›'}</button></div>`;
+  $('#qNext').onclick=()=>{qi++;quizShow()};$('#qNext').focus()});
+}
+function quizEnd(){const n=qAns.filter(a=>a).length,N=qOrder.length,p=Math.round(n/N*100);
+ const wrong=qOrder.filter((Q,k)=>!qAns[k]);
+ const msg=p>=90?'Suurepärane, oled valmis laboriks!':p>=70?'Hea tulemus. Vaata vigased küsimused üle.':p>=50?'Osaliselt selge. Loe peatükk 21 uuesti ja proovi tööpinki.':'Alusta mõistetest (vahekaart 1) ja animatsioonist (vahekaart 2), siis proovi uuesti.';
+ $('#quiz').innerHTML=`<div class="lbl">Tulemus</div><div class="score">${n} / ${N} <span class="quiet" style="font-size:18px">(${p}%)</span></div><div class="pbar"><i style="width:${p}%;background:${p>=70?'var(--ok)':p>=50?'var(--warn)':'var(--bad)'}"></i></div><p>${msg}</p>${wrong.length?`<h3>Vaata üle</h3><ul class="tight">${wrong.map(Q=>`<li><b>${esc(QS[Q.i][0])}</b><br>Õige: ${esc(QS[Q.i][1][0])}<br><span class="quiet small">${esc(QS[Q.i][2])}</span></li>`).join('')}</ul>`:''}<div class="stepbar"><button class="btn primary" id="qAgain">↻ Uuesti (uues järjekorras)</button></div>`;
+ $('#qAgain').onclick=quizStart;
+ const best=store.get('wifi8021x-best',0);if(n>best)store.set('wifi8021x-best',n);
+}
+quizStart();
+
+/* käivitus */
+const start=(location.hash||'').slice(1);
+showTab(TABS.some(t=>t[0]===start)?start:'moisted');
+</script>
+</body>
+</html>

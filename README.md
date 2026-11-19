@@ -12,6 +12,7 @@
 | --- | --- |
 | [Autentimise ja autoriseerimise simulaator](https://valdonolvak.github.io/Windows-serveri-haldus/interaktiivne/autentimise-simulaator.html) | Domeeniga liitmine, arvuti käivitamine, kasutaja sisselogimine (Kerberos, PAC, token, GPO-d), ligipääs failiserverile; rikked |
 | [GPO rakendamise simulaator](https://valdonolvak.github.io/Windows-serveri-haldus/interaktiivne/gpo-simulaator.html) | LSDOU järjekord, Enforced, Block Inheritance, turvafilter; 6 stsenaariumiülesannet |
+| [WiFi ja 802.1X: NPS ja RADIUS](https://valdonolvak.github.io/Windows-serveri-haldus/interaktiivne/wifi-8021x-nps.html) | 802.1X rollid, PEAP-i autentimine samm-sammult koos rikete ja evil twin rünnakuga, võrgupoliitikate tööpink, animeeritud labor 19, enesetest (25 küsimust) |
 
 ## Sisukord
 

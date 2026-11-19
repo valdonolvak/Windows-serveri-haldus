@@ -25,6 +25,8 @@ Kodune WiFi kasutab ühist parooli (**WPA2/WPA3-Personal**, PSK). Ettevõttes on
 
 *Joonis: 802.1X WiFi autentimine · klient, pääsupunkt, NPS ja AD*
 
+> **Interaktiivne õppeleht:** [WiFi ja 802.1X: NPS ja RADIUS](https://valdonolvak.github.io/Windows-serveri-haldus/interaktiivne/wifi-8021x-nps.html): rollid ja mõisted, autentimine samm-sammult (rikked ja võltspääsupunkt), võrgupoliitikate tööpink, labor 19 animeeritult ja [enesetest (25 küsimust)](https://valdonolvak.github.io/Windows-serveri-haldus/interaktiivne/wifi-8021x-nps.html#test).
+
 **Miks serveri sertifikaat on tähtis:** PEAP-i puhul peab klient kontrollima, et ta räägib õige NPS-iga (sertifikaat `PERENIMI-CA`-lt, nimi `dc1.perenimi.local`). Kui klient sertifikaati ei kontrolli, saab ründaja teha sama nimega võltsvõrgu (*evil twin*) ja püüda kinni kasutajate parooliräsid. Seetõttu seadistatakse WiFi-profiil GPO-ga, mitte kasutaja käsitsi.
 
 ### 21.2 NPS-i paigaldus ja sertifikaat
