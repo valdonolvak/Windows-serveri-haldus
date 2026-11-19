@@ -2,6 +2,8 @@
 
 Põhimõte on sama mis failide puhul (AGDLP, peatükk 8): **iga rakendus on ressurss, millel on oma domeenilokaalne rühm** `DL_APP_<rakendus>`. Rollirühmad `GG_<osakond>` pannakse rakendusrühmadesse ja tehnilised mehhanismid (GPO, AppLocker, IIS) vaatavad ainult rakendusrühma. Kui uus raamatupidaja tuleb tööle, lisatakse ta üksnes `GG_Raamatupidamine` rühma ja ta saab automaatselt kõik raamatupidaja rakendused; kui ta lahkub, kaovad need samuti.
 
+> **Interaktiivne simulaator:** [Rakenduste ligipääs AD rühmade järgi](https://valdonolvak.github.io/Windows-serveri-haldus/interaktiivne/rakenduste-ligipaas-simulaator.html) – muuda rühmaliikmesusi, logi kasutajana tööjaama sisse ja vaata, mis paigaldub, mis käivitub ja mis keelatakse. Näed ka, miks muudatus jõuab kasutajani alles pärast uut sisselogimist.
+
 ### 16.1 Mõisted
 
 | Termin (EN) | Selgitus |
@@ -16,7 +18,7 @@ Põhimõte on sama mis failide puhul (AGDLP, peatükk 8): **iga rakendus on ress
 | App Control for Business | AppLockeri uuem ja tugevam järglane (endine WDAC). Kehtib terve seadme kohta, mitte kasutajapõhiselt. Kui reegel peab sõltuma kasutaja rühmast, sobib AppLocker. |
 | URL-i autoriseerimine (IIS) | Veebiserveri reegel, mis lubab saidile või kaustale ainult teatud kasutajaid või rühmi; töötab koos Windowsi autentimisega. |
 
-### 16.2 Neli mehhanismi
+### 16.2 Viis mehhanismi
 
 | Mehhanism | Mida kontrollib | Millal kasutada | Laboris |
 | --- | --- | --- | --- |
@@ -24,8 +26,9 @@ Põhimõte on sama mis failide puhul (AGDLP, peatükk 8): **iga rakendus on ress
 | GPP otsetee + item-level targeting | **Kas kasutaja näeb rakendust** (otsetee, link) | Veebirakendused, jagatud programmid, mis on kõigil arvutis olemas | Raamatupidamise kaust ja intraneti link |
 | AppLocker | **Kas programmi tohib käivitada** | Kui rakendus on arvutis olemas, kuid kõik ei tohi seda kasutada | VLC ainult IT-le |
 | IIS URL-i autoriseerimine | **Kas veebirakendus/kaust avaneb** | Intranet, sisesed veebirakendused | `https://veeb.perenimi.local/sisene` |
+| Rakenduse enda õigused (NTFS + rakenduse kontroll) | **Mida kasutaja rakenduses teha tohib** (vaadata, muuta) | Rakendused, mille andmed on failiserveris või andmebaasis | Laoseis (16.8, Labor 14B) |
 
-Märkus: paigaldus ja otsetee ei ole turvameetmed – kui kasutaja leiab programmi käsitsi, saab ta selle käivitada. Tõeliselt keelab käivitamise ainult AppLocker (või rakenduse enda õigused).
+Märkus: paigaldus ja otsetee ei ole turvameetmed – kui kasutaja leiab programmi käsitsi, saab ta selle käivitada. Tõeliselt keelab käivitamise ainult AppLocker (või rakenduse enda õigused). Sama kehtib rakenduse sees: kui rakendus peidab nupu „Salvesta“, on see mugavus – andmeid kaitseb alles failiserveri või andmebaasi õigus.
 
 ### 16.3 Rühmad laboris
 
@@ -131,7 +134,69 @@ IIS-is saab saidi alamkausta piirata AD rühmaga. Selleks lülitatakse kaustal v
 </configuration>
 ```
 
-Autentimise seaded tehakse IIS Manageris (*Sites → veeb → sisene → Authentication*: *Anonymous* = Disabled, *Windows Authentication* = Enabled), sest need sektsioonid on vaikimisi serveri tasemel lukus. Et brauser logiks domeenikasutaja automaatselt sisse (ilma parooliküsimuseta), peab sait olema **Local Intranet** tsoonis: GPO `U_Intranet_Tsoon` → *User → Admin Templates → Windows Components → Internet Explorer → Internet Control Panel → Security Page → Site to Zone Assignment List*: `https://veeb.perenimi.local` = `1`. Kerberose jaoks registreeri SPN: `setspn -S HTTP/veeb.perenimi.local DC1`. Praktiline seadistus tehakse Labor 15-s.
+Autentimise seaded tehakse IIS Manageris (*Sites → veeb → sisene → Authentication*: *Anonymous* = Disabled, *Windows Authentication* = Enabled), sest need sektsioonid on vaikimisi serveri tasemel lukus. Et brauser logiks domeenikasutaja automaatselt sisse (ilma parooliküsimuseta), peab sait olema **Local Intranet** tsoonis: GPO `U_Intranet_Tsoon` → *User → Admin Templates → Windows Components → Internet Explorer → Internet Control Panel → Security Page → Site to Zone Assignment List*: `veeb.perenimi.local` = `1`. Kirjuta nimi **ilma protokollita** – siis kehtib tsoon nii `http://` kui ka `https://` aadressile (Labor 15 kasutab esmalt HTTP-d, peatükis 18 lisandub HTTPS). Kontroll kliendis: `gpresult /r /scope:user` peab näitama `U_Intranet_Tsoon` rakendununa. Kerberose jaoks registreeri SPN: `setspn -S HTTP/veeb.perenimi.local DC1`. Praktiline seadistus tehakse Labor 15-s.
+
+### 16.8 Rakenduse enda õigused: kaks taset ühes rakenduses
+
+Eelmised mehhanismid vastavad küsimusele „kas kasutaja saab rakenduse **kätte**“. Päris töös on sageli vaja ka teist taset: **mida ta rakenduses teha tohib**. Näiteks laoseisu peavad nägema nii müük kui ka raamatupidamine, aga muuta tohib ainult müük. Ka siin kasutame AGDLP-d – rakendusel on kaks rühma:
+
+| Rakendusrühm | Liikmed | Õigus |
+| --- | --- | --- |
+| `DL_APP_Laoseis` | `GG_Myyk`, `GG_Raamatupidamine` | Rakendus käivitub, andmeid saab vaadata (NTFS **Read & execute**) |
+| `DL_APP_Laoseis_Muutja` | `GG_Myyk` | Andmeid saab muuta (andmekaustal NTFS **Modify**) |
+
+Rakendus `Laoseis.ps1` on lihtne PowerShelli vormiga programm, mis loeb ja salvestab faili `laoseis.csv` (skript ja näidisandmed: [Skriptid/Laoseis](../Skriptid/Laoseis/)). Rakendus asub failiserveris ja kontrollid on kahes kohas:
+
+| Kontroll | Kus | Mida teeb | Kas on turvameede? |
+| --- | --- | --- | --- |
+| Otsetee (GPP + ILT) | Kasutaja töölaud | Otsetee on ainult `DL_APP_Laoseis` liikmetel | Ei – mugavus |
+| NTFS kaustal `Laoseis` | CORE1 | Programmi ja andmeid saavad lugeda ainult `DL_APP_Laoseis` liikmed; ABE peidab kausta teistelt | **Jah** |
+| Rakenduse kontroll `IsInRole()` | Rakendus ise | Kui kasutaja pole `DL_APP_Laoseis_Muutja` liige, on tabel kirjutuskaitstud ja nupp „Salvesta“ hall | Ei – mugavus (kasutaja saab skripti kopeerida ja muuta) |
+| NTFS kaustal `andmed` | CORE1 | Faili saavad muuta ainult `DL_APP_Laoseis_Muutja` liikmed | **Jah** |
+
+Rakendus küsib rühmaliikmesust Windowsilt nii:
+
+```powershell
+$id     = [Security.Principal.WindowsIdentity]::GetCurrent()      # sisselogitud kasutaja juurdepääsuluba
+$roll   = New-Object Security.Principal.WindowsPrincipal($id)
+$muutja = $roll.IsInRole("$env:USERDOMAIN\DL_APP_Laoseis_Muutja")  # $true või $false
+```
+
+`IsInRole()` ei küsi AD-st midagi: ta vaatab juurdepääsuluba (*access token*), mis loodi sisselogimisel. Seepärast jõuab rühmamuudatus rakendusse alles pärast **välja- ja sisselogimist** – täpselt nagu GPO-de ja AppLockeri puhul.
+
+> **Põhimõte:** kasutajaliides (peidetud nupp, puuduv otsetee) teeb rakenduse mugavaks, aga turvalisuse annab alati **serveri pool** – failiserveri NTFS-õigus, andmebaasi õigus või veebiserveri autoriseerimine. Labor 14B näitab seda praktiliselt: kui Mari muudab rakenduse koopiat nii, et nupp on aktiivne, keelab failiserver ikkagi salvestamise.
+
+### 16.9 Kontroll ja tõrkeotsing
+
+Kõik mehhanismid vaatavad kasutaja **juurdepääsuluba**. Seepärast on esimene samm alati kontrollida, kas rühm on AD-s õigesti **ja** kas see on jõudnud kasutaja tokenisse.
+
+```powershell
+# DC1: kas rühmad on AD-s õigesti?
+Get-ADPrincipalGroupMembership liis.lepp | Select-Object Name
+Get-ADGroupMember DL_APP_VLC -Recursive | Select-Object SamAccountName
+
+# Kliendis kasutajana: mis on tokenis praegu?
+whoami /groups | findstr DL_APP
+klist                                  # Kerberose piletid; klist purge kustutab need
+gpresult /r /scope:user                # rakendunud ja välja filtreeritud GPO-d (filtreerimise põhjusega)
+gpresult /h C:\Users\Public\gp.html     # sama HTML-aruandena
+```
+
+| Sümptom | Tõenäoline põhjus | Lahendus |
+| --- | --- | --- |
+| Rühm lisati, aga kasutajal midagi ei muutu | Token on vana – rühmad loetakse sisselogimisel | Kasutaja logib välja ja sisse; `whoami /groups` |
+| GPO ei rakendu **kellelegi**, ka õigetele rühmadele | Turvafiltrist eemaldati *Authenticated Users*, aga *Delegation* all puudub neil **Read** (MS16-072) | Lisa *Authenticated Users: Read* (ilma *Apply*-ta) |
+| `gpresult` näitab GPO-d all *Denied GPOs – Security* | Kasutaja pole turvafiltri rühmas | Kontrolli rühmade pesastust |
+| Tarkvara ei paigaldu, `gpupdate` ütleb „Software Installation … next logon“ | Paigaldus toimub ainult sisselogimisel; kiire sisselogimine (*Fast Logon Optimization*) jätab selle vahele | `C_Oota_Vorku` (peatükk 15); logi välja ja sisse (vajadusel kaks korda) |
+| Paigaldus ebaõnnestub, *Application* logis MsiInstaller/Application Management viga | Paketi tee pole UNC või kliendil pole jagamisele lugemisõigust | Kasuta `\\perenimi.local\Andmed\Tarkvara\...`; *Domain Computers* ja *Authenticated Users*: Read |
+| Rühmast eemaldatud kasutajal jäi programm alles | Paketil pole märgitud *Uninstall this application when it falls out of the scope of management* | Märgi see; eemaldamine toimub järgmisel sisselogimisel |
+| Otsetee jäi alles | GPP üksusel pole *Remove this item when it is no longer applied* | Märgi see *Common* vahekaardil |
+| AppLocker ei keela midagi, logis pole sündmusi | Teenus `AppIDSvc` ei tööta või reeglikogum on tühi | `Get-Service AppIDSvc`; GPO-s teenus *Automatic* |
+| AppLocker lubab, aga logis on 8003 | Režiim on *Audit only* | Kui logi on korras, muuda *Enforce rules* |
+| **Kõik** programmid on keelatud | Vaikereeglid on kustutatud | Taasta *Create Default Rules*; testi alati enne test-OU-s |
+| Intranet küsib parooli | Sait pole *Local Intranet* tsoonis | `U_Intranet_Tsoon`, nimi ilma protokollita |
+| Intranet: 401.2 | Kasutaja pole `DL_APP_Intranet` liige (autoriseerimine) | Lisa õige globaalrühm DL-rühma |
+| Laoseis: „Access to the path … is denied“ | Kasutaja pole `DL_APP_Laoseis` (avamine) või `DL_APP_Laoseis_Muutja` (salvestamine) liige | Kontrolli NTFS-i: *Properties → Security → Advanced → Effective Access* |
 
 ### Labor 14. Rakenduste ligipääs AD rühmade järgi
 
@@ -158,6 +223,90 @@ Autentimise seaded tehakse IIS Manageris (*Sites → veeb → sisene → Authent
 2. Miks on tarkvara paigaldus ja otsetee „mugavus“, aga AppLocker „turvalisus“?
 3. Miks peab GPO-l olema *Authenticated Users: Read*, kui turvafiltris neid enam pole?
 4. Mis juhtub AppLockeriga, kui teenus *Application Identity* ei käi?
+
+### Labor 14B. Rühmast sõltuv rakendus „Laoseis“
+
+**Eesmärk:** paigaldada failiserverisse rakendus, mille kasutamine sõltub ainult AD rühmast: müük saab laoseisu muuta, raamatupidamine ainult vaadata ja IT ei näe seda üldse. Näha, et rakenduse kasutajaliidese kontroll on mugavus, aga turvalisuse annab NTFS.
+
+**Eeldused:** Labor 7 (failiserver, `GG_` rühmad), Labor 12 (DFS nimeruum `\\perenimi.local\Andmed`), Labor 14 (`U_Otseteed`).
+
+**Oodatav tulemus:**
+
+| Kasutaja | Rollirühm | Otsetee | Rakendus avaneb | Saab salvestada |
+| --- | --- | --- | --- | --- |
+| `liis.lepp` | `GG_Myyk` | on | jah | jah |
+| `mari.maasikas` | `GG_Raamatupidamine` | on | jah, ainult vaatamiseks | ei |
+| `kati.karu` | `GG_IT` | pole | ei (kaust on ABE-ga peidetud) | ei |
+
+**Sammud:**
+
+1. **Rühmad** (DC1). GUI: `dsa.msc` → `Labor → Ryhmad` → *New → Group* → `DL_APP_Laoseis` ja `DL_APP_Laoseis_Muutja` (*Domain local*, *Security*) → liikmed nagu tabelis 16.8. PowerShell:
+
+   ```powershell
+   $ou = "OU=Ryhmad,OU=Labor,DC=perenimi,DC=local"
+   New-ADGroup -Name DL_APP_Laoseis        -GroupScope DomainLocal -GroupCategory Security -Path $ou
+   New-ADGroup -Name DL_APP_Laoseis_Muutja -GroupScope DomainLocal -GroupCategory Security -Path $ou
+   Add-ADGroupMember DL_APP_Laoseis        -Members GG_Myyk, GG_Raamatupidamine
+   Add-ADGroupMember DL_APP_Laoseis_Muutja -Members GG_Myyk
+   ```
+
+2. **Kaustad ja jagamine** (CORE1 konsoolis või DC1-st `Enter-PSSession core1`):
+
+   ```powershell
+   New-Item -ItemType Directory F:\Rakendused\Laoseis\andmed -Force
+   New-SmbShare -Name Rakendused -Path F:\Rakendused -FolderEnumerationMode AccessBased `
+     -ChangeAccess "Authenticated Users" -FullAccess "PERENIMI\Domain Admins"
+   ```
+
+   Jagamisõigus on lai (*Change*), tegeliku õiguse määrab NTFS. `-FolderEnumerationMode AccessBased` lülitab sisse ABE: kasutaja ei näe kaustu, kuhu tal õigust pole.
+
+3. **NTFS-õigused** (CORE1):
+
+   ```powershell
+   # Juurkaust: pärimine maha, kõigil ainult selle kausta sisu nägemine
+   icacls F:\Rakendused /inheritance:r /grant "SYSTEM:(OI)(CI)F" "Administrators:(OI)(CI)F" "Authenticated Users:RX"
+   # Rakenduse kaust: käivitamine ja lugemine rakendusrühmale
+   icacls F:\Rakendused\Laoseis /grant "PERENIMI\DL_APP_Laoseis:(OI)(CI)RX"
+   # Andmekaust: muutmine ainult muutjatele
+   icacls F:\Rakendused\Laoseis\andmed /grant "PERENIMI\DL_APP_Laoseis_Muutja:(OI)(CI)M"
+   icacls F:\Rakendused\Laoseis /T
+   ```
+
+   `(OI)(CI)` = õigus pärandub failidele (*object inherit*) ja alamkaustadele (*container inherit*). `Authenticated Users:RX` ilma `(OI)(CI)`-ta kehtib ainult kausta `F:\Rakendused` enda kohta.
+
+4. **DFS** (DC1): `dfsmgmt.msc` → nimeruum `\\perenimi.local\Andmed` → *New Folder* → nimi `Rakendused`, sihtkoht `\\core1\Rakendused`. PowerShell: `New-DfsnFolder -Path "\\perenimi.local\Andmed\Rakendused" -TargetPath "\\core1\Rakendused"`.
+
+5. **Rakendus ja andmed:** kopeeri failid `Laoseis.ps1` ja `laoseis.csv` ([Skriptid/Laoseis](../Skriptid/Laoseis/)) kaustadesse `\\perenimi.local\Andmed\Rakendused\Laoseis\` ja `...\Laoseis\andmed\`. Muuda skripti real `$juur = ...` `perenimi` oma domeeni nimeks. Salvesta skript kodeeringus **UTF-8 with BOM** (Windows PowerShell 5.1 loeb muidu täpitähed valesti).
+
+6. **Otsetee** GPO-s `U_Otseteed` → *User → Preferences → Windows Settings → Shortcuts → New → Shortcut*:
+   - *Name* `Laoseis`, *Target type* **File System Object**, *Location* **Desktop**;
+   - *Target path* `%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe`;
+   - *Arguments* `-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "\\perenimi.local\Andmed\Rakendused\Laoseis\Laoseis.ps1"`;
+   - *Common* → **Item-level targeting** → *Security Group* `PERENIMI\DL_APP_Laoseis` ja **Remove this item when it is no longer applied**.
+
+   `-ExecutionPolicy Bypass` lubab skripti käivitada. See ei ole turvaauk: käivitamispoliitika on kaitse kogemata käivitamise vastu, mitte õiguste piir – õigused määrab NTFS.
+
+7. **Test – Liis** (WIN11-01): logi sisse kui `liis.lepp`. Töölaual on „Laoseis“. Ava see: akna pealkirjas on „muutja“. Muuda toote 1002 kogus 8 → 20, vajuta *Salvesta*. Kontrolli, et failis `andmed\muudatused.log` on rida Liisi nimega.
+
+8. **Test – Mari** (WIN11-02): logi sisse kui `mari.maasikas`. Laoseis avaneb, pealkirjas „ainult vaatamine“, tabelit ei saa muuta ja *Salvesta* on hall. Mari näeb Liisi tehtud muudatust (kogus 20).
+
+9. **Test – Kati** (WIN11-01): logi sisse kui `kati.karu`. Otseteed pole. Ava Exploreris `\\perenimi.local\Andmed\Rakendused` – kaust `Laoseis` pole nähtav (ABE). Proovi otse teed `\\perenimi.local\Andmed\Rakendused\Laoseis` – *Access is denied*.
+
+10. **Möödaviigu katse – Mari:** kopeeri `Laoseis.ps1` oma töölauale, ava see Notepadis ja muuda rida `$muutja = $roll.IsInRole(...)` kujule `$muutja = $true`. Käivita koopia (paremklikk → *Run with PowerShell*). Nupp *Salvesta* on nüüd aktiivne – vajuta seda. Tulemus: **„Access to the path … laoseis.csv is denied“**. Proovi ka avada `laoseis.csv` otse Notepadis ja salvestada – sama tulemus. Kustuta koopia.
+
+11. **Rühma muutmine:** lisa DC1-l `GG_Raamatupidamine` rühma `DL_APP_Laoseis_Muutja`. Mari käivitab Laoseisu uuesti **välja logimata** – ikka „ainult vaatamine“. Kontrolli `whoami /groups | findstr Laoseis`: uut rühma pole. Mari logib välja ja sisse → nüüd „muutja“ ja salvestamine õnnestub. Eemalda `GG_Raamatupidamine` rühmast `DL_APP_Laoseis_Muutja` ja kontrolli pärast Mari uut sisselogimist, et ta on jälle vaataja.
+
+12. **Efektiivne õigus** (DC1): `\\core1\f$\Rakendused\Laoseis\andmed` → *Properties → Security → Advanced → Effective Access* → *Select a user* → võrdle kasutajaid `liis.lepp`, `mari.maasikas`, `kati.karu`.
+
+**Kontrollpunkt:** tulemused vastavad tabelile „Oodatav tulemus“; Mari möödaviigukatse lõpeb vea „Access denied“; rühmamuudatus jõuab rakendusse pärast uut sisselogimist; `muudatused.log` sisaldab ainult muutjate ridu.
+
+**Küsimused:**
+
+1. Miks on rakendusel kaks rühma, mitte üks?
+2. Rakendus peidab nupu „Salvesta“. Miks on sellest hoolimata vaja NTFS-õigust kaustal `andmed`?
+3. Miks ei muutu Mari õigus rakenduses enne, kui ta välja ja sisse logib? Kust `IsInRole()` rühmad võtab?
+4. Mis vahe on sammus 9 sellel, et Kati kausta **ei näe**, ja sellel, et tal pole sinna **õigust**?
+5. Ettevõte tahab, et IT saaks laoseisu vaadata, aga mitte muuta. Millise ühe käsuga seda teha?
 
 ---
 

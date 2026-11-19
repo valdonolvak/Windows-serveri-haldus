@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="et">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rakenduste ligipääs AD rühmade järgi – simulaator</title>
+<style>
+:root{--bg:#f7f6f3;--card:#fff;--ink:#1f1e1c;--quiet:#6b6862;--line:#dcd9d2;--acc:#2f6fd6;--acc-t:#e8f0fc;--ok:#2e7d4f;--ok-t:#e4f3ea;--bad:#b3261e;--bad-t:#fbe9e7;--warn:#9a6700;--warn-t:#fbf1dc;--mono:ui-monospace,Consolas,monospace;--desk:#1f4e79}
+@media (prefers-color-scheme:dark){:root{--bg:#1b1b1a;--card:#252524;--ink:#ecebe8;--quiet:#a3a09a;--line:#3a3936;--acc:#7aa7f0;--acc-t:#24324a;--ok:#6cc08b;--ok-t:#1f3428;--bad:#f08a80;--bad-t:#3d2220;--warn:#e0b250;--warn-t:#3a3020;--desk:#16324d}}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--ink)}
+.wrap{max-width:1360px;margin:auto;padding:18px 20px 40px}
+h1{font-size:22px;margin:0 0 4px}
+h2{font-size:16px;margin:0 0 8px}
+.lead{color:var(--quiet);margin:0 0 12px;max-width:980px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.tabs button,.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:6px 11px;font:inherit;font-size:14px;cursor:pointer}
+.tabs button.on{background:var(--acc-t);border-color:var(--acc);font-weight:600}
+.btn.primary{background:var(--acc);border-color:var(--acc);color:#fff}
+.btn:disabled{opacity:.4;cursor:default}
+.btn.sm{padding:3px 8px;font-size:13px}
+.lbl{font-size:12.5px;color:var(--quiet);text-transform:uppercase;letter-spacing:.04em;margin:10px 0 4px}
+.grid3{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);gap:16px}
+@media (max-width:1050px){.grid3{grid-template-columns:1fr}}
+.stack{display:grid;gap:16px;align-content:start}
+table.mx{border-collapse:collapse;font-size:13px;width:100%}
+table.mx th,table.mx td{border-bottom:1px solid var(--line);padding:3px 5px;text-align:center}
+table.mx th:first-child,table.mx td:first-child{text-align:left;white-space:nowrap}
+table.mx thead th{font-weight:600;font-size:11.5px;vertical-align:bottom}
+table.mx thead th span{writing-mode:vertical-rl;transform:rotate(180deg);display:inline-block;white-space:nowrap;font-family:var(--mono);font-weight:500}
+table.mx input{cursor:pointer;width:16px;height:16px}
+.opt{display:flex;flex-direction:column;gap:3px;font-size:13.5px}
+.opt label{display:flex;gap:7px;align-items:flex-start;cursor:pointer}
+.opt select{font:inherit;font-size:13px;padding:2px 4px;border-radius:6px;border:1px solid var(--line);background:var(--card);color:var(--ink)}
+svg text{font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+.pending{background:var(--warn-t);border-radius:8px;padding:8px 10px;font-size:13.5px;margin-top:8px}
+.users{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+/* tööjaam */
+.pc{border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.pc .top{display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--bg);border-bottom:1px solid var(--line);font-size:13px}
+.desk{background:linear-gradient(160deg,var(--desk),#2d6aa3);min-height:320px;padding:12px;display:flex;gap:14px;position:relative}
+.icons{display:flex;flex-direction:column;gap:8px;width:92px}
+.ic{display:flex;flex-direction:column;align-items:center;gap:2px;color:#fff;font-size:11.5px;text-align:center;cursor:pointer;border:0;background:none;padding:4px;border-radius:6px}
+.ic:hover{background:rgba(255,255,255,.15)}
+.ic .g{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:19px;background:rgba(255,255,255,.9);color:#1f1e1c}
+.start{background:rgba(20,20,20,.55);border-radius:10px;padding:8px 10px;color:#fff;font-size:12.5px;min-width:170px;align-self:flex-start}
+.start b{display:block;font-size:11px;opacity:.75;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
+.start button{display:block;width:100%;text-align:left;background:none;border:0;color:#fff;font:inherit;padding:3px 4px;border-radius:5px;cursor:pointer}
+.start button:hover{background:rgba(255,255,255,.15)}
+.start .muted{opacity:.6}
+.logon{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:#fff;width:100%;min-height:296px}
+.win{position:absolute;right:12px;top:12px;bottom:12px;left:118px;background:var(--card);color:var(--ink);border-radius:8px;box-shadow:0 6px 24px rgba(0,0,0,.35);display:flex;flex-direction:column;overflow:hidden}
+.win .tb{display:flex;align-items:center;gap:8px;padding:5px 10px;background:var(--bg);border-bottom:1px solid var(--line);font-size:12.5px}
+.win .tb .x{margin-left:auto;cursor:pointer;border:0;background:none;color:var(--ink);font-size:15px}
+.win .bd{padding:10px 12px;overflow:auto;font-size:13.5px;flex:1}
+.win table{border-collapse:collapse;width:100%;font-size:12.5px}
+.win td,.win th{border:1px solid var(--line);padding:2px 6px;text-align:left}
+.win td input{width:60px;font:inherit;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:4px;padding:0 4px}
+.win .blocked{color:var(--bad);font-weight:600}
+.tools{display:flex;gap:6px;flex-wrap:wrap;padding:8px 10px;border-top:1px solid var(--line);background:var(--bg)}
+.kv{font-family:var(--mono);font-size:12.3px;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;white-space:pre-wrap;word-break:break-word;max-height:260px;overflow:auto}
+.ev{font-size:13.5px;max-height:300px;overflow:auto}
+.ev div{padding:4px 8px;border-left:3px solid var(--line);margin:3px 0;background:var(--bg);border-radius:0 6px 6px 0}
+.ev .ok{border-color:var(--ok)}
+.ev .bad{border-color:var(--bad)}
+.ev .warn{border-color:var(--warn)}
+.ev .info{border-color:var(--acc)}
+.ev .hd{background:none;border:0;font-weight:600;padding:8px 0 0;color:var(--quiet);font-size:12.5px}
+code{font-family:var(--mono);font-size:.92em;background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:0 4px}
+.box{border-radius:8px;padding:9px 11px;margin-top:10px;font-size:14px}
+.box.ok{background:var(--ok-t)}.box.bad{background:var(--bad-t)}.box.check{background:var(--acc-t)}
+.box b.h{display:block;margin-bottom:2px}
+.q{margin-bottom:14px}
+.q .opts{display:grid;gap:7px;margin-top:8px}
+.q .opts button{text-align:left;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:8px 12px;font:inherit;font-size:14px;cursor:pointer}
+.q .opts button.right{background:var(--ok-t);border-color:var(--ok)}
+.q .opts button.wrong{background:var(--bad-t);border-color:var(--bad)}
+.legend{font-size:12.5px;color:var(--quiet);margin-top:6px}
+</style>
+</head>
+<body>
+<div class="wrap"><p style="margin:0 0 6px;font-size:14px"><a href="../" style="color:inherit">← Õppematerjali sisukord</a> · <a href="index.html" style="color:inherit">Kõik simulaatorid</a> · <a href="https://github.com/valdonolvak/Windows-serveri-haldus/blob/main/peatykid/16-rakenduste-ligipaas-ad-ruhmadega.md" style="color:inherit">Peatükk 16</a></p>
+<h1>Rakenduste ligipääs AD rühmade järgi – simulaator</h1>
+<p class="lead">Vasakul on <b>Active Directory</b> (DC1): kasutajad, rollirühmad <code>GG_</code> ja rakendusrühmad <code>DL_APP_</code> (AGDLP). Paremal on tööjaam <b>WIN11-01</b>: logi sisse, käivita programme, ava otseteid ja rakendust Laoseis. Muuda rühmaliikmesusi ja seadeid ning vaata, mis muutub – ja <b>millal</b>: tööjaam näeb muudatust alles siis, kui kasutaja logib uuesti sisse, sest rühmad kirjutatakse sisselogimisel tema juurdepääsuloale (<i>access token</i>).</p>
+
+<div class="tabs" id="tabs"><button class="on" data-t="sim">Simulaator</button><button data-t="quiz">Ülesanded (8)</button></div>
+
+<div id="simView">
+<div class="grid3">
+ <div class="stack">
+  <div class="card">
+   <h2>Active Directory (DC1)</h2>
+   <div id="agdlp"></div>
+   <p class="legend">Paks joon = valitud kasutaja tee tokenis. Kollane katkendjoon = AD-s juba olemas, aga kasutaja tokenis veel mitte (ootab uut sisselogimist). Hall = tee, mis seda kasutajat ei puuduta.</p>
+   <div class="lbl">Kasutajad rollirühmades (A → G)</div>
+   <table class="mx" id="mxU"></table>
+   <div class="lbl">Rollirühmad rakendusrühmades (G → DL)</div>
+   <table class="mx" id="mxG"></table>
+   <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap"><button class="btn sm" id="resetAD">⟲ Peatüki 16 algseis</button></div>
+  </div>
+  <div class="card">
+   <h2>Seaded (GPO-d, AppLocker, IIS, failiserver)</h2>
+   <div class="opt" id="opts"></div>
+  </div>
+ </div>
+
+ <div class="stack">
+  <div class="card">
+   <h2>WIN11-01</h2>
+   <div class="pc">
+    <div class="top" id="pctop"></div>
+    <div class="desk" id="desk"></div>
+    <div class="tools" id="tools"></div>
+   </div>
+   <div id="pend"></div>
+  </div>
+  <div class="card">
+   <h2>Mis juhtus</h2>
+   <div class="ev" id="ev"></div>
+  </div>
+  <div class="card" id="outCard" hidden>
+   <h2 id="outTitle"></h2>
+   <div class="kv" id="out"></div>
+  </div>
+ </div>
+</div>
+</div>
+
+<div id="quizView" hidden>
+ <div class="card" style="max-width:920px">
+  <p style="margin-top:0">Iga ülesanne kirjeldab olukorda laboris. Vali õige vastus – selgitus avaneb kohe. Nupp <b>Proovi simulaatoris</b> seab simulaatori sellesse olukorda.</p>
+  <div id="quiz"></div>
+  <p class="legend" id="qscore"></p>
+ </div>
+</div>
+</div>
+
+<script>
+/* ============ Mudel ============ */
+const USERS={kati:{n:'kati.karu',d:'IT'},mari:{n:'mari.maasikas',d:'Raamatupidamine'},liis:{n:'liis.lepp',d:'Müük'}};
+const GG=['GG_IT','GG_Raamatupidamine','GG_Myyk'];
+const DL=[
+ {id:'DL_APP_7Zip',m:'GPO paigaldus'},
+ {id:'DL_APP_Firefox',m:'GPO paigaldus'},
+ {id:'DL_APP_VLC',m:'GPO paigaldus + AppLocker'},
+ {id:'DL_APP_Raamat',m:'GPP otsetee'},
+ {id:'DL_APP_Intranet',m:'GPP otsetee + IIS'},
+ {id:'DL_APP_Laoseis',m:'GPP otsetee + NTFS'},
+ {id:'DL_APP_Laoseis_Muutja',m:'NTFS + rakendus'},
+ {id:'DL_Raamatupidamine_RW',m:'NTFS (peatükk 8)'},
+ {id:'DL_Raamatupidamine_R',m:'NTFS (peatükk 8)'}
+];
+const MECH=['GPO tarkvara paigaldus','GPP otsetee (ILT)','AppLocker','IIS URL Authorization','NTFS / rakendus'];
+const MECHOF={DL_APP_7Zip:[0],DL_APP_Firefox:[0],DL_APP_VLC:[0,2],DL_APP_Raamat:[1],DL_APP_Intranet:[1,3],DL_APP_Laoseis:[1,4],DL_APP_Laoseis_Muutja:[4],DL_Raamatupidamine_RW:[4],DL_Raamatupidamine_R:[4]};
+const APPS={'7zip':{n:'7-Zip',dl:'DL_APP_7Zip',gpo:'U_APP_7Zip',exe:'C:\\Program Files\\7-Zip\\7zFM.exe',ic:'🗜'},
+ firefox:{n:'Firefox',dl:'DL_APP_Firefox',gpo:'U_APP_Firefox',exe:'C:\\Program Files\\Mozilla Firefox\\firefox.exe',ic:'🦊'},
+ vlc:{n:'VLC',dl:'DL_APP_VLC',gpo:'U_APP_VLC',exe:'C:\\Program Files\\VideoLAN\\VLC\\vlc.exe',ic:'🎬'}};
+const SHORT={raamat:{n:'Raamatupidamine',dl:['DL_APP_Raamat'],ic:'📁'},intranet:{n:'Intranet',dl:['DL_APP_Intranet'],ic:'🌐'},laoseis:{n:'Laoseis',dl:['DL_APP_Laoseis'],ic:'📦'}};
+
+function defaults(){return {
+ ug:{kati:['GG_IT'],mari:['GG_Raamatupidamine'],liis:['GG_Myyk']},
+ gd:{DL_APP_7Zip:['GG_IT'],DL_APP_Firefox:['GG_IT','GG_Raamatupidamine','GG_Myyk'],DL_APP_VLC:['GG_IT'],DL_APP_Raamat:['GG_Raamatupidamine'],DL_APP_Intranet:['GG_Myyk','GG_IT'],
+     DL_APP_Laoseis:['GG_Myyk','GG_Raamatupidamine'],DL_APP_Laoseis_Muutja:['GG_Myyk'],DL_Raamatupidamine_RW:['GG_Raamatupidamine'],DL_Raamatupidamine_R:['GG_Myyk']}};}
+function defOpt(){return {deleg:true,uninst:true,remove:true,al:'enforce',appid:true,zone:true,appcheck:true,abe:true};}
+let AD=defaults(),OPT=defOpt();
+let PC={files:new Set(),menu:{kati:new Set(),mari:new Set(),liis:new Set()},sc:{kati:new Set(),mari:new Set(),liis:new Set()},tok:{},user:null,win:null,csv:{1002:8},modded:false};
+let sel='kati';
+let EV=[];
+
+function adGroups(u){const g=new Set(['Domain Users',...AD.ug[u]]);for(const d of DL)if(AD.gd[d.id].some(x=>AD.ug[u].includes(x)))g.add(d.id);return g;}
+function tokenOf(u){return PC.tok[u]||null;}
+function has(u,grp){const t=tokenOf(u);return !!t&&t.has(grp);}
+
+/* ============ Sündmused ============ */
+function ev(cls,html){EV.push({cls,html});}
+function hd(t){EV.push({cls:'hd',html:t});}
+function renderEv(){const e=document.getElementById('ev');e.innerHTML=EV.slice(-40).map(x=>`<div class="${x.cls}">${x.html}</div>`).join('')||'<span class="legend">Logi kasutajana sisse.</span>';e.scrollTop=e.scrollHeight;}
+
+/* ============ Sisselogimine ja GPO töötlus ============ */
+function logon(u){
+ PC.user=u;PC.win=null;PC.tok[u]=adGroups(u);
+ hd(`${new Date().toLocaleTimeString('et-EE')} · ${USERS[u].n} logib sisse`);
+ ev('info',`DC1 väljastab Kerberose pileti; PAC-is on rühmad: <code>${[...PC.tok[u]].filter(g=>g!=='Domain Users').join('</code>, <code>')}</code>. Nende põhjal luuakse juurdepääsuluba.`);
+ applySoftware(u,true);applyShortcuts(u);
+ draw();
+}
+function logoff(){if(!PC.user)return;hd(`${USERS[PC.user].n} logib välja`);PC.user=null;PC.win=null;draw();}
+function applySoftware(u,atLogon){
+ for(const [k,a] of Object.entries(APPS)){
+  const inFilter=has(u,a.dl);
+  const applies=OPT.deleg&&inFilter;
+  if(applies){
+   if(!PC.menu[u].has(k)){
+     if(atLogon){PC.menu[u].add(k);PC.files.add(k);ev('ok',`GPO <code>${a.gpo}</code> rakendub (turvafilter <code>${a.dl}</code>) → <b>${a.n}</b> paigaldatakse.`);}
+     else ev('warn',`<code>${a.gpo}</code>: tarkvara paigaldus toimub ainult sisselogimisel – „Certain user policies are enabled that can only run during logon.“`);
+   }
+  } else {
+   if(!OPT.deleg&&inFilter)ev('bad',`GPO <code>${a.gpo}</code> ei rakendu: kasutaja on küll turvafiltris, aga GPO-d ei saa lugeda (Delegation: <i>Authenticated Users – Read</i> puudub, MS16-072). <code>gpresult</code>: „Denied (Security)“ / „Inaccessible“.`);
+   if(PC.menu[u].has(k)){
+     if(!atLogon)continue;
+     if(OPT.uninst){PC.menu[u].delete(k);if(!Object.values(PC.menu).some(s=>s.has(k)))PC.files.delete(k);ev('warn',`<code>${a.gpo}</code> enam ei kehti → <b>${a.n}</b> eemaldatakse (<i>Uninstall when it falls out of the scope of management</i>).`);}
+     else ev('warn',`<code>${a.gpo}</code> enam ei kehti, aga <b>${a.n}</b> jääb alles, sest „Uninstall … out of scope“ pole märgitud.`);
+   }
+  }
+ }
+}
+function applyShortcuts(u){
+ for(const [k,s] of Object.entries(SHORT)){
+  const ok=s.dl.some(g=>has(u,g));
+  if(ok&&!PC.sc[u].has(k)){PC.sc[u].add(k);ev('ok',`<code>U_Otseteed</code>: otsetee <b>${s.n}</b> luuakse (ILT: <code>${s.dl.join(' või ')}</code>).`);}
+  if(!ok&&PC.sc[u].has(k)){
+    if(OPT.remove){PC.sc[u].delete(k);ev('warn',`<code>U_Otseteed</code>: otsetee <b>${s.n}</b> kustutatakse (ILT ei kehti, <i>Remove this item when no longer applied</i>).`);}
+    else ev('warn',`<code>U_Otseteed</code>: otsetee <b>${s.n}</b> jääb alles, sest „Remove this item…“ pole märgitud.`);}
+ }
+}
+function gpupdate(){
+ const u=PC.user;hd(`gpupdate /force (${USERS[u].n})`);
+ const diff=[...adGroups(u)].filter(g=>!PC.tok[u].has(g)),gone=[...PC.tok[u]].filter(g=>!adGroups(u).has(g));
+ if(diff.length||gone.length)ev('warn',`Rühmapoliitika töödeldakse uuesti, aga <b>sama juurdepääsuloaga</b> – AD muudatused (${[...diff.map(x=>'+'+x),...gone.map(x=>'−'+x)].join(', ')}) ei ole tokenis. GPO turvafilter ja ILT näevad vanu rühmi.`);
+ applySoftware(u,false);applyShortcuts(u);ev('info','Kasutajapoliitika värskendus lõpetatud.');draw();
+}
+
+/* ============ Tegevused tööjaamas ============ */
+function runApp(k,fromMenu){
+ const u=PC.user,a=APPS[k];hd(`${USERS[u].n} käivitab ${fromMenu?'Start-menüüst':'käsitsi'} ${a.n}`);
+ if(!PC.files.has(k)){ev('bad',`<code>${a.exe}</code> – faili pole. Programm pole sellesse arvutisse paigaldatud.`);PC.win={t:a.n,h:`<p class="blocked">Windows ei leia faili „${a.exe}“.</p>`};return draw();}
+ if(!fromMenu)ev('info',`Start-menüüs ${a.n}-i pole, aga programm on arvutis (paigaldatud teisele kasutajale) – kasutaja käivitab <code>${a.exe}</code> otse.`);
+ const r=applocker(u,k);
+ PC.win=r.ok?{t:a.n,h:`<p>${a.ic} <b>${a.n}</b> töötab.</p>`}:{t:'This app has been blocked',h:`<p class="blocked">This app has been blocked by your system administrator.</p><p>Contact your system administrator for more info.</p>`};
+ draw();
+}
+function applocker(u,k){
+ const a=APPS[k];
+ if(OPT.al==='off'){ev('ok',`AppLocker pole seadistatud → ${a.n} käivitub.`);return {ok:true};}
+ if(!OPT.appid){ev('warn',`Teenus <b>Application Identity</b> ei tööta → AppLocker ei jõusta midagi, logis sündmusi pole. ${a.n} käivitub.`);return {ok:true};}
+ let allowed=true,rule='';
+ if(k==='vlc'){allowed=has(u,'DL_APP_VLC');rule=allowed?'reegel „Allow DL_APP_VLC: %PROGRAMFILES%\\VideoLAN\\*“':'vaikereegel „Program Files“ välistab VideoLAN-i ja tokenis pole DL_APP_VLC';}
+ else rule='vaikereegel „All files located in the Program Files folder“ (Everyone)';
+ if(allowed){ev('ok',`AppLocker sündmus <b>8002</b> (lubatud): ${rule}.`);return {ok:true};}
+ if(OPT.al==='audit'){ev('warn',`AppLocker sündmus <b>8003</b>: oleks keelatud (${rule}), aga režiim on <i>Audit only</i> → käivitub.`);return {ok:true};}
+ ev('bad',`AppLocker sündmus <b>8004</b> – keelatud: ${rule}.`);return {ok:false};
+}
+function openShortcut(k){
+ const u=PC.user;hd(`${USERS[u].n} avab ${SHORT[k].n}`);
+ if(k==='raamat'){
+  const rw=has(u,'DL_Raamatupidamine_RW'),r=has(u,'DL_Raamatupidamine_R');
+  if(rw||r){ev('ok',`NTFS: <code>\\\\perenimi.local\\Andmed\\Osakonnad\\Raamatupidamine</code> – ${rw?'muutmine (DL_Raamatupidamine_RW)':'ainult lugemine (DL_Raamatupidamine_R)'}.`);PC.win={t:'Raamatupidamine',h:`<p>📄 arved_2026.xlsx<br>📄 eelarve.xlsx<br>📁 Aruanded</p><p style="color:var(--quiet)">${rw?'Saad faile muuta ja lisada.':'Saad faile avada, aga mitte salvestada.'}</p>`};}
+  else{ev('bad','NTFS: kasutajal pole kaustale õigust; ABE peidab kausta. Otsetee ei anna õigust – see on ainult viide.');PC.win={t:'Raamatupidamine',h:'<p class="blocked">Windows cannot access \\\\perenimi.local\\Andmed\\Osakonnad\\Raamatupidamine. You do not have permission to access …</p>'};}
+ }
+ if(k==='intranet'){
+  if(!OPT.zone)ev('warn','Sait pole <i>Local Intranet</i> tsoonis → brauser ei saada volitusi automaatselt ja küsib kasutajanime ja parooli. Kasutaja sisestab need.');
+  ev('info','IIS: anonüümne autentimine keelatud → 401 + Negotiate → Kerberose teenusepilet HTTP/veeb.perenimi.local.');
+  if(has(u,'DL_APP_Intranet')){ev('ok','IIS URL Authorization: tokenis on DL_APP_Intranet → <b>200 OK</b>.');PC.win={t:'Intranet – veeb.perenimi.local/sisene',h:`<h3 style="margin:0 0 6px">Intranet – ainult DL_APP_Intranet</h3><p>Tere, ${USERS[u].n}!</p>`};}
+  else{ev('bad','IIS URL Authorization: tokenis pole DL_APP_Intranet → <b>401.2</b>.');PC.win={t:'veeb.perenimi.local/sisene',h:'<p class="blocked">401 - Unauthorized: Access is denied due to invalid credentials.</p>'};}
+ }
+ if(k==='laoseis')openLaoseis(false);
+ draw();
+}
+function openLaoseis(copy){
+ const u=PC.user;
+ if(!has(u,'DL_APP_Laoseis')){
+  ev('bad',`NTFS: <code>Laoseis.ps1</code> lugemine keelatud – tokenis pole <code>DL_APP_Laoseis</code>${OPT.abe?' (ABE peidab kausta Laoseis sootuks)':''}.`);
+  PC.win={t:'Windows PowerShell',h:`<p class="blocked">${copy?'':'. : '}Access to the path '\\\\perenimi.local\\Andmed\\Rakendused\\Laoseis\\Laoseis.ps1' is denied.</p>`};return;}
+ if(copy)ev('warn','Mari käivitab <b>muudetud koopia</b> töölaualt: rida <code>$muutja = $true</code> – rakenduse kontroll on välja lülitatud.');
+ else ev('ok','NTFS: <code>DL_APP_Laoseis</code> → Read &amp; execute. Laoseis.ps1 käivitub ja loeb laoseis.csv.');
+ const m=has(u,'DL_APP_Laoseis_Muutja');
+ const uiEdit=copy||!OPT.appcheck||m;
+ if(!copy)ev(m?'ok':'info',OPT.appcheck?`Rakendus: <code>IsInRole("PERENIMI\\DL_APP_Laoseis_Muutja")</code> = <b>${m?'$true':'$false'}</b> → ${m?'muutmine lubatud':'ainult vaatamine, nupp „Salvesta“ hall'}.`:'Rakenduse <code>IsInRole()</code> kontroll on välja lülitatud → nupp on kõigile aktiivne.');
+ PC.win={t:`Laoseis – PERENIMI\\${USERS[u].n} – ${uiEdit?'muutja':'ainult vaatamine'}`,lao:true,edit:uiEdit};
+}
+function saveLaoseis(){
+ const u=PC.user;const inp=document.getElementById('kogus');const v=inp?inp.value:PC.csv[1002];
+ hd(`${USERS[u].n} vajutab „Salvesta“`);
+ if(has(u,'DL_APP_Laoseis_Muutja')){PC.csv[1002]=v;ev('ok',`NTFS: <code>DL_APP_Laoseis_Muutja</code> → Modify. laoseis.csv salvestatud, muudatused.log: <code>…;PERENIMI\\${USERS[u].n};salvestas</code>.`);alertWin('Salvestatud.',false);}
+ else{ev('bad','NTFS keelab kirjutamise: tokenis pole <code>DL_APP_Laoseis_Muutja</code>. Kasutajaliides lubas, aga <b>failiserver ei luba</b>.');alertWin("Salvestamine ebaõnnestus:\nAccess to the path '\\\\perenimi.local\\Andmed\\Rakendused\\Laoseis\\andmed\\laoseis.csv' is denied.",true);}
+ draw();
+}
+function alertWin(t,bad){PC.win={...PC.win,msg:t,bad};}
+function notepad(){
+ const u=PC.user;hd(`${USERS[u].n} avab laoseis.csv Notepadis ja salvestab`);
+ if(!has(u,'DL_APP_Laoseis')){ev('bad','NTFS: faili ei saa isegi avada.');PC.win={t:'Notepad',h:'<p class="blocked">Access is denied.</p>'};return draw();}
+ if(has(u,'DL_APP_Laoseis_Muutja')){ev('ok','NTFS lubab salvestada (Modify). Rakendusest mööda minnes saab muutja faili ka otse muuta – logisse rida ei teki!');PC.win={t:'laoseis.csv – Notepad',h:'<p>Salvestatud.</p>'};}
+ else{ev('bad','Notepad: „Access is denied“ – NTFS kaitseb faili sõltumata sellest, millise programmiga seda muuta püütakse.');PC.win={t:'laoseis.csv – Notepad',h:'<p class="blocked">Cannot create the \\\\perenimi.local\\Andmed\\Rakendused\\Laoseis\\andmed\\laoseis.csv file.<br>Access is denied.</p>'};}
+ draw();
+}
+function whoami(){const t=[...PC.tok[PC.user]];const ad=adGroups(PC.user);
+ show('whoami /groups (filtreeritud)',`GROUP INFORMATION\n-----------------\n`+t.map(g=>`PERENIMI\\${g.padEnd(26)} Group  Mandatory group, Enabled`).join('\n')+(ad.size!==t.length||[...ad].some(g=>!PC.tok[PC.user].has(g))?`\n\n# NB! AD-s on praegu teised rühmad: ${[...ad].join(', ')}\n# Token uueneb alles uuel sisselogimisel.`:''));}
+function gpresult(){const u=PC.user;let o=`USER SETTINGS\n-------------\n    Applied Group Policy Objects\n    -----------------------------\n        U_Otseteed\n        U_Intranet_Tsoon\n`;
+ const den=[];for(const a of Object.values(APPS)){if(OPT.deleg&&has(u,a.dl))o+=`        ${a.gpo}\n`;else den.push(`        ${a.gpo}\n            Filtering:  ${OPT.deleg?'Denied (Security)':'Not Applied (Unknown Reason) / Inaccessible'}`);}
+ o+=`\n    The following GPOs were not applied because they were filtered out\n    -------------------------------------------------------------------\n`+(den.join('\n')||'        (puuduvad)');
+ o+=`\n\n    The user is a part of the following security groups\n    ---------------------------------------------------\n        `+[...PC.tok[u]].join('\n        ');show('gpresult /r /scope:user',o);}
+function show(t,x){document.getElementById('outCard').hidden=false;document.getElementById('outTitle').textContent=t;document.getElementById('out').textContent=x;}
+
+/* ============ Joonistamine ============ */
+function drawAGDLP(){
+ const W=640,rowH=30,top=26,H=top+DL.length*rowH+8;
+ const xU=10,xG=150,xD=330,xM=520;
+ const uY={},gY={},dY={},mY={};
+ Object.keys(USERS).forEach((u,i)=>uY[u]=top+60+i*80);
+ GG.forEach((g,i)=>gY[g]=top+60+i*80);
+ DL.forEach((d,i)=>dY[d.id]=top+i*rowH+12);
+ MECH.forEach((m,i)=>mY[i]=top+22+i*56);
+ const viewer=PC.user||sel;const tok=PC.tok[viewer]&&PC.user===viewer?PC.tok[viewer]:null;const ad=adGroups(viewer);
+ let o=`<svg viewBox="0 0 ${W} ${H}" width="100%">`;
+ [['Kasutajad (A)',xU],['Rollirühmad (G)',xG],['Rakendusrühmad (DL)',xD],['Mehhanism',xM]].forEach(([t,x])=>o+=`<text x="${x}" y="14" font-size="11" fill="var(--quiet)" font-weight="600">${t}</text>`);
+ const line=(x1,y1,x2,y2,st)=>{const c=st==='on'?'var(--acc)':st==='pend'?'var(--warn)':'var(--line)';o+=`<path d="M${x1},${y1} C${(x1+x2)/2},${y1} ${(x1+x2)/2},${y2} ${x2},${y2}" fill="none" stroke="${c}" stroke-width="${st==='on'?2.6:st==='pend'?2:1.1}" ${st==='pend'?'stroke-dasharray="5 4"':''}/>`;};
+ const inTok=g=>tok?tok.has(g):ad.has(g);
+ // A→G
+ for(const u of Object.keys(USERS))for(const g of AD.ug[u]){let st='off';if(u===viewer)st=tok&&!tok.has(g)?'pend':'on';line(xU+112,uY[u],xG,gY[g],st);}
+ // G→DL
+ for(const d of DL)for(const g of AD.gd[d.id]){let st='off';if(AD.ug[viewer].includes(g))st=(tok&&!tok.has(d.id))?'pend':'on';line(xG+140,gY[g],xD,dY[d.id],st);}
+ // DL→M
+ for(const d of DL)for(const m of MECHOF[d.id]){const st=inTok(d.id)?'on':(ad.has(d.id)?'pend':'off');line(xD+170,dY[d.id],xM,mY[m],st);}
+ // pending removed (in token but not AD)
+ const box=(x,y,w,h,t,on,pend,sub)=>{o+=`<rect x="${x}" y="${y-h/2}" width="${w}" height="${h}" rx="6" fill="${on?'var(--acc-t)':pend?'var(--warn-t)':'var(--card)'}" stroke="${on?'var(--acc)':pend?'var(--warn)':'var(--line)'}" ${pend?'stroke-dasharray="4 3"':''}/><text x="${x+8}" y="${y+(sub?-1:4)}" font-size="11.5" fill="var(--ink)" font-family="${sub?'':'var(--mono)'}" font-weight="${on?600:400}">${t}</text>`+(sub?`<text x="${x+8}" y="${y+12}" font-size="10" fill="var(--quiet)">${sub}</text>`:'');};
+ for(const u of Object.keys(USERS))box(xU,uY[u],112,34,USERS[u].n,u===viewer,false,USERS[u].d+(PC.user===u?' · sees':''));
+ for(const g of GG){const on=AD.ug[viewer].includes(g)&&(!tok||tok.has(g)),pe=(AD.ug[viewer].includes(g)&&tok&&!tok.has(g))||(tok&&tok.has(g)&&!AD.ug[viewer].includes(g));box(xG,gY[g],140,26,g,on,pe);}
+ for(const d of DL){const on=tok?tok.has(d.id)&&ad.has(d.id):ad.has(d.id);const pe=tok&&(tok.has(d.id)!==ad.has(d.id));box(xD,dY[d.id],170,24,d.id.replace('DL_Raamatupidamine','DL_Raamatup.'),on&&!pe,pe);}
+ MECH.forEach((m,i)=>{box(xM,mY[i],116,34,'',false,false);o+=`<text x="${xM+8}" y="${mY[i]-2}" font-size="11" fill="var(--ink)" font-weight="600">${m.split(' ').slice(0,2).join(' ')}</text><text x="${xM+8}" y="${mY[i]+11}" font-size="10" fill="var(--quiet)">${m.split(' ').slice(2).join(' ')}</text>`;});
+ o+='</svg>';document.getElementById('agdlp').innerHTML=o;
+}
+function drawMatrix(){
+ let h=`<thead><tr><th>Kasutaja</th>${GG.map(g=>`<th><span>${g}</span></th>`).join('')}</tr></thead><tbody>`;
+ for(const [u,U] of Object.entries(USERS))h+=`<tr><td>${U.n}</td>${GG.map(g=>`<td><input type="checkbox" data-u="${u}" data-g="${g}" ${AD.ug[u].includes(g)?'checked':''}></td>`).join('')}</tr>`;
+ document.getElementById('mxU').innerHTML=h+'</tbody>';
+ h=`<thead><tr><th>Rakendusrühm</th>${GG.map(g=>`<th><span>${g}</span></th>`).join('')}</tr></thead><tbody>`;
+ for(const d of DL)h+=`<tr><td><code>${d.id}</code></td>${GG.map(g=>`<td><input type="checkbox" data-d="${d.id}" data-g="${g}" ${AD.gd[d.id].includes(g)?'checked':''}></td>`).join('')}</tr>`;
+ document.getElementById('mxG').innerHTML=h+'</tbody>';
+ document.querySelectorAll('#mxU input').forEach(c=>c.onchange=()=>{const a=AD.ug[c.dataset.u];c.checked?a.push(c.dataset.g):a.splice(a.indexOf(c.dataset.g),1);hd('DC1: muudatus AD-s');ev('info',`${c.checked?'Add':'Remove'}-ADGroupMember ${c.dataset.g} -Members ${USERS[c.dataset.u].n}`);draw();});
+ document.querySelectorAll('#mxG input').forEach(c=>c.onchange=()=>{const a=AD.gd[c.dataset.d];c.checked?a.push(c.dataset.g):a.splice(a.indexOf(c.dataset.g),1);hd('DC1: muudatus AD-s');ev('info',`${c.checked?'Add':'Remove'}-ADGroupMember ${c.dataset.d} -Members ${c.dataset.g}`);draw();});
+}
+function drawOpts(){
+ const cb=(k,t)=>`<label><input type="checkbox" data-o="${k}" ${OPT[k]?'checked':''}><span>${t}</span></label>`;
+ document.getElementById('opts').innerHTML=
+  cb('deleg','U_APP_* GPO-del <i>Delegation</i>: Authenticated Users – <b>Read</b> (MS16-072)')+
+  cb('uninst','Paketil <i>Uninstall this application when it falls out of the scope of management</i>')+
+  cb('remove','Otseteedel <i>Remove this item when it is no longer applied</i>')+
+  `<label><span style="min-width:150px">AppLockeri režiim (EXE):</span><select data-o="al"><option value="off">pole seadistatud</option><option value="audit">Audit only</option><option value="enforce">Enforce rules</option></select></label>`+
+  cb('appid','Teenus <b>Application Identity</b> (AppIDSvc) töötab')+
+  cb('zone','GPO <code>U_Intranet_Tsoon</code>: veeb.perenimi.local on Local Intranet tsoonis')+
+  cb('appcheck','Laoseis.ps1 kontrollib <code>IsInRole(DL_APP_Laoseis_Muutja)</code>')+
+  cb('abe','Jagamisel <code>Rakendused</code> on ABE (Access-based enumeration)');
+ document.querySelector('#opts select').value=OPT.al;
+ document.querySelectorAll('#opts input').forEach(c=>c.onchange=()=>{OPT[c.dataset.o]=c.checked;draw();});
+ document.querySelector('#opts select').onchange=e=>{OPT.al=e.target.value;draw();};
+}
+function drawPC(){
+ const u=PC.user;const top=document.getElementById('pctop'),desk=document.getElementById('desk'),tools=document.getElementById('tools');
+ if(!u){
+  top.innerHTML='<b>Sisselogimine</b><span style="margin-left:auto;color:var(--quiet)">PERENIMI</span>';
+  desk.innerHTML=`<div class="logon"><div style="font-size:15px">Vali kasutaja ja logi sisse</div><div class="users">${Object.entries(USERS).map(([k,x])=>`<button class="btn ${k===sel?'primary':''}" data-sel="${k}">${x.n}</button>`).join('')}</div><button class="btn primary" id="doLogon">Logi sisse kui ${USERS[sel].n}</button></div>`;
+  tools.innerHTML='<span class="legend" style="margin:0">Tööjaam on sisselogimise ootel.</span>';
+  desk.querySelectorAll('[data-sel]').forEach(b=>b.onclick=()=>{sel=b.dataset.sel;draw();});
+  document.getElementById('doLogon').onclick=()=>logon(sel);
+  return;}
+ top.innerHTML=`<b>PERENIMI\\${USERS[u].n}</b><span style="color:var(--quiet)">· ${USERS[u].d}</span>`;
+ let icons=[...PC.sc[u]].map(k=>`<button class="ic" data-sc="${k}"><span class="g">${SHORT[k].ic}</span>${SHORT[k].n}</button>`).join('');
+ const menu=Object.entries(APPS).map(([k,a])=>{const inM=PC.menu[u].has(k);return inM?`<button data-run="${k}" data-m="1">${a.ic} ${a.n}</button>`:'';}).join('');
+ const manual=Object.entries(APPS).filter(([k])=>!PC.menu[u].has(k)).map(([k,a])=>`<button class="muted" data-run="${k}" data-m="0">▸ ${a.exe.split('\\').slice(-1)[0]} käsitsi</button>`).join('');
+ let win='';
+ if(PC.win){
+  let body=PC.win.h||'';
+  if(PC.win.lao){body=`<table><tr><th>Kood</th><th>Toode</th><th>Kogus</th><th>Asukoht</th></tr>
+   <tr><td>1001</td><td>Paber A4 (500 lehte)</td><td>120</td><td>Ladu A</td></tr>
+   <tr><td>1002</td><td>Printeri toonerkassett</td><td>${PC.win.edit?`<input id="kogus" value="${PC.csv[1002]}">`:PC.csv[1002]}</td><td>Ladu A</td></tr>
+   <tr><td>1003</td><td>USB-C kaabel 1 m</td><td>45</td><td>Ladu B</td></tr></table>
+   <button class="btn ${PC.win.edit?'primary':''}" style="margin-top:8px;width:100%" id="save" ${PC.win.edit?'':'disabled'}>Salvesta</button>`+
+   (PC.win.msg?`<div class="box ${PC.win.bad?'bad':'ok'}" style="white-space:pre-wrap;font-size:12.5px">${PC.win.msg.replace(/</g,'&lt;')}</div>`:'');}
+  win=`<div class="win"><div class="tb">${PC.win.t}<button class="x" id="closeWin">✕</button></div><div class="bd">${body}</div></div>`;}
+ desk.innerHTML=`<div class="icons">${icons||'<span style="color:#fff;opacity:.7;font-size:11.5px">Töölaual otseteid pole</span>'}</div><div class="start"><b>Start-menüü</b>${menu||'<span style="opacity:.7">rühmade järgi paigaldatud programme pole</span>'}${manual?'<div style="border-top:1px solid rgba(255,255,255,.25);margin:5px 0"></div>'+manual:''}</div>${win}`;
+ tools.innerHTML=`<button class="btn sm" id="tGp">gpupdate /force</button><button class="btn sm" id="tWho">whoami /groups</button><button class="btn sm" id="tGr">gpresult /r</button><button class="btn sm" id="tNp">Notepad: laoseis.csv</button>${u==='mari'?'<button class="btn sm" id="tCopy">Käivita muudetud koopia (Labor 14B s10)</button>':''}<button class="btn sm primary" id="tOff" style="margin-left:auto">Logi välja</button><button class="btn sm" id="tRe">Logi välja ja uuesti sisse</button>`;
+ desk.querySelectorAll('[data-sc]').forEach(b=>b.onclick=()=>openShortcut(b.dataset.sc));
+ desk.querySelectorAll('[data-run]').forEach(b=>b.onclick=()=>runApp(b.dataset.run,b.dataset.m==='1'));
+ const cw=document.getElementById('closeWin');if(cw)cw.onclick=()=>{PC.win=null;draw();};
+ const sv=document.getElementById('save');if(sv)sv.onclick=saveLaoseis;
+ document.getElementById('tGp').onclick=gpupdate;document.getElementById('tWho').onclick=whoami;document.getElementById('tGr').onclick=gpresult;document.getElementById('tNp').onclick=notepad;
+ const cp=document.getElementById('tCopy');if(cp)cp.onclick=()=>{hd('Mari: muudetud koopia töölaualt');openLaoseis(true);draw();};
+ document.getElementById('tOff').onclick=logoff;document.getElementById('tRe').onclick=()=>{const x=PC.user;logoff();logon(x);};
+}
+function drawPending(){
+ const u=PC.user,p=document.getElementById('pend');if(!u){p.innerHTML='';return;}
+ const ad=adGroups(u),t=PC.tok[u];const plus=[...ad].filter(g=>!t.has(g)),minus=[...t].filter(g=>!ad.has(g));
+ p.innerHTML=(plus.length||minus.length)?`<div class="pending">⚠ <b>AD ja token erinevad.</b> AD-s ${plus.length?'lisandus: <code>'+plus.join('</code>, <code>')+'</code>':''}${plus.length&&minus.length?'; ':''}${minus.length?'eemaldati: <code>'+minus.join('</code>, <code>')+'</code>':''}. Tööjaam kasutab endiselt sisselogimisel loodud tokenit – muudatus jõuab kohale pärast <b>välja- ja sisselogimist</b>.</div>`:'';
+}
+function draw(){drawAGDLP();drawPC();drawPending();renderEv();}
+
+document.getElementById('resetAD').onclick=()=>{AD=defaults();OPT=defOpt();hd('Algseis taastatud');drawMatrix();drawOpts();draw();};
+
+/* ============ Ülesanded ============ */
+const QUIZ=[
+ {q:'Liis (Müük) peab hakkama VLC-d kasutama. Milline muudatus on AGDLP järgi õige?',
+  o:['Lisa GG_Myyk rühma DL_APP_VLC','Lisa liis.lepp otse AppLockeri VLC reeglisse','Lisa GG_Myyk GPO U_APP_VLC turvafiltrisse','Kustuta AppLockeri vaikereegli VideoLAN-i erand'],a:0,
+  e:'Mehhanismid (GPO turvafilter ja AppLocker) vaatavad ainult rühma DL_APP_VLC. Üks muudatus rühmade pesastuses annab nii paigalduse kui ka käivitamisõiguse. Otse kasutaja või GG-rühma lisamine mehhanismi lõhub AGDLP: järgmine kord pead muutma mitut kohta.',
+  set:()=>{}},
+ {q:'Lisasid Mari rühma GG_IT ja käskisid tal käivitada gpupdate /force. 7-Zipi ikka ei tule. Miks?',
+  o:['Rühmad on tokenis, mis loodi sisselogimisel; lisaks paigaldab tarkvara GPO ainult sisselogimisel – Mari peab välja ja sisse logima','AD replikatsioon kestab 24 tundi','gpupdate töötab ainult arvutipoliitikaga','7-Zip vajab arvuti taaskäivitust'],a:0,
+  e:'gpupdate töötleb GPO-d uuesti, aga sama juurdepääsuloaga – uus rühm pole seal. Tarkvara paigaldus käib lisaks ainult sisselogimisel. Simulaatoris: logi sisse kasutajana mari.maasikas, lisa ta rühma GG_IT, proovi gpupdate ja siis „Logi välja ja uuesti sisse“.',
+  set:()=>{setup('mari');}},
+ {q:'Muutsid GPO U_APP_7Zip turvafiltrit: eemaldasid Authenticated Users ja lisasid DL_APP_7Zip. Nüüd ei saa 7-Zipi ka Kati (IT). Mis on puudu?',
+  o:['Delegation vahekaardil Authenticated Users – Read','Kati peab olema Domain Admins rühmas','GPO tuleb linkida OU-le Arvutid','DL_APP_7Zip peab olema globaalrühm'],a:0,
+  e:'Alates MS16-072 uuendusest loeb klient kasutaja GPO-d arvutikonto õigustega. Kui Authenticated Users (kuhu kuuluvad ka arvutid) ei saa GPO-d lugeda, ei rakendu see kellelegi. Lahendus: Delegation → Authenticated Users → Read (ilma Apply-ta).',
+  set:()=>{OPT.deleg=false;setup('kati');}},
+ {q:'Kati viidi IT-st müüki (GG_IT → GG_Myyk). Ta logis uuesti sisse, aga 7-Zip ja VLC on alles. Miks?',
+  o:['Paketil pole märgitud „Uninstall this application when it falls out of the scope of management“','AppLocker hoiab programme alles','Müügil on samuti õigus 7-Zipile','Programmid eemaldatakse alles 30 päeva pärast'],a:0,
+  e:'Ilma selle valikuta GPO lihtsalt lõpetab rakendumise, aga juba paigaldatud programm jääb. VLC käivitamist keelab siiski AppLocker (Enforce), 7-Zipi mitte.',
+  set:()=>{OPT.uninst=false;logon('kati');AD.ug.kati=['GG_Myyk'];logoff();setup('kati');}},
+ {q:'AppLocker on režiimis Enforce rules, aga Liis saab VLC-d käivitada ja AppLockeri logis pole ühtki sündmust. Mis on kõige tõenäolisem põhjus?',
+  o:['Teenus Application Identity (AppIDSvc) ei tööta','Liis on DL_APP_VLC liige','Režiim peaks olema Audit only','VLC on 32-bitine'],a:0,
+  e:'AppLockeri reegleid jõustab teenus AppIDSvc. Kui see ei tööta, ei kontrollita midagi ja ka sündmusi ei teki. Pane GPO-s teenus Automatic ja taaskäivita arvuti.',
+  set:()=>{OPT.appid=false;logon('kati');logoff();setup('liis');}},
+ {q:'Mari muutis Laoseis.ps1 koopiat nii, et $muutja = $true. Nupp „Salvesta“ on aktiivne. Mis juhtub salvestamisel?',
+  o:['„Access … denied“ – NTFS lubab andmekaustas muuta ainult DL_APP_Laoseis_Muutja liikmetel','Salvestamine õnnestub, sest rakendus lubas','Rakendus parandab end ise ja nupp läheb halliks','AppLocker blokeerib PowerShelli'],a:0,
+  e:'Rakenduse kontroll IsInRole() on kasutajamugavus. Tõelise piiri annab server: NTFS kontrollib Mari tokenit faili kirjutamisel sõltumata sellest, kas kirjutab Laoseis, muudetud koopia või Notepad.',
+  set:()=>{setup('mari');}},
+ {q:'Liis avab töölaualt „Intranet“ ja brauser küsib kasutajanime ja parooli. Pärast sisestamist leht avaneb. Mis on valesti seadistatud?',
+  o:['Sait pole Local Intranet tsoonis (U_Intranet_Tsoon)','Liis pole DL_APP_Intranet liige','IIS-is on anonüümne autentimine sees','SPN on kaks korda registreeritud'],a:0,
+  e:'Brauser saadab domeenikasutaja volitused automaatselt ainult Local Intranet tsooni saitidele. Kui leht pärast parooli sisestamist avaneb, on autoriseerimine korras – probleem on ainult tsoonis. Kirjuta tsooni nimekirja veeb.perenimi.local ilma protokollita.',
+  set:()=>{OPT.zone=false;setup('liis');}},
+ {q:'IT peab laoseisu nägema, aga mitte muutma. Mis on õige muudatus?',
+  o:['Lisa GG_IT rühma DL_APP_Laoseis','Lisa GG_IT rühma DL_APP_Laoseis_Muutja','Anna kati.karu-le NTFS Read õigus kaustale andmed','Lisa GG_IT rühma DL_Raamatupidamine_R'],a:0,
+  e:'DL_APP_Laoseis annab otsetee, rakenduse käivitamise ja andmete lugemise; muutmisõigus on eraldi rühmas. Proovi simulaatoris: lisa GG_IT → DL_APP_Laoseis, logi Kati välja ja sisse ning ava Laoseis.',
+  set:()=>{setup('kati');}}
+];
+function setup(u){PC.user=null;PC.win=null;sel=u;drawOpts();drawMatrix();}
+let qs={ok:0,n:0};
+function drawQuiz(){
+ document.getElementById('quiz').innerHTML=QUIZ.map((x,i)=>`<div class="q card"><b>${i+1}. ${x.q}</b><div class="opts">${x.o.map((t,j)=>({t,j})).sort((a,b)=>((a.j*7+i*3)%5)-((b.j*7+i*3)%5)).map(o=>`<button data-q="${i}" data-a="${o.j}">${o.t}</button>`).join('')}</div><div id="fb${i}"></div></div>`).join('');
+ document.querySelectorAll('.q .opts button').forEach(b=>b.onclick=()=>{
+  const i=+b.dataset.q,x=QUIZ[i];const box=b.parentElement;if(box.dataset.done)return;box.dataset.done=1;
+  const ok=+b.dataset.a===x.a;qs.n++;if(ok)qs.ok++;
+  box.querySelectorAll('button').forEach(z=>{if(+z.dataset.a===x.a)z.classList.add('right');else if(z===b)z.classList.add('wrong');});
+  document.getElementById('fb'+i).innerHTML=`<div class="box ${ok?'ok':'bad'}"><b class="h">${ok?'✔ Õige':'✘ Vale'}</b>${x.e}</div><button class="btn sm" style="margin-top:8px" data-try="${i}">Proovi simulaatoris ›</button>`;
+  document.querySelector(`[data-try="${i}"]`).onclick=()=>{AD=defaults();OPT=defOpt();PC={files:new Set(),menu:{kati:new Set(),mari:new Set(),liis:new Set()},sc:{kati:new Set(),mari:new Set(),liis:new Set()},tok:{},user:null,win:null,csv:{1002:8}};EV=[];x.set();hd('Ülesanne '+(i+1)+': '+x.q);switchTab('sim');draw();};
+  document.getElementById('qscore').textContent=`Õigesti ${qs.ok} / ${qs.n}`;});
+}
+function switchTab(t){document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));document.getElementById('simView').hidden=t!=='sim';document.getElementById('quizView').hidden=t!=='quiz';window.scrollTo(0,0);}
+document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>switchTab(b.dataset.t));
+
+drawMatrix();drawOpts();drawQuiz();draw();
+</script>
+</body>
+</html>
